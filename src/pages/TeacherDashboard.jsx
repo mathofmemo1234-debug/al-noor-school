@@ -209,13 +209,112 @@ function WeeklyPlan() {
 }
 
 function Assignments() {
+  const [assignments, setAssignments] = useState([]);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    
+    const q = query(
+      collection(db, 'assignments'),
+      where('teacherId', '==', auth.currentUser.uid)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = [];
+      snapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() });
+      });
+      setAssignments(data);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleAddAssignment = async (e) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newDueDate || !auth.currentUser) return;
+    
+    setIsAdding(true);
+    try {
+      await addDoc(collection(db, 'assignments'), {
+        title: newTitle,
+        dueDate: newDueDate,
+        teacherId: auth.currentUser.uid,
+        createdAt: new Date().toISOString()
+      });
+      setNewTitle('');
+      setNewDueDate('');
+    } catch (error) {
+      console.error("Error adding assignment:", error);
+      alert('حدث خطأ أثناء إضافة الواجب');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const deleteAssignment = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'assignments', id));
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+    }
+  };
+
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>إدارة الواجبات</h2>
-        <button className="btn btn-primary"><Plus size={18} /> واجب جديد</button>
       </div>
-      <p style={{ color: 'var(--color-text-muted)' }}>لا توجد واجبات مضافة حالياً. ابدأ بإضافة واجب جديد للطلاب.</p>
+      
+      <form onSubmit={handleAddAssignment} style={{ display: 'flex', gap: '10px', marginBottom: '20px', background: 'white', padding: '16px', borderRadius: '8px' }}>
+        <input 
+          type="text" 
+          placeholder="عنوان الواجب (مثال: حل تمارين صـ 15)" 
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          style={{ flex: 2, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+          required
+        />
+        <input 
+          type="date" 
+          value={newDueDate}
+          onChange={(e) => setNewDueDate(e.target.value)}
+          style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+          required
+        />
+        <button type="submit" className="btn btn-primary" disabled={isAdding}>
+          <Plus size={16} /> إضافة واجب
+        </button>
+      </form>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {assignments.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>لا توجد واجبات مضافة حالياً.</p>
+        ) : (
+          assignments.map(assignment => (
+            <div key={assignment.id} style={{ 
+              background: 'white', 
+              padding: '16px', 
+              borderRadius: '8px', 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center', 
+              borderLeft: '4px solid var(--color-primary)'
+            }}>
+              <div>
+                <h4 style={{ margin: '0 0 5px 0' }}>{assignment.title}</h4>
+                <small style={{ color: 'var(--color-text-muted)' }}>آخر موعد للتسليم: {assignment.dueDate}</small>
+              </div>
+              <button onClick={() => deleteAssignment(assignment.id)} style={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}>
+                <Trash2 size={18} />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
