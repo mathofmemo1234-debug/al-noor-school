@@ -150,6 +150,10 @@ function ManageStudents() {
   return <div className="glass-panel" style={{ padding: '24px' }}><h2>إدارة الطلاب</h2><p>سيتم عرض قائمة الطلاب هنا مع إمكانية التعديل والإضافة.</p></div>;
 }
 
+function ManageClasses() {
+  return <div className="glass-panel" style={{ padding: '24px' }}><h2>الفصول الدراسية</h2><p>هنا يمكنك إضافة وإدارة الفصول الدراسية وتوزيع الطلاب عليها.</p></div>;
+}
+
 export default function AdminDashboard() {
   return (
     <Layout role="admin" title="لوحة تحكم الإدارة">
@@ -157,6 +161,7 @@ export default function AdminDashboard() {
         <Route path="/" element={<AdminHome />} />
         <Route path="/teachers" element={<ManageTeachers />} />
         <Route path="/students" element={<ManageStudents />} />
+        <Route path="/classes" element={<ManageClasses />} />
         <Route path="*" element={<AdminHome />} />
       </Routes>
     </Layout>
