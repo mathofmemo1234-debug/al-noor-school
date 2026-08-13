@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -19,17 +19,23 @@ export function AuthProvider({ children }) {
       setCurrentUser(user);
       if (user) {
         try {
-          // Fetch user role from Firestore
-          const docRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            setUserRole(docSnap.data().role);
+          // Admin override based on email for safety
+          if (user.email === 'admin@admin.com' || user.email === 'admin@school.edu.sa') {
+            setUserRole('admin');
           } else {
-            setUserRole('student'); // fallback
+            // Fetch user role from Firestore by email
+            const q = query(collection(db, 'users'), where('email', '==', user.email));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+              setUserRole(querySnapshot.docs[0].data().role);
+            } else {
+              setUserRole('student'); // fallback
+            }
           }
         } catch (error) {
           console.error("Error fetching role:", error);
-          setUserRole('admin'); // Fallback for dev purposes if rules block access
+          setUserRole('student'); // Fallback
         }
       } else {
         setUserRole(null);
