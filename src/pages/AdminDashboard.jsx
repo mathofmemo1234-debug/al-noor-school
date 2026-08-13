@@ -148,6 +148,7 @@ function ManageTeachers() {
 
 function ManageStudents() {
   const [students, setStudents] = useState([]);
+  const [classesList, setClassesList] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -155,16 +156,20 @@ function ManageStudents() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'students'), (snap) => {
+    const unsubStudents = onSnapshot(collection(db, 'students'), (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setStudents(data);
     });
-    return () => unsub();
+    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setClassesList(data);
+    });
+    return () => { unsubStudents(); unsubClasses(); };
   }, []);
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!name || !email) return;
+    if (!name || !email || !studentClass) return;
     setIsSaving(true);
     try {
       await addDoc(collection(db, 'students'), {
@@ -223,7 +228,12 @@ function ManageStudents() {
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>الفصل الدراسي</label>
-                <input type="text" className="input-field" value={studentClass} onChange={e => setStudentClass(e.target.value)} placeholder="مثال: 1/أ" required />
+                <select className="input-field" value={studentClass} onChange={e => setStudentClass(e.target.value)} required>
+                  <option value="">اختر الفصل...</option>
+                  {classesList.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
               </div>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
             </form>
