@@ -1,0 +1,19 @@
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA-BaaAqrzeFzHiZpmNEwAeEB6Igd6QWKc",
+  authDomain: "advanced-smart-learning-3dfbf.firebaseapp.com",
+  databaseURL: "https://advanced-smart-learning-3dfbf-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "advanced-smart-learning-3dfbf",
+  storageBucket: "advanced-smart-learning-3dfbf.firebasestorage.app",
+  messagingSenderId: "210401728875",
+  appId: "1:210401728875:web:e7bf2d6626ac6d4d85542e"
+};
+
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
