@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { CheckSquare, Plus, Save } from 'lucide-react';
+import { db, auth } from '../firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 function TeacherTasks() {
   return (
@@ -26,12 +28,58 @@ function TeacherTasks() {
 
 function WeeklyPlan() {
   const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-  
+  const [plan, setPlan] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load existing plan (optional, but good for UX)
+  React.useEffect(() => {
+    const fetchPlan = async () => {
+      if (!auth.currentUser) return;
+      const docRef = doc(db, 'weekly_plans', auth.currentUser.uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        setPlan(snap.data().plan || {});
+      }
+    };
+    fetchPlan();
+  }, []);
+
+  const handleChange = (day, field, value) => {
+    setPlan(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSave = async () => {
+    if (!auth.currentUser) return alert('يجب تسجيل الدخول أولاً');
+    setIsSaving(true);
+    try {
+      const docRef = doc(db, 'weekly_plans', auth.currentUser.uid);
+      await setDoc(docRef, { 
+        teacherId: auth.currentUser.uid,
+        plan: plan,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      alert('تم حفظ الخطة الأسبوعية بنجاح!');
+    } catch (error) {
+      console.error("Error saving plan:", error);
+      alert('حدث خطأ أثناء الحفظ. (ربما بسبب صلاحيات Firebase)');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2>الخطة الأسبوعية</h2>
-        <button className="btn btn-primary"><Save size={18} /> حفظ الخطة</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
+          <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ الخطة'}
+        </button>
       </div>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -42,11 +90,21 @@ function WeeklyPlan() {
             <div style={{ display: 'flex', gap: '16px' }}>
               <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                 <label>موضوع الدرس</label>
-                <input type="text" placeholder="اكتب عنوان وموضوع الدرس هنا..." />
+                <input 
+                  type="text" 
+                  placeholder="اكتب عنوان وموضوع الدرس هنا..." 
+                  value={plan[day]?.topic || ''}
+                  onChange={(e) => handleChange(day, 'topic', e.target.value)}
+                />
               </div>
               <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                 <label>الأهداف التعليمية</label>
-                <input type="text" placeholder="ما الذي سيتعلمه الطالب؟" />
+                <input 
+                  type="text" 
+                  placeholder="ما الذي سيتعلمه الطالب؟" 
+                  value={plan[day]?.goals || ''}
+                  onChange={(e) => handleChange(day, 'goals', e.target.value)}
+                />
               </div>
             </div>
             
