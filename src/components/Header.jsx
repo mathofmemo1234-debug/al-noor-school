@@ -2,12 +2,13 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Bell } from 'lucide-react';
 
-export default function Header({ title }) {
+export default function Header({ title, role }) {
   const { currentUser, userRole } = useAuth();
   
   // Format role for display
-  const displayRole = userRole === 'admin' ? 'مدير النظام' : 
-                      userRole === 'teacher' ? 'معلم' : 'طالب';
+  const effectiveRole = role || userRole;
+  const displayRole = effectiveRole === 'admin' ? 'مدير النظام' : 
+                      effectiveRole === 'teacher' ? 'معلم' : 'طالب';
 
   return (
     <header className="top-header">

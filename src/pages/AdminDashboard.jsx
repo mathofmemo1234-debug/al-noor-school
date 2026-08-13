@@ -6,13 +6,7 @@ import { db } from '../firebase';
 import { collection, addDoc, onSnapshot } from 'firebase/firestore';
 
 function AdminHome() {
-  const [modalType, setModalType] = useState(null); // 'teacher' or 'student'
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [extraInfo, setExtraInfo] = useState(''); // Subject for teacher, Class for student
-  const [isSaving, setIsSaving] = useState(false);
-
-  const [stats, setStats] = useState({ teachers: 0, students: 0 });
+  const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0 });
 
   useEffect(() => {
     const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
@@ -21,41 +15,11 @@ function AdminHome() {
     const unsubStudents = onSnapshot(collection(db, 'students'), (snap) => {
       setStats(prev => ({ ...prev, students: snap.size }));
     });
-    return () => { unsubTeachers(); unsubStudents(); };
+    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+      setStats(prev => ({ ...prev, classes: snap.size }));
+    });
+    return () => { unsubTeachers(); unsubStudents(); unsubClasses(); };
   }, []);
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-    if (!name || !email) return;
-    setIsSaving(true);
-    try {
-      const collectionName = modalType === 'teacher' ? 'teachers' : 'students';
-      await addDoc(collection(db, collectionName), {
-        name,
-        email,
-        [modalType === 'teacher' ? 'subject' : 'class']: extraInfo,
-        createdAt: new Date().toISOString()
-      });
-      
-      // Also add to 'users' collection so they have a role when they sign up
-      await addDoc(collection(db, 'users'), {
-        email,
-        role: modalType,
-        name
-      });
-
-      alert(`تم إضافة ${modalType === 'teacher' ? 'المعلم' : 'الطالب'} بنجاح!`);
-      setModalType(null);
-      setName('');
-      setEmail('');
-      setExtraInfo('');
-    } catch (error) {
-      console.error("Error adding user:", error);
-      alert('تعذر الحفظ، يرجى التحقق من صلاحيات Firebase.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   return (
     <div>
@@ -86,54 +50,94 @@ function AdminHome() {
           </div>
           <div className="stat-info">
             <p>الفصول الدراسية</p>
-            <h3>32</h3>
+            <h3>{stats.classes}</h3>
           </div>
         </div>
       </div>
-      
-      <div className="glass-panel" style={{ padding: '24px' }}>
-        <h2 style={{ marginBottom: '20px' }}>الإجراءات السريعة</h2>
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <button className="btn btn-primary" onClick={() => setModalType('teacher')}>
-            <UserPlus size={18} /> إضافة معلم جديد
-          </button>
-          <button className="btn btn-secondary" onClick={() => setModalType('student')}>
-            <UserPlus size={18} /> تسجيل طالب
-          </button>
-        </div>
+    </div>
+  );
+}
+
+function ManageTeachers() {
+  const [teachers, setTeachers] = useState([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [subject, setSubject] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'teachers'), (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setTeachers(data);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name || !email) return;
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, 'teachers'), {
+        name, email, subject, role: 'teacher', createdAt: new Date()
+      });
+      await addDoc(collection(db, 'users'), {
+        email, role: 'teacher', name
+      });
+      setIsAdding(false);
+      setName(''); setEmail(''); setSubject('');
+    } catch (err) {
+      console.error(err);
+      alert('خطأ في الحفظ. تأكد من الصلاحيات.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel" style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>إدارة المعلمين</h2>
+        <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
+          إضافة معلم جديد
+        </button>
       </div>
 
-      {modalType && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
+      <div style={{ display: 'grid', gap: '12px' }}>
+        {teachers.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)' }}>لا يوجد معلمين مضافين بعد.</p>
+        ) : (
+          teachers.map(t => (
+            <div key={t.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{t.name}</h3>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>{t.email} • {t.subject}</p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {isAdding && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
-            <button 
-              onClick={() => setModalType(null)} 
-              style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              <X size={20} />
-            </button>
-            <h2 style={{ marginBottom: '20px' }}>
-              {modalType === 'teacher' ? 'إضافة معلم جديد' : 'تسجيل طالب جديد'}
-            </h2>
-            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <div className="form-group">
-                <label>الاسم الرباعي</label>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} required />
+            <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>إضافة معلم جديد</h3>
+            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم المعلم</label>
+                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="الاسم الرباعي" required />
               </div>
-              <div className="form-group">
-                <label>البريد الإلكتروني</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>البريد الإلكتروني</label>
+                <input type="email" className="input-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" required />
               </div>
-              <div className="form-group">
-                <label>{modalType === 'teacher' ? 'المادة الدراسية' : 'الفصل الدراسي'}</label>
-                <input type="text" value={extraInfo} onChange={e => setExtraInfo(e.target.value)} required />
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>المادة الدراسية</label>
+                <input type="text" className="input-field" value={subject} onChange={e => setSubject(e.target.value)} placeholder="رياضيات، لغتي، الخ..." required />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                {isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}
-              </button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
             </form>
           </div>
         </div>
@@ -142,12 +146,92 @@ function AdminHome() {
   );
 }
 
-function ManageTeachers() {
-  return <div className="glass-panel" style={{ padding: '24px' }}><h2>إدارة المعلمين</h2><p>سيتم عرض قائمة المعلمين هنا مع إمكانية التعديل والإضافة.</p></div>;
-}
-
 function ManageStudents() {
-  return <div className="glass-panel" style={{ padding: '24px' }}><h2>إدارة الطلاب</h2><p>سيتم عرض قائمة الطلاب هنا مع إمكانية التعديل والإضافة.</p></div>;
+  const [students, setStudents] = useState([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [studentClass, setStudentClass] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'students'), (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setStudents(data);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name || !email) return;
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, 'students'), {
+        name, email, class: studentClass, role: 'student', createdAt: new Date()
+      });
+      await addDoc(collection(db, 'users'), {
+        email, role: 'student', name
+      });
+      setIsAdding(false);
+      setName(''); setEmail(''); setStudentClass('');
+    } catch (err) {
+      console.error(err);
+      alert('خطأ في الحفظ. تأكد من الصلاحيات.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel" style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>إدارة الطلاب</h2>
+        <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
+          تسجيل طالب
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gap: '12px' }}>
+        {students.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)' }}>لا يوجد طلاب مضافين بعد.</p>
+        ) : (
+          students.map(s => (
+            <div key={s.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{s.name}</h3>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>{s.email} • فصل: {s.class}</p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {isAdding && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+            <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>تسجيل طالب جديد</h3>
+            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم الطالب</label>
+                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="الاسم الرباعي" required />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>البريد الإلكتروني</label>
+                <input type="email" className="input-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" required />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>الفصل الدراسي</label>
+                <input type="text" className="input-field" value={studentClass} onChange={e => setStudentClass(e.target.value)} placeholder="مثال: 1/أ" required />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ManageClasses() {
