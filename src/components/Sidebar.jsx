@@ -33,6 +33,7 @@ export default function Sidebar({ role }) {
 
   const studentLinks = [
     { path: '/student', icon: Home, label: 'الرئيسية' },
+    { path: '/student/weekly-plan', icon: Calendar, label: 'الخطة الأسبوعية' },
     { path: '/student/schedule', icon: Calendar, label: 'الجدول الدراسي' },
     { path: '/student/assignments', icon: BookOpen, label: 'الواجبات' },
     { path: '/student/materials', icon: BookOpen, label: 'الملخصات' },

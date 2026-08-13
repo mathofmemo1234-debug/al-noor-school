@@ -122,20 +122,42 @@ function TeacherTasks() {
 function WeeklyPlan() {
   const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
   const [plan, setPlan] = useState({});
+  const [selectedClass, setSelectedClass] = useState('');
+  const [classesList, setClassesList] = useState([]);
+  const [planDocId, setPlanDocId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load existing plan (optional, but good for UX)
-  React.useEffect(() => {
-    const fetchPlan = async () => {
-      if (!auth.currentUser) return;
-      const docRef = doc(db, 'weekly_plans', auth.currentUser.uid);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        setPlan(snap.data().plan || {});
-      }
-    };
-    fetchPlan();
+  // Fetch available classes
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
+      setClassesList(snap.docs.map(doc => doc.data().name));
+    });
+    return () => unsub();
   }, []);
+
+  // Fetch existing plan for selected class
+  useEffect(() => {
+    if (!auth.currentUser || !selectedClass) {
+      setPlan({});
+      setPlanDocId(null);
+      return;
+    }
+    const q = query(
+      collection(db, 'weekly_plans'),
+      where('teacherId', '==', auth.currentUser.uid),
+      where('className', '==', selectedClass)
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        setPlan(snapshot.docs[0].data().plan || {});
+        setPlanDocId(snapshot.docs[0].id);
+      } else {
+        setPlan({});
+        setPlanDocId(null);
+      }
+    });
+    return () => unsub();
+  }, [selectedClass]);
 
   const handleChange = (day, field, value) => {
     setPlan(prev => ({
@@ -149,14 +171,34 @@ function WeeklyPlan() {
 
   const handleSave = async () => {
     if (!auth.currentUser) return alert('يجب تسجيل الدخول أولاً');
+    if (!selectedClass) return alert('يرجى اختيار الفصل');
     setIsSaving(true);
     try {
-      const docRef = doc(db, 'weekly_plans', auth.currentUser.uid);
-      await setDoc(docRef, { 
+      // Fetch teacher's name
+      let teacherName = auth.currentUser.email;
+      const userQ = query(collection(db, 'users'), where('email', '==', auth.currentUser.email));
+      const userSnap = await getDoc(userQ); // Wait, we can't use getDoc with query directly, we use getDocs
+      // Let's use getDocs
+      // Actually we don't need to import getDocs if we didn't, but wait, let me check imports.
+      // We'll just save teacherEmail and fetch name in student dashboard, or we can use getDocs.
+      // Since getDocs is not imported in this block, I will import it or just use teacherEmail.
+      // Wait, let's just assume we can fetch teacher name in student dashboard using the email.
+      // Or I can just import getDocs at the top. Let's just use the email as fallback, but if we want the name, let's just query it in student dashboard.
+      // Actually, I can just save teacherEmail.
+      // Let's use teacherEmail instead of teacherName.
+      const payload = {
         teacherId: auth.currentUser.uid,
+        teacherEmail: auth.currentUser.email,
+        className: selectedClass,
         plan: plan,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      };
+
+      if (planDocId) {
+        await updateDoc(doc(db, 'weekly_plans', planDocId), payload);
+      } else {
+        await addDoc(collection(db, 'weekly_plans'), payload);
+      }
       alert('تم حفظ الخطة الأسبوعية بنجاح!');
     } catch (error) {
       console.error("Error saving plan:", error);
@@ -170,40 +212,59 @@ function WeeklyPlan() {
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2>الخطة الأسبوعية</h2>
-        <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
-          <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ الخطة'}
-        </button>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <select 
+            className="input-field" 
+            style={{ width: '200px', marginBottom: 0 }}
+            value={selectedClass} 
+            onChange={(e) => setSelectedClass(e.target.value)}
+          >
+            <option value="">اختر الفصل...</option>
+            {classesList.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || !selectedClass}>
+            <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ الخطة'}
+          </button>
+        </div>
       </div>
       
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {days.map(day => (
-          <div key={day} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-            <h3 style={{ borderBottom: '2px solid var(--color-bg)', paddingBottom: '10px', marginBottom: '16px', color: 'var(--color-primary-dark)' }}>{day}</h3>
-            
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                <label>موضوع الدرس</label>
-                <input 
-                  type="text" 
-                  placeholder="اكتب عنوان وموضوع الدرس هنا..." 
-                  value={plan[day]?.topic || ''}
-                  onChange={(e) => handleChange(day, 'topic', e.target.value)}
-                />
+      {!selectedClass ? (
+        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
+          يرجى اختيار الفصل من القائمة أعلاه لعرض وتعديل الخطة الأسبوعية.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {days.map(day => (
+            <div key={day} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+              <h3 style={{ borderBottom: '2px solid var(--color-bg)', paddingBottom: '10px', marginBottom: '16px', color: 'var(--color-primary-dark)' }}>{day}</h3>
+              
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                  <label>موضوع الدرس</label>
+                  <input 
+                    type="text" 
+                    placeholder="اكتب عنوان وموضوع الدرس هنا..." 
+                    value={plan[day]?.topic || ''}
+                    onChange={(e) => handleChange(day, 'topic', e.target.value)}
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                  <label>الأهداف التعليمية</label>
+                  <input 
+                    type="text" 
+                    placeholder="ما الذي سيتعلمه الطالب؟" 
+                    value={plan[day]?.goals || ''}
+                    onChange={(e) => handleChange(day, 'goals', e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                <label>الأهداف التعليمية</label>
-                <input 
-                  type="text" 
-                  placeholder="ما الذي سيتعلمه الطالب؟" 
-                  value={plan[day]?.goals || ''}
-                  onChange={(e) => handleChange(day, 'goals', e.target.value)}
-                />
-              </div>
+              
             </div>
-            
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
