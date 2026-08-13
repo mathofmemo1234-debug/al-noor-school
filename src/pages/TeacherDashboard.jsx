@@ -271,16 +271,30 @@ function WeeklyPlan() {
 
 function Assignments() {
   const [assignments, setAssignments] = useState([]);
+  const [classesList, setClassesList] = useState([]);
+  const [selectedClass, setSelectedClass] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
+  // Fetch available classes
   useEffect(() => {
-    if (!auth.currentUser) return;
+    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
+      setClassesList(snap.docs.map(doc => doc.data().name));
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!auth.currentUser || !selectedClass) {
+      setAssignments([]);
+      return;
+    }
     
     const q = query(
       collection(db, 'assignments'),
-      where('teacherId', '==', auth.currentUser.uid)
+      where('teacherId', '==', auth.currentUser.uid),
+      where('className', '==', selectedClass)
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -292,11 +306,11 @@ function Assignments() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [selectedClass]);
 
   const handleAddAssignment = async (e) => {
     e.preventDefault();
-    if (!newTitle.trim() || !newDueDate || !auth.currentUser) return;
+    if (!newTitle.trim() || !newDueDate || !auth.currentUser || !selectedClass) return;
     
     setIsAdding(true);
     try {
@@ -304,6 +318,8 @@ function Assignments() {
         title: newTitle,
         dueDate: newDueDate,
         teacherId: auth.currentUser.uid,
+        teacherEmail: auth.currentUser.email,
+        className: selectedClass,
         createdAt: new Date().toISOString()
       });
       setNewTitle('');
@@ -326,69 +342,240 @@ function Assignments() {
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2>إدارة الواجبات</h2>
+        <select 
+          className="input-field" 
+          style={{ width: '200px', marginBottom: 0 }}
+          value={selectedClass} 
+          onChange={(e) => setSelectedClass(e.target.value)}
+        >
+          <option value="">اختر الفصل...</option>
+          {classesList.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
       </div>
       
-      <form onSubmit={handleAddAssignment} style={{ display: 'flex', gap: '10px', marginBottom: '20px', background: 'white', padding: '16px', borderRadius: '8px' }}>
-        <input 
-          type="text" 
-          placeholder="عنوان الواجب (مثال: حل تمارين صـ 15)" 
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          style={{ flex: 2, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
-          required
-        />
-        <input 
-          type="date" 
-          value={newDueDate}
-          onChange={(e) => setNewDueDate(e.target.value)}
-          style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
-          required
-        />
-        <button type="submit" className="btn btn-primary" disabled={isAdding}>
-          <Plus size={16} /> إضافة واجب
-        </button>
-      </form>
+      {!selectedClass ? (
+        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
+          يرجى اختيار الفصل لعرض وإضافة الواجبات.
+        </p>
+      ) : (
+        <>
+          <form onSubmit={handleAddAssignment} style={{ display: 'flex', gap: '10px', marginBottom: '20px', background: 'white', padding: '16px', borderRadius: '8px' }}>
+            <input 
+              type="text" 
+              placeholder="عنوان الواجب (مثال: حل تمارين صـ 15)" 
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              style={{ flex: 2, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+              required
+            />
+            <input 
+              type="date" 
+              value={newDueDate}
+              onChange={(e) => setNewDueDate(e.target.value)}
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+              required
+            />
+            <button type="submit" className="btn btn-primary" disabled={isAdding}>
+              <Plus size={16} /> إضافة واجب
+            </button>
+          </form>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {assignments.length === 0 ? (
-          <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>لا توجد واجبات مضافة حالياً.</p>
-        ) : (
-          assignments.map(assignment => (
-            <div key={assignment.id} style={{ 
-              background: 'white', 
-              padding: '16px', 
-              borderRadius: '8px', 
-              display: 'flex', 
-              justifyContent: 'space-between',
-              alignItems: 'center', 
-              borderLeft: '4px solid var(--color-primary)'
-            }}>
-              <div>
-                <h4 style={{ margin: '0 0 5px 0' }}>{assignment.title}</h4>
-                <small style={{ color: 'var(--color-text-muted)' }}>آخر موعد للتسليم: {assignment.dueDate}</small>
-              </div>
-              <button onClick={() => deleteAssignment(assignment.id)} style={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}>
-                <Trash2 size={18} />
-              </button>
-            </div>
-          ))
-        )}
-      </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {assignments.length === 0 ? (
+              <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>لا توجد واجبات مضافة حالياً.</p>
+            ) : (
+              assignments.map(assignment => (
+                <div key={assignment.id} style={{ 
+                  background: 'white', 
+                  padding: '16px', 
+                  borderRadius: '8px', 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center', 
+                  borderLeft: '4px solid var(--color-primary)'
+                }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 5px 0' }}>{assignment.title}</h4>
+                    <small style={{ color: 'var(--color-text-muted)' }}>آخر موعد للتسليم: {assignment.dueDate}</small>
+                  </div>
+                  <button onClick={() => deleteAssignment(assignment.id)} style={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}>
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 function Attendance() {
+  const [classesList, setClassesList] = useState([]);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [students, setStudents] = useState([]);
+  const [attendanceRecords, setAttendanceRecords] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // Fetch available classes
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
+      setClassesList(snap.docs.map(doc => doc.data().name));
+    });
+    return () => unsub();
+  }, []);
+
+  // Fetch students for the selected class and any existing attendance for today
+  useEffect(() => {
+    if (!selectedClass) {
+      setStudents([]);
+      setAttendanceRecords({});
+      return;
+    }
+    
+    // Better to use onSnapshot for students
+    const sq = query(collection(db, 'students'), where('class', '==', selectedClass));
+    const unsubStudents = onSnapshot(sq, (snap) => {
+      setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    // And onSnapshot for today's attendance
+    const aq = query(
+      collection(db, 'attendance'),
+      where('className', '==', selectedClass),
+      where('date', '==', today)
+    );
+    const unsubAttendance = onSnapshot(aq, (snap) => {
+      if (!snap.empty) {
+        setAttendanceRecords(snap.docs[0].data().records || {});
+      } else {
+        setAttendanceRecords({});
+      }
+    });
+
+    return () => {
+      unsubStudents();
+      unsubAttendance();
+    };
+  }, [selectedClass, today]);
+
+  const handleStatusChange = (studentId, status) => {
+    setAttendanceRecords(prev => ({
+      ...prev,
+      [studentId]: status
+    }));
+  };
+
+  const handleSaveAttendance = async () => {
+    if (!auth.currentUser || !selectedClass) return;
+    setIsSaving(true);
+    try {
+      // We check if a doc already exists for today and this class to update or add new
+      // We can use a deterministic ID like `${selectedClass}_${today}`
+      const docId = `${selectedClass.replace(/\//g, '-')}_${today}`;
+      const docRef = doc(db, 'attendance', docId);
+      
+      await setDoc(docRef, {
+        className: selectedClass,
+        date: today,
+        teacherId: auth.currentUser.uid,
+        records: attendanceRecords,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      
+      alert('تم حفظ سجل الغياب والحضور بنجاح!');
+    } catch (error) {
+      console.error("Error saving attendance:", error);
+      alert('حدث خطأ أثناء الحفظ');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <h2>سجل الغياب والحضور</h2>
-      <p style={{ color: 'var(--color-text-muted)' }}>اختر الفصل الدراسي لتسجيل الحضور والغياب لليوم.</p>
-      {/* Table placeholder */}
-      <div style={{ background: 'white', borderRadius: '8px', padding: '20px', marginTop: '20px', textAlign: 'center' }}>
-        سيتم عرض قائمة الطلاب هنا
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h2>سجل الغياب والحضور - اليوم: {today}</h2>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <select 
+            className="input-field" 
+            style={{ width: '200px', marginBottom: 0 }}
+            value={selectedClass} 
+            onChange={(e) => setSelectedClass(e.target.value)}
+          >
+            <option value="">اختر الفصل...</option>
+            {classesList.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <button className="btn btn-primary" onClick={handleSaveAttendance} disabled={isSaving || !selectedClass}>
+            <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ السجل'}
+          </button>
+        </div>
       </div>
+      
+      {!selectedClass ? (
+        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
+          يرجى اختيار الفصل لعرض قائمة الطلاب وتسجيل الحضور.
+        </p>
+      ) : students.length === 0 ? (
+        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
+          لا يوجد طلاب مسجلين في هذا الفصل حالياً.
+        </p>
+      ) : (
+        <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <tr>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>اسم الطالب</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>حاضر</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>غائب</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>متأخر</th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map(student => (
+                <tr key={student.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '12px 16px', fontWeight: '500' }}>{student.name}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <input 
+                      type="radio" 
+                      name={`status_${student.id}`} 
+                      checked={attendanceRecords[student.id] === 'present'}
+                      onChange={() => handleStatusChange(student.id, 'present')}
+                      style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                    />
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <input 
+                      type="radio" 
+                      name={`status_${student.id}`} 
+                      checked={attendanceRecords[student.id] === 'absent'}
+                      onChange={() => handleStatusChange(student.id, 'absent')}
+                      style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                    />
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <input 
+                      type="radio" 
+                      name={`status_${student.id}`} 
+                      checked={attendanceRecords[student.id] === 'late'}
+                      onChange={() => handleStatusChange(student.id, 'late')}
+                      style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

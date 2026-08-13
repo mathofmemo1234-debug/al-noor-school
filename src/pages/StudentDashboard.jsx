@@ -13,12 +13,9 @@ function StudentHome() {
   );
 }
 
-function StudentWeeklyPlan() {
+function useStudentClass() {
   const [studentClass, setStudentClass] = useState(null);
-  const [plans, setPlans] = useState([]);
-  const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-
-  // Fetch student's class
+  
   useEffect(() => {
     const fetchClass = async () => {
       if (!auth.currentUser) return;
@@ -31,7 +28,14 @@ function StudentWeeklyPlan() {
     fetchClass();
   }, []);
 
-  // Fetch plans for that class
+  return studentClass;
+}
+
+function StudentWeeklyPlan() {
+  const studentClass = useStudentClass();
+  const [plans, setPlans] = useState([]);
+  const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+
   useEffect(() => {
     if (!studentClass) return;
     const q = query(collection(db, 'weekly_plans'), where('className', '==', studentClass));
@@ -82,12 +86,84 @@ function StudentWeeklyPlan() {
   );
 }
 
+function StudentAssignments() {
+  const studentClass = useStudentClass();
+  const [assignments, setAssignments] = useState([]);
+
+  useEffect(() => {
+    if (!studentClass) return;
+    const q = query(collection(db, 'assignments'), where('className', '==', studentClass));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const data = [];
+      snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
+      setAssignments(data);
+    });
+    return () => unsub();
+  }, [studentClass]);
+
+  if (!studentClass) {
+    return <div className="glass-panel" style={{ padding: '24px' }}>جاري تحميل البيانات...</div>;
+  }
+
+  return (
+    <div className="glass-panel" style={{ padding: '24px' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h2>الواجبات - فصل {studentClass}</h2>
+        <p style={{ color: 'var(--color-text-muted)' }}>تجد هنا جميع الواجبات المطلوبة من معلمي فصلك.</p>
+      </div>
+
+      {assignments.length === 0 ? (
+        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>
+          لا توجد واجبات مضافة لهذا الفصل حالياً.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {assignments.map(a => (
+            <div key={a.id} style={{ background: 'white', padding: '16px', borderRadius: '8px', borderLeft: '4px solid var(--color-primary)' }}>
+              <h4 style={{ margin: '0 0 8px 0' }}>{a.title}</h4>
+              <div style={{ color: 'var(--color-text-muted)', fontSize: '0.9em', display: 'flex', gap: '16px' }}>
+                <span><strong>المعلم:</strong> {a.teacherEmail}</span>
+                <span><strong>آخر موعد:</strong> {a.dueDate}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudentSchedule() {
+  return (
+    <div className="glass-panel" style={{ padding: '24px' }}>
+      <h2>الجدول الدراسي</h2>
+      <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
+        سيتم إضافة الجدول الدراسي قريباً.
+      </p>
+    </div>
+  );
+}
+
+function StudentMaterials() {
+  return (
+    <div className="glass-panel" style={{ padding: '24px' }}>
+      <h2>الملخصات والمراجعات</h2>
+      <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
+        سيتم إضافة قسم الملخصات قريباً.
+      </p>
+    </div>
+  );
+}
+
 export default function StudentDashboard() {
   return (
     <Layout role="student" title="لوحة تحكم الطالب">
       <Routes>
         <Route path="/" element={<StudentHome />} />
         <Route path="/weekly-plan" element={<StudentWeeklyPlan />} />
+        <Route path="/assignments" element={<StudentAssignments />} />
+        <Route path="/schedule" element={<StudentSchedule />} />
+        <Route path="/materials" element={<StudentMaterials />} />
       </Routes>
     </Layout>
   );
