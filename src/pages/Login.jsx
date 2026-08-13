@@ -37,12 +37,16 @@ export default function Login() {
     <div className="login-container">
       <div className="login-card glass-panel">
         <div className="login-header">
-          <div className="logo-container">
-            {/* The user can place the actual logo image in public folder and link here */}
-            {/* <img src="/logo.png" alt="شعار المدارس" /> */}
-            <div style={{ color: 'var(--color-primary)', fontWeight: 'bold', fontSize: '2rem' }}>A</div>
+          <div className="logo-container" style={{ width: '140px', height: '140px', background: 'transparent', boxShadow: 'none' }}>
+            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+              {/* Teal 'A' shape */}
+              <path d="M100 20 L40 140 H70 L100 80 L130 140 H160 Z" fill="#63B2C6" />
+              {/* Green book/wavy shape across the middle */}
+              <path d="M50 110 Q100 80 150 110 L140 130 Q100 100 60 130 Z" fill="#B4D396" />
+              <text x="100" y="155" fontFamily="Arial" fontSize="12" fill="#B4D396" textAnchor="middle" fontWeight="bold">1995 - 1416</text>
+            </svg>
           </div>
-          <h1>المدارس المتقدمة للتعلم الذكي</h1>
+          <h1>المدارس المتقدمة للتعلم الذكي بجدة</h1>
           <p>بوابة الدخول الموحدة</p>
         </div>
 
