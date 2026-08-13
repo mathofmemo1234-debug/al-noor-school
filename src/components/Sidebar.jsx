@@ -25,8 +25,8 @@ export default function Sidebar({ role }) {
   ];
 
   const teacherLinks = [
-    { path: '/teacher', icon: Home, label: 'الرئيسية' },
-    { path: '/teacher/schedule', icon: Calendar, label: 'الجدول الدراسي' },
+    { path: '/teacher', icon: Home, label: 'المهام (الرئيسية)' },
+    { path: '/teacher/weekly-plan', icon: Calendar, label: 'الخطة الأسبوعية' },
     { path: '/teacher/assignments', icon: BookOpen, label: 'الواجبات' },
     { path: '/teacher/attendance', icon: Users, label: 'الغياب والحضور' },
   ];
