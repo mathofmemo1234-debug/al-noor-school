@@ -151,7 +151,95 @@ function ManageStudents() {
 }
 
 function ManageClasses() {
-  return <div className="glass-panel" style={{ padding: '24px' }}><h2>الفصول الدراسية</h2><p>هنا يمكنك إضافة وإدارة الفصول الدراسية وتوزيع الطلاب عليها.</p></div>;
+  const [classes, setClasses] = useState([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [className, setClassName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
+      const cls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setClasses(cls);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!className) return;
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, 'classes'), {
+        name: className,
+        createdAt: new Date()
+      });
+      setIsAdding(false);
+      setClassName('');
+    } catch (err) {
+      console.error(err);
+      alert('خطأ في الحفظ. تأكد من الصلاحيات.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel" style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>الفصول الدراسية</h2>
+        <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
+          إضافة فصل جديد
+        </button>
+      </div>
+      
+      <div style={{ display: 'grid', gap: '12px' }}>
+        {classes.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)' }}>لا توجد فصول مضافة بعد.</p>
+        ) : (
+          classes.map(cls => (
+            <div key={cls.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{cls.name}</h3>
+            </div>
+          ))
+        )}
+      </div>
+
+      {isAdding && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+            <button 
+              onClick={() => setIsAdding(false)} 
+              style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <X size={20} color="var(--color-text-muted)" />
+            </button>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>
+              إضافة فصل دراسي
+            </h3>
+            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم الفصل (مثال: 1/أ)</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={className}
+                  onChange={(e) => setClassName(e.target.value)}
+                  placeholder="اسم الفصل"
+                  required
+                />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                {isSaving ? 'جاري الحفظ...' : 'حفظ الفصل'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function AdminDashboard() {
