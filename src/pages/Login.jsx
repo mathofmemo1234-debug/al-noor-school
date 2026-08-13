@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, AlertCircle } from 'lucide-react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
 import './Login.css';
-// import { signInWithEmailAndPassword } from 'firebase/auth';
-// import { auth } from '../firebase';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,20 +11,25 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('student');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     
-    // TODO: Connect Firebase Auth here
     try {
-      // await signInWithEmailAndPassword(auth, email, password);
-      // For now, mock navigation based on role
+      await signInWithEmailAndPassword(auth, email, password);
+      // User role should dictate navigation, but for now we'll respect the UI selection
+      // Once Firestore is properly populated, this will pull from the user document
       if (role === 'admin') navigate('/admin');
       if (role === 'teacher') navigate('/teacher');
       if (role === 'student') navigate('/student');
     } catch (err) {
+      console.error(err);
       setError('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+    } finally {
+      setLoading(false);
     }
   };
 
