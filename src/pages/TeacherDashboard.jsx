@@ -1,26 +1,119 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { CheckSquare, Plus, Save } from 'lucide-react';
+import { CheckSquare, Square, Plus, Save, Trash2 } from 'lucide-react';
 import { db, auth } from '../firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
 
 function TeacherTasks() {
+  const [tasks, setTasks] = useState([]);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    
+    const q = query(
+      collection(db, 'tasks'),
+      where('teacherId', '==', auth.currentUser.uid)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const tasksData = [];
+      snapshot.forEach((doc) => {
+        tasksData.push({ id: doc.id, ...doc.data() });
+      });
+      // Sort so incomplete tasks are at the top
+      tasksData.sort((a, b) => (a.completed === b.completed ? 0 : a.completed ? 1 : -1));
+      setTasks(tasksData);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleAddTask = async (e) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim() || !auth.currentUser) return;
+    
+    setIsAdding(true);
+    try {
+      await addDoc(collection(db, 'tasks'), {
+        title: newTaskTitle,
+        completed: false,
+        teacherId: auth.currentUser.uid,
+        createdAt: new Date().toISOString()
+      });
+      setNewTaskTitle('');
+    } catch (error) {
+      console.error("Error adding task:", error);
+      alert('تعذر إضافة المهمة، يرجى التأكد من صلاحيات قاعدة البيانات');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const toggleTask = async (task) => {
+    try {
+      await updateDoc(doc(db, 'tasks', task.id), {
+        completed: !task.completed
+      });
+    } catch (error) {
+      console.error("Error toggling task:", error);
+    }
+  };
+
+  const deleteTask = async (taskId) => {
+    try {
+      await deleteDoc(doc(db, 'tasks', taskId));
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    }
+  };
+
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>مهام اليوم</h2>
-        <button className="btn btn-primary btn-sm"><Plus size={16} /> إضافة مهمة</button>
       </div>
+      
+      <form onSubmit={handleAddTask} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <input 
+          type="text" 
+          placeholder="أدخل مهمة جديدة..." 
+          value={newTaskTitle}
+          onChange={(e) => setNewTaskTitle(e.target.value)}
+          style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+        />
+        <button type="submit" className="btn btn-primary" disabled={isAdding || !newTaskTitle.trim()}>
+          <Plus size={16} /> إضافة مهمة
+        </button>
+      </form>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ background: 'white', padding: '16px', borderRadius: '8px', display: 'flex', gap: '12px', alignItems: 'center', borderLeft: '4px solid var(--color-primary)' }}>
-          <CheckSquare color="var(--color-text-muted)" />
-          <span>تصحيح واجب الرياضيات للصف الأول متوسط</span>
-        </div>
-        <div style={{ background: 'white', padding: '16px', borderRadius: '8px', display: 'flex', gap: '12px', alignItems: 'center', borderLeft: '4px solid var(--color-secondary)' }}>
-          <CheckSquare color="var(--color-text-muted)" />
-          <span>إعداد اختبار قصير للفصل 2/أ</span>
-        </div>
+        {tasks.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '20px' }}>لا توجد مهام حالياً. يمكنك إضافة مهام جديدة!</p>
+        ) : (
+          tasks.map(task => (
+            <div key={task.id} style={{ 
+              background: 'white', 
+              padding: '16px', 
+              borderRadius: '8px', 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center', 
+              borderLeft: `4px solid ${task.completed ? 'var(--color-text-muted)' : 'var(--color-primary)'}`,
+              opacity: task.completed ? 0.7 : 1
+            }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', cursor: 'pointer', flex: 1 }} onClick={() => toggleTask(task)}>
+                {task.completed ? <CheckSquare color="var(--color-primary)" /> : <Square color="var(--color-text-muted)" />}
+                <span style={{ textDecoration: task.completed ? 'line-through' : 'none' }}>{task.title}</span>
+              </div>
+              <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}>
+                <Trash2 size={18} />
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
