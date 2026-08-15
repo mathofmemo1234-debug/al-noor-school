@@ -4,7 +4,7 @@ import Layout from '../components/Layout';
 import { Users, BookOpen, UserPlus, X, Edit, Trash2 } from 'lucide-react';
 import ManageSchedules from './ManageSchedules';
 import { db } from '../firebase';
-import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, setDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
 import AdminPreparations from './AdminPreparations';
 
 function AdminHome() {
@@ -23,8 +23,80 @@ function AdminHome() {
     return () => { unsubTeachers(); unsubStudents(); unsubClasses(); };
   }, []);
 
+  const handleSeedData = async () => {
+    try {
+      alert("جاري إضافة البيانات...");
+      
+      const teacherIds = [];
+      const teachers = [
+        { name: "محمد أحمد", subject: "رياضيات" },
+        { name: "خالد عبدالله", subject: "لغتي" },
+        { name: "سعد محمد", subject: "علوم" },
+        { name: "علي حسن", subject: "إنجليزي" },
+        { name: "عمر فهد", subject: "فيزياء" }
+      ];
+      for (let i = 0; i < 5; i++) {
+        const nid = `100000000${i+1}`;
+        const email = `${nid}@school.local`;
+        const docRef = await addDoc(collection(db, 'teachers'), {
+          name: teachers[i].name, nationalId: nid, email, subject: teachers[i].subject, role: 'teacher', createdAt: new Date()
+        });
+        teacherIds.push(docRef.id);
+        await addDoc(collection(db, 'users'), {
+          nationalId: nid, email, role: 'teacher', name: teachers[i].name
+        });
+      }
+
+      const classNames = ["أول متوسط", "ثاني متوسط", "ثالث متوسط", "أول ثانوي", "ثاني ثانوي", "ثالث ثانوي"];
+      const studentNames = ["أحمد سعيد", "عبدالرحمن سعد", "ياسر علي", "فارس فهد", "سلمان محمد"];
+      for (let i = 0; i < 5; i++) {
+        const nid = `200000000${i+1}`;
+        const email = `${nid}@school.local`;
+        await addDoc(collection(db, 'students'), {
+          name: studentNames[i], nationalId: nid, email, className: "أول متوسط", role: 'student', createdAt: new Date()
+        });
+        await addDoc(collection(db, 'users'), {
+          nationalId: nid, email, role: 'student', name: studentNames[i]
+        });
+      }
+
+      const classDocs = [];
+      for (let cName of classNames) {
+        const docRef = await addDoc(collection(db, 'classes'), {
+          name: cName, level: 'test', createdAt: new Date()
+        });
+        classDocs.push({ id: docRef.id, name: cName });
+      }
+
+      const targetClass = classDocs.find(c => c.name === "أول متوسط");
+      if (targetClass) {
+        const matrix = {};
+        matrix["الأحد-الحصة الأولى"] = { subject: "رياضيات", teacherId: teacherIds[0] };
+        matrix["الأحد-الحصة الثانية"] = { subject: "لغتي", teacherId: teacherIds[1] };
+        matrix["الإثنين-الحصة الأولى"] = { subject: "علوم", teacherId: teacherIds[2] };
+        matrix["الثلاثاء-الحصة الثالثة"] = { subject: "إنجليزي", teacherId: teacherIds[3] };
+        matrix["الأربعاء-الحصة الرابعة"] = { subject: "فيزياء", teacherId: teacherIds[4] };
+        
+        await setDoc(doc(db, 'schedules', targetClass.id), {
+          className: "أول متوسط",
+          matrix
+        });
+      }
+
+      alert("تم إضافة 5 معلمين، 5 طلاب، والفصول، وجدول تجريبي بنجاح!");
+    } catch (err) {
+      console.error(err);
+      alert("خطأ: " + err.message);
+    }
+  };
+
   return (
     <div>
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+        <button onClick={handleSeedData} className="btn btn-primary">
+          إضافة بيانات تجريبية (5 معلمين، 5 طلاب، فصول، جدول)
+        </button>
+      </div>
       <div className="stats-grid">
         <div className="stat-card glass-panel">
           <div className="stat-icon blue">
