@@ -192,7 +192,7 @@ function WeeklyPlan() {
     }
     const q = query(
       collection(db, 'weekly_plans'),
-      where('teacherId', '==', auth.currentUser.uid),
+      where('teacherId', '==', teacherDocId),
       where('className', '==', selectedClass)
     );
     const unsub = onSnapshot(q, (snapshot) => {
@@ -223,7 +223,7 @@ function WeeklyPlan() {
     setIsSaving(true);
     try {
       const payload = {
-        teacherId: auth.currentUser.uid,
+        teacherId: teacherDocId,
         teacherEmail: auth.currentUser.email,
         className: selectedClass,
         plan: plan,

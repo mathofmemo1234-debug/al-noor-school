@@ -36,52 +36,136 @@ function useStudentClass() {
 function StudentWeeklyPlan() {
   const studentClass = useStudentClass();
   const [plans, setPlans] = useState([]);
-  const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+  const [scheduleData, setScheduleData] = useState({});
+  const [teachers, setTeachers] = useState({});
+  const [classId, setClassId] = useState(null);
+  
+  const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+  const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+  useEffect(() => {
+    if (studentClass) {
+      const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
+        let foundId = null;
+        classesSnap.docs.forEach(doc => {
+          if (doc.data().name === studentClass) {
+            foundId = doc.id;
+          }
+        });
+        setClassId(foundId);
+      });
+      return () => unsubClasses();
+    } else {
+      setClassId(null);
+    }
+  }, [studentClass]);
 
   useEffect(() => {
     if (!studentClass) return;
     const q = query(collection(db, 'weekly_plans'), where('className', '==', studentClass));
-    const unsub = onSnapshot(q, (snapshot) => {
+    const unsubPlans = onSnapshot(q, (snapshot) => {
       const data = [];
       snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
       setPlans(data);
     });
-    return () => unsub();
+    return () => unsubPlans();
   }, [studentClass]);
 
+  useEffect(() => {
+    const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
+      const tMap = {};
+      snap.docs.forEach(doc => {
+        tMap[doc.id] = doc.data().name;
+      });
+      setTeachers(tMap);
+    });
+
+    if (classId) {
+      const unsubSchedule = onSnapshot(doc(db, 'schedules', classId), (docSnap) => {
+        if (docSnap.exists()) {
+          setScheduleData(docSnap.data().matrix || {});
+        } else {
+          setScheduleData({});
+        }
+      });
+      return () => { unsubTeachers(); unsubSchedule(); };
+    }
+    
+    return () => unsubTeachers();
+  }, [classId]);
+
   if (!studentClass) {
-    return <div className="glass-panel" style={{ padding: '24px' }}>جاري تحميل البيانات...</div>;
+    return <div className="glass-panel" style={{ padding: '24px', textAlign: 'center' }}><p style={{color: 'var(--color-text-muted)'}}>لست مسجلاً في أي فصل دراسي بعد.</p></div>;
   }
+
+  // Map plans by teacherId for quick lookup
+  const plansByTeacher = {};
+  plans.forEach(p => {
+    if (p.teacherId) {
+      plansByTeacher[p.teacherId] = p.plan;
+    }
+  });
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
         <h2>الخطة الأسبوعية - فصل {studentClass}</h2>
-        <p style={{ color: 'var(--color-text-muted)' }}>هنا تجد خطط الأسبوع من جميع المعلمين.</p>
+        <p style={{ color: 'var(--color-text-muted)' }}>تفاصيل الدروس والأهداف مرتبطة بجدولك الدراسي.</p>
       </div>
 
-      {plans.length === 0 ? (
-        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>
-          لا توجد خطط أسبوعية مضافة لهذا الفصل بعد.
-        </p>
+      {Object.keys(scheduleData).length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
+          لم يتم رفع الجدول الدراسي لفصلك بعد.
+        </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {plans.map(p => (
-            <div key={p.id} style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <h3 style={{ margin: '0 0 16px 0', color: 'var(--color-primary-dark)' }}>المعلم: {p.teacherEmail}</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {days.map(day => (
-                  <div key={day} style={{ display: 'flex', gap: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
-                    <div style={{ width: '100px', fontWeight: 'bold', color: 'var(--color-text-muted)' }}>{day}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ marginBottom: '4px' }}><strong>موضوع الدرس:</strong> {p.plan?.[day]?.topic || 'لا يوجد'}</div>
-                      <div><strong>الأهداف:</strong> {p.plan?.[day]?.goals || 'لا يوجد'}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th style={{ width: '80px' }}>اليوم</th>
+                {PERIODS.map(p => <th key={p} style={{ textAlign: 'center', minWidth: '150px' }}>الحصة {p}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {DAYS.map(day => (
+                <tr key={day}>
+                  <td style={{ fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>{day}</td>
+                  {PERIODS.map(period => {
+                    const key = `${day}-${period}`;
+                    const cell = scheduleData[key];
+                    let cellContent = <span style={{ color: '#ccc' }}>-</span>;
+
+                    if (cell && cell.subject) {
+                      const teacherPlan = plansByTeacher[cell.teacherId] || {};
+                      const dayPlan = teacherPlan[day] || {};
+                      
+                      cellContent = (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(99,178,198,0.05)', padding: '12px', borderRadius: '8px', textAlign: 'right', border: '1px solid rgba(99,178,198,0.2)' }}>
+                          <div style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '8px', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: 'bold', color: 'var(--color-primary-dark)', display: 'block' }}>{cell.subject}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>أ. {teachers[cell.teacherId] || 'غير محدد'}</span>
+                          </div>
+                          
+                          <div style={{ fontSize: '13px' }}>
+                            <strong style={{ color: '#334155' }}>الدرس:</strong> <span style={{color: '#475569'}}>{dayPlan.topic || 'لم يُحدد'}</span>
+                          </div>
+                          <div style={{ fontSize: '13px' }}>
+                            <strong style={{ color: '#334155' }}>الهدف:</strong> <span style={{color: '#475569'}}>{dayPlan.goals || 'لم يُحدد'}</span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <td key={period} style={{ padding: '8px', verticalAlign: 'top' }}>
+                        {cellContent}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
