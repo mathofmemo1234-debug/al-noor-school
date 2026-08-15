@@ -20,10 +20,12 @@ export function AuthProvider({ children }) {
       setCurrentUser(user);
       if (user) {
         try {
-          // Admin override based on email for safety
-          if (user.email === 'admin@admin.com' || user.email === 'admin@school.edu.sa') {
+          if (user.email === 'super@admin.com') {
+            setUserRole('superadmin');
+            setUserData({ name: 'حساب الماستر', role: 'superadmin', schoolId: 'ALL' });
+          } else if (user.email === 'admin@admin.com' || user.email === 'admin@school.edu.sa') {
             setUserRole('admin');
-            setUserData({ name: 'مدير النظام', role: 'admin' });
+            setUserData({ name: 'مدير المدرسة', role: 'admin', schoolId: 'default_school_1' });
           } else {
             // Fetch user role from Firestore by email
             const q = query(collection(db, 'users'), where('email', '==', user.email));
@@ -31,6 +33,15 @@ export function AuthProvider({ children }) {
             
             if (!querySnapshot.empty) {
               const data = querySnapshot.docs[0].data();
+              
+              if (data.schoolId && data.schoolId !== 'ALL') {
+                const schoolDoc = await getDoc(doc(db, 'schools', data.schoolId));
+                if (schoolDoc.exists()) {
+                  data.schoolName = schoolDoc.data().name;
+                  data.logoUrl = schoolDoc.data().logoUrl || null;
+                }
+              }
+              
               setUserRole(data.role);
               setUserData(data);
             } else {

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, writeBatch, query, where } from 'firebase/firestore';
 import { Calendar, BookOpen, Plus, Trash2, Save } from 'lucide-react';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
-export default function ManageSchedules() {
+export default function ManageSchedules({ schoolId }) {
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -23,25 +23,33 @@ export default function ManageSchedules() {
   
   // Data loading
   useEffect(() => {
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+    if (!schoolId) return;
+
+    const qClasses = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+    const unsubClasses = onSnapshot(qClasses, (snap) => {
       setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
+
+    const qTeachers = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
+    const unsubTeachers = onSnapshot(qTeachers, (snap) => {
       setTeachers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubSubjects = onSnapshot(collection(db, 'subjects'), (snap) => {
+
+    const qSubjects = query(collection(db, 'subjects'), where('schoolId', '==', schoolId));
+    const unsubSubjects = onSnapshot(qSubjects, (snap) => {
       let subs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (subs.length === 0) {
-        const defaultSubjects = ['القرآن الكريم', 'التوحيد', 'الفقه', 'الحديث', 'لغتي', 'الرياضيات', 'العلوم', 'اللغة الإنجليزية', 'الدراسات الاجتماعية', 'التربية الفنية', 'التربية البدنية', 'المهارات الرقمية'];
+        const defaultSubjects = ['القرآن الكريم', 'التفسير', 'التوحيد', 'الفقه', 'الحديث', 'اللغة العربية', 'الرياضيات', 'العلوم الطبيعية', 'الدراسات الاجتماعية', 'اللغة الإنجليزية', 'التربية الفنية', 'التربية البدنية'];
         defaultSubjects.forEach(async (sub) => {
-          await addDoc(collection(db, 'subjects'), { name: sub });
+          await addDoc(collection(db, 'subjects'), { name: sub, schoolId });
         });
       }
       setSubjects(subs);
     });
     
     // Load existing schedules and flatten them
-    const unsubSchedules = onSnapshot(collection(db, 'schedules'), (snap) => {
+    const qSchedules = query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
+    const unsubSchedules = onSnapshot(qSchedules, (snap) => {
       let flatEntries = [];
       snap.docs.forEach(docSnap => {
         const data = docSnap.data();
@@ -76,7 +84,7 @@ export default function ManageSchedules() {
     });
 
     return () => { unsubClasses(); unsubTeachers(); unsubSubjects(); unsubSchedules(); };
-  }, []);
+  }, [schoolId]);
 
   const handleAddRow = () => {
     setEntries([{
@@ -114,7 +122,8 @@ export default function ManageSchedules() {
       });
 
       // We need to delete old classes that might no longer exist in grouped
-      const oldSchedulesSnap = await getDocs(collection(db, 'schedules'));
+      const qSchedules = query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
+      const oldSchedulesSnap = await getDocs(qSchedules);
       const batch = writeBatch(db);
       
       oldSchedulesSnap.docs.forEach(docSnap => {
@@ -128,6 +137,7 @@ export default function ManageSchedules() {
         const docRef = doc(db, 'schedules', classId);
         batch.set(docRef, {
           classId: classId,
+          schoolId,
           academicYear,
           semester,
           matrix: grouped[classId],
@@ -149,7 +159,7 @@ export default function ManageSchedules() {
     e.preventDefault();
     if (!newSubject.trim()) return;
     try {
-      await addDoc(collection(db, 'subjects'), { name: newSubject.trim() });
+      await addDoc(collection(db, 'subjects'), { name: newSubject.trim(), schoolId });
       setNewSubject('');
     } catch (err) {
       console.error(err);

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar } from 'lucide-react';
+import { Calendar, Link as LinkIcon, Edit2, X, Check } from 'lucide-react';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -12,6 +12,11 @@ export default function TeacherSchedule() {
   const [schedules, setSchedules] = useState([]);
   const [classes, setClasses] = useState({});
   const [teacherDocId, setTeacherDocId] = useState(null);
+
+  // Link Editing State
+  const [editingCell, setEditingCell] = useState(null); // { scheduleId, key, currentLink }
+  const [linkInput, setLinkInput] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     // Find the teacher document ID
@@ -49,7 +54,6 @@ export default function TeacherSchedule() {
   }, []);
 
   // Filter schedule for this teacher
-  // Find which class and subject the teacher is assigned to for each period
   const getTeacherCell = (day, period) => {
     if (!teacherDocId) return null;
     const key = `${day}-${period}`;
@@ -59,15 +63,35 @@ export default function TeacherSchedule() {
     for (const schedule of schedules) {
       if (schedule.matrix && schedule.matrix[key] && schedule.matrix[key].teacherId === teacherDocId) {
         result = {
+          scheduleId: schedule.id, // doc id
+          key: key,
           subject: schedule.matrix[key].subject,
-          className: classes[schedule.classId] || 'فصل غير معروف',
-          academicYear: schedule.academicYear,
-          semester: schedule.semester
+          className: classes[schedule.id] || 'فصل غير معروف',
+          virtualLink: schedule.matrix[key].virtualLink || ''
         };
         break; // A teacher can only be in one class per period
       }
     }
     return result;
+  };
+
+  const handleSaveLink = async () => {
+    if (!editingCell) return;
+    setIsSaving(true);
+    try {
+      const scheduleRef = doc(db, 'schedules', editingCell.scheduleId);
+      // We only update the specific virtualLink inside the matrix key
+      await updateDoc(scheduleRef, {
+        [`matrix.${editingCell.key}.virtualLink`]: linkInput
+      });
+      setEditingCell(null);
+      setLinkInput('');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء حفظ الرابط.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -91,14 +115,53 @@ export default function TeacherSchedule() {
                 {PERIODS.map(period => {
                   const cell = getTeacherCell(day, period);
                   return (
-                    <td key={period} style={{ padding: '12px', textAlign: 'center', height: '60px' }}>
+                    <td key={period} style={{ padding: '12px', textAlign: 'center', height: '100px', verticalAlign: 'top' }}>
                       {cell ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(99,178,198,0.1)', padding: '8px', borderRadius: '8px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(99,178,198,0.1)', padding: '8px', borderRadius: '8px', height: '100%', position: 'relative' }}>
                           <span style={{ fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>{cell.subject}</span>
                           <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{cell.className}</span>
+                          
+                          {/* Virtual Link Section */}
+                          <div style={{ marginTop: 'auto', paddingTop: '8px' }}>
+                            {editingCell && editingCell.scheduleId === cell.scheduleId && editingCell.key === cell.key ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <input 
+                                  type="url" 
+                                  value={linkInput} 
+                                  onChange={e => setLinkInput(e.target.value)} 
+                                  placeholder="رابط المنصة..."
+                                  style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #ccc', borderRadius: '4px' }}
+                                />
+                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                  <button onClick={handleSaveLink} disabled={isSaving} style={{ background: '#25D366', color: 'white', border: 'none', borderRadius: '4px', padding: '4px', cursor: 'pointer' }}><Check size={14}/></button>
+                                  <button onClick={() => setEditingCell(null)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '4px', cursor: 'pointer' }}><X size={14}/></button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                {cell.virtualLink ? (
+                                  <a href={cell.virtualLink} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: '#25D366', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
+                                    <LinkIcon size={12} /> رابط الحصة
+                                  </a>
+                                ) : (
+                                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>لا يوجد رابط</span>
+                                )}
+                                <button 
+                                  onClick={() => {
+                                    setEditingCell({ scheduleId: cell.scheduleId, key: cell.key });
+                                    setLinkInput(cell.virtualLink);
+                                  }} 
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#64748b' }}
+                                  title="إضافة / تعديل رابط الحصة الافتراضية"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ) : (
-                        <span style={{ color: '#ccc' }}>-</span>
+                        <div style={{ color: '#ccc', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>-</div>
                       )}
                     </td>
                   );

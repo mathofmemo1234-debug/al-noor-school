@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Users, BookOpen, UserPlus, X, Edit, Trash2 } from 'lucide-react';
@@ -6,22 +7,30 @@ import ManageSchedules from './ManageSchedules';
 import { db } from '../firebase';
 import { collection, addDoc, setDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
 import AdminPreparations from './AdminPreparations';
+import WeeklyPlanView from '../components/WeeklyPlanView';
+import SchoolSettings from './SchoolSettings';
+import AdminExcellence from './AdminExcellence';
 
-function AdminHome() {
+function AdminHome({ schoolId }) {
   const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0 });
 
   useEffect(() => {
-    const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
+    if (!schoolId) return;
+    const qTeachers = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
+    const qStudents = query(collection(db, 'students'), where('schoolId', '==', schoolId));
+    const qClasses = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+
+    const unsubTeachers = onSnapshot(qTeachers, (snap) => {
       setStats(prev => ({ ...prev, teachers: snap.size }));
     });
-    const unsubStudents = onSnapshot(collection(db, 'students'), (snap) => {
+    const unsubStudents = onSnapshot(qStudents, (snap) => {
       setStats(prev => ({ ...prev, students: snap.size }));
     });
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+    const unsubClasses = onSnapshot(qClasses, (snap) => {
       setStats(prev => ({ ...prev, classes: snap.size }));
     });
     return () => { unsubTeachers(); unsubStudents(); unsubClasses(); };
-  }, []);
+  }, [schoolId]);
 
   const handleSeedData = async () => {
     try {
@@ -39,11 +48,11 @@ function AdminHome() {
         const nid = `100000000${i+1}`;
         const email = `${nid}@school.local`;
         const docRef = await addDoc(collection(db, 'teachers'), {
-          name: teachers[i].name, nationalId: nid, email, subject: teachers[i].subject, role: 'teacher', createdAt: new Date()
+          name: teachers[i].name, nationalId: nid, email, subject: teachers[i].subject, role: 'teacher', schoolId, createdAt: new Date()
         });
         teacherIds.push(docRef.id);
         await addDoc(collection(db, 'users'), {
-          nationalId: nid, email, role: 'teacher', name: teachers[i].name
+          nationalId: nid, email, role: 'teacher', name: teachers[i].name, schoolId
         });
       }
 
@@ -54,17 +63,17 @@ function AdminHome() {
         const email = `${nid}@school.local`;
         const assignedClass = classNames[i % classNames.length];
         await addDoc(collection(db, 'students'), {
-          name: studentNames[i], nationalId: nid, email, className: assignedClass, role: 'student', createdAt: new Date()
+          name: studentNames[i], nationalId: nid, email, className: assignedClass, role: 'student', schoolId, createdAt: new Date()
         });
         await addDoc(collection(db, 'users'), {
-          nationalId: nid, email, role: 'student', name: studentNames[i]
+          nationalId: nid, email, role: 'student', name: studentNames[i], schoolId
         });
       }
 
       const classDocs = [];
       for (let cName of classNames) {
         const docRef = await addDoc(collection(db, 'classes'), {
-          name: cName, level: 'test', createdAt: new Date()
+          name: cName, level: 'test', schoolId, createdAt: new Date()
         });
         classDocs.push({ id: docRef.id, name: cName });
       }
@@ -73,14 +82,15 @@ function AdminHome() {
       const targetClasses = classDocs.slice(0, 3);
       for (let targetClass of targetClasses) {
         const matrix = {};
-        matrix["الأحد-الحصة الأولى"] = { subject: "رياضيات", teacherId: teacherIds[0] };
-        matrix["الأحد-الحصة الثانية"] = { subject: "لغتي", teacherId: teacherIds[1] };
-        matrix["الإثنين-الحصة الأولى"] = { subject: "علوم", teacherId: teacherIds[2] };
-        matrix["الثلاثاء-الحصة الثالثة"] = { subject: "إنجليزي", teacherId: teacherIds[3] };
-        matrix["الأربعاء-الحصة الرابعة"] = { subject: "فيزياء", teacherId: teacherIds[4] };
+        matrix["الأحد-1"] = { subject: "رياضيات", teacherId: teacherIds[0] };
+        matrix["الأحد-2"] = { subject: "لغتي", teacherId: teacherIds[1] };
+        matrix["الإثنين-1"] = { subject: "علوم", teacherId: teacherIds[2] };
+        matrix["الثلاثاء-3"] = { subject: "إنجليزي", teacherId: teacherIds[3] };
+        matrix["الأربعاء-4"] = { subject: "فيزياء", teacherId: teacherIds[4] };
         
         await setDoc(doc(db, 'schedules', targetClass.id), {
           className: targetClass.name,
+          schoolId,
           matrix
         });
       }
@@ -134,7 +144,7 @@ function AdminHome() {
   );
 }
 
-function ManageTeachers() {
+function ManageTeachers({ schoolId }) {
   const [teachers, setTeachers] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
   const [isBulkAdding, setIsBulkAdding] = useState(false);
@@ -150,12 +160,14 @@ function ManageTeachers() {
   const [bulkData, setBulkData] = useState('');
   
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'teachers'), (snap) => {
+    if (!schoolId) return;
+    const q = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
+    const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTeachers(data);
     });
     return () => unsub();
-  }, []);
+  }, [schoolId]);
 
   const handleSaveSingle = async (e) => {
     e.preventDefault();
@@ -164,10 +176,10 @@ function ManageTeachers() {
     try {
       const fakeEmail = `${nationalId}@school.local`;
       await addDoc(collection(db, 'teachers'), {
-        name, nationalId, email: fakeEmail, subject, role: 'teacher', createdAt: new Date()
+        name, nationalId, email: fakeEmail, subject, role: 'teacher', schoolId, createdAt: new Date()
       });
       await addDoc(collection(db, 'users'), {
-        nationalId, email: fakeEmail, role: 'teacher', name
+        nationalId, email: fakeEmail, role: 'teacher', name, schoolId
       });
       setIsAdding(false);
       setName(''); setNationalId(''); setSubject('');
@@ -197,10 +209,10 @@ function ManageTeachers() {
           if (tId && tName) {
             const fakeEmail = `${tId}@school.local`;
             await addDoc(collection(db, 'teachers'), {
-              name: tName, nationalId: tId, email: fakeEmail, subject: tSubj, role: 'teacher', createdAt: new Date()
+              name: tName, nationalId: tId, email: fakeEmail, subject: tSubj, role: 'teacher', schoolId, createdAt: new Date()
             });
             await addDoc(collection(db, 'users'), {
-              nationalId: tId, email: fakeEmail, role: 'teacher', name: tName
+              nationalId: tId, email: fakeEmail, role: 'teacher', name: tName, schoolId
             });
           }
         }
@@ -235,7 +247,8 @@ function ManageTeachers() {
     try {
       await updateDoc(doc(db, 'teachers', editingTeacher.id), {
         name: editingTeacher.name,
-        subject: editingTeacher.subject
+        subject: editingTeacher.subject,
+        whatsapp: editingTeacher.whatsapp || ''
       });
       const uq = query(collection(db, 'users'), where('nationalId', '==', editingTeacher.nationalId));
       const snap = await getDocs(uq);
@@ -273,7 +286,7 @@ function ManageTeachers() {
             <div key={t.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{t.name}</h3>
-                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>رقم الهوية: {t.nationalId} • {t.subject}</p>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>رقم الهوية: {t.nationalId} • {t.subject} {t.whatsapp ? `• واتساب: ${t.whatsapp}` : ''}</p>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => setEditingTeacher(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
@@ -322,6 +335,10 @@ function ManageTeachers() {
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>المادة الدراسية</label>
                 <input type="text" className="input-field" value={editingTeacher.subject} onChange={e => setEditingTeacher({...editingTeacher, subject: e.target.value})} placeholder="رياضيات، لغتي، الخ..." required />
               </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>رقم الواتساب (اختياري)</label>
+                <input type="text" className="input-field" value={editingTeacher.whatsapp || ''} onChange={e => setEditingTeacher({...editingTeacher, whatsapp: e.target.value})} placeholder="مثال: 05xxxxxxx" />
+              </div>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}</button>
             </form>
           </div>
@@ -356,7 +373,7 @@ function ManageTeachers() {
   );
 }
 
-function ManageStudents() {
+function ManageStudents({ schoolId }) {
   const [students, setStudents] = useState([]);
   const [classesList, setClassesList] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
@@ -373,16 +390,20 @@ function ManageStudents() {
   const [bulkData, setBulkData] = useState('');
 
   useEffect(() => {
-    const unsubStudents = onSnapshot(collection(db, 'students'), (snap) => {
+    if (!schoolId) return;
+    const qStudents = query(collection(db, 'students'), where('schoolId', '==', schoolId));
+    const qClasses = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+
+    const unsubStudents = onSnapshot(qStudents, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setStudents(data);
     });
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+    const unsubClasses = onSnapshot(qClasses, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setClassesList(data);
     });
     return () => { unsubStudents(); unsubClasses(); };
-  }, []);
+  }, [schoolId]);
 
   const handleSaveSingle = async (e) => {
     e.preventDefault();
@@ -391,10 +412,10 @@ function ManageStudents() {
     try {
       const fakeEmail = `${nationalId}@school.local`;
       await addDoc(collection(db, 'students'), {
-        name, nationalId, email: fakeEmail, class: studentClass, role: 'student', createdAt: new Date()
+        name, nationalId, email: fakeEmail, class: studentClass, role: 'student', schoolId, createdAt: new Date()
       });
       await addDoc(collection(db, 'users'), {
-        nationalId, email: fakeEmail, role: 'student', name
+        nationalId, email: fakeEmail, role: 'student', name, schoolId
       });
       setIsAdding(false);
       setName(''); setNationalId(''); setStudentClass('');
@@ -423,10 +444,10 @@ function ManageStudents() {
           if (sId && sName) {
             const fakeEmail = `${sId}@school.local`;
             await addDoc(collection(db, 'students'), {
-              name: sName, nationalId: sId, email: fakeEmail, class: sClass, role: 'student', createdAt: new Date()
+              name: sName, nationalId: sId, email: fakeEmail, class: sClass, role: 'student', schoolId, createdAt: new Date()
             });
             await addDoc(collection(db, 'users'), {
-              nationalId: sId, email: fakeEmail, role: 'student', name: sName
+              nationalId: sId, email: fakeEmail, role: 'student', name: sName, schoolId
             });
           }
         }
@@ -592,7 +613,7 @@ function ManageStudents() {
   );
 }
 
-function ManageClasses() {
+function ManageClasses({ schoolId }) {
   const [classes, setClasses] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
   const [className, setClassName] = useState('');
@@ -600,12 +621,14 @@ function ManageClasses() {
   const [editingClass, setEditingClass] = useState(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
+    if (!schoolId) return;
+    const q = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+    const unsub = onSnapshot(q, (snap) => {
       const cls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setClasses(cls);
     });
     return () => unsub();
-  }, []);
+  }, [schoolId]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -614,6 +637,7 @@ function ManageClasses() {
     try {
       await addDoc(collection(db, 'classes'), {
         name: className,
+        schoolId,
         createdAt: new Date()
       });
       setIsAdding(false);
@@ -750,16 +774,20 @@ function ManageClasses() {
 }
 
 export default function AdminDashboard() {
+  const { userData } = useAuth();
   return (
     <Layout role="admin" title="لوحة تحكم الإدارة">
       <Routes>
-        <Route path="/" element={<AdminHome />} />
-        <Route path="/teachers" element={<ManageTeachers />} />
-        <Route path="/students" element={<ManageStudents />} />
-        <Route path="/classes" element={<ManageClasses />} />
-        <Route path="/schedule" element={<ManageSchedules />} />
-        <Route path="/preparations" element={<AdminPreparations />} />
-        <Route path="*" element={<AdminHome />} />
+        <Route path="/" element={<AdminHome schoolId={userData?.schoolId} />} />
+        <Route path="/teachers" element={<ManageTeachers schoolId={userData?.schoolId} />} />
+        <Route path="/students" element={<ManageStudents schoolId={userData?.schoolId} />} />
+        <Route path="/classes" element={<ManageClasses schoolId={userData?.schoolId} />} />
+        <Route path="/schedule" element={<ManageSchedules schoolId={userData?.schoolId} />} />
+        <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />
+        <Route path="/weekly-plan" element={<WeeklyPlanView schoolId={userData?.schoolId} />} />
+        <Route path="/excellence" element={<AdminExcellence schoolId={userData?.schoolId} />} />
+        <Route path="/settings" element={<SchoolSettings schoolId={userData?.schoolId} />} />
+        <Route path="*" element={<AdminHome schoolId={userData?.schoolId} />} />
       </Routes>
     </Layout>
   );

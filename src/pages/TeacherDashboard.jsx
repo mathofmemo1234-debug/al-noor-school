@@ -2,13 +2,16 @@ import Settings from './Settings';
 import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Calendar, FileText, Users, X, Edit, Trash2, CheckSquare, Square, Plus, Save } from 'lucide-react';
+import { Calendar, FileText, Users, X, Edit, Trash2, CheckSquare, Square, Plus, Save, Award } from 'lucide-react';
 import { db, auth } from '../firebase';
 import TeacherSchedule from './TeacherSchedule';
 import { doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import LessonPreparation from './LessonPreparation';
 import MaterialsUpload from './MaterialsUpload';
+import TeacherExams from './TeacherExams';
+import TeacherExcellence from './TeacherExcellence';
+
 function TeacherTasks() {
   const [tasks, setTasks] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -643,7 +646,9 @@ export default function TeacherDashboard() {
         <Route path="/preparation" element={<LessonPreparation />} />
         <Route path="/materials" element={<MaterialsUpload />} />
         <Route path="/assignments" element={<Assignments />} />
+        <Route path="/exams" element={<TeacherExams />} />
         <Route path="/attendance" element={<Attendance />} />
+        <Route path="/excellence" element={<TeacherExcellence />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>

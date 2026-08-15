@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import MarkdownViewer from '../components/MarkdownViewer';
 
-export default function AdminPreparations() {
+export default function AdminPreparations({ schoolId }) {
   const [preparations, setPreparations] = useState([]);
   const [classesList, setClassesList] = useState([]);
   const [teachersList, setTeachersList] = useState({});
@@ -12,31 +12,37 @@ export default function AdminPreparations() {
 
   // Fetch classes
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
+    if (!schoolId) return;
+    const q = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+    const unsub = onSnapshot(q, (snap) => {
       setClassesList(snap.docs.map(doc => doc.data().name));
     });
     return () => unsub();
-  }, []);
+  }, [schoolId]);
 
   // Fetch teachers for name mapping
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'teachers'), (snap) => {
+    if (!schoolId) return;
+    const q = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
+    const unsub = onSnapshot(q, (snap) => {
       const map = {};
       snap.docs.forEach(d => map[d.id] = d.data().name);
       setTeachersList(map);
     });
     return () => unsub();
-  }, []);
+  }, [schoolId]);
 
   // Fetch all preparations
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'preparations'), (snap) => {
+    if (!schoolId) return;
+    const q = query(collection(db, 'preparations'), where('schoolId', '==', schoolId));
+    const unsub = onSnapshot(q, (snap) => {
       const data = [];
       snap.docs.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
       setPreparations(data);
     });
     return () => unsub();
-  }, []);
+  }, [schoolId]);
 
   let filtered = preparations;
   if (selectedClass) filtered = filtered.filter(p => p.className === selectedClass);
@@ -102,12 +108,13 @@ export default function AdminPreparations() {
                   </div>
                 )}
                 
-                {['goals', 'warmup', 'portfolio', 'content', 'resources', 'formativeEval', 'summativeEval', 'homework'].map(field => {
+                {['goals', 'portfolio', 'warmup', 'strategy', 'content', 'resources', 'formativeEval', 'summativeEval', 'homework'].map(field => {
                   const titles = {
                     goals: 'الأهداف السلوكية',
+                    portfolio: 'الحقبنة',
                     warmup: 'التهيئة',
-                    portfolio: 'الحقيبة',
-                    content: 'المحتوى',
+                    strategy: 'استراتيجيات التدريس',
+                    content: 'محتوى الدرس',
                     resources: 'الوسائل ومصادر التعلم',
                     formativeEval: 'التقويم البنائي',
                     summativeEval: 'التقويم النهائي',

@@ -17,6 +17,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [studentClass, setStudentClass] = useState('');
+  const [teacherSubject, setTeacherSubject] = useState('');
   const [role, setRole] = useState('student');
   
   const [error, setError] = useState('');
@@ -50,9 +51,13 @@ export default function Login() {
       const loginEmail = role === 'admin' ? trimmedId : getFakeEmail(trimmedId);
       await signInWithEmailAndPassword(auth, loginEmail, trimmedPassword);
       
-      if (role === 'admin') navigate('/admin');
-      if (role === 'teacher') navigate('/teacher');
-      if (role === 'student') navigate('/student');
+      if (loginEmail === 'super@admin.com') {
+        navigate('/superadmin');
+      } else {
+        if (role === 'admin') navigate('/admin');
+        if (role === 'teacher') navigate('/teacher');
+        if (role === 'student') navigate('/student');
+      }
     } catch (err) {
       console.error("Login Error:", err);
       
@@ -103,6 +108,10 @@ export default function Login() {
       setError('الرجاء اختيار الفصل الدراسي');
       return;
     }
+    if (role === 'teacher' && !teacherSubject) {
+      setError('الرجاء إدخال المادة الدراسية');
+      return;
+    }
 
     setLoading(true);
     
@@ -111,15 +120,49 @@ export default function Login() {
       const defaultPassword = nationalId; // National ID as default password
 
       // 1. Create Firebase Auth user
-      const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, defaultPassword);
+      let userCredential;
+      let isExistingUser = false;
+      try {
+        userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, defaultPassword);
+      } catch (createErr) {
+        if (createErr.code === 'auth/email-already-in-use' && role === 'teacher') {
+           try {
+             // Verify it's the correct owner by trying to login
+             userCredential = await signInWithEmailAndPassword(auth, fakeEmail, defaultPassword);
+             isExistingUser = true;
+           } catch (loginErr) {
+             throw createErr;
+           }
+        } else {
+           throw createErr;
+        }
+      }
+      
       const user = userCredential.user;
+
+      if (isExistingUser) {
+        // Teacher is adding a new subject
+        const teacherQ = query(collection(db, 'teachers'), where('nationalId', '==', nationalId));
+        const snap = await getDocs(teacherQ);
+        if (!snap.empty) {
+          const docRef = snap.docs[0].ref;
+          const existingSubject = snap.docs[0].data().subject || '';
+          let subjectArr = existingSubject.split(',').map(s => s.trim()).filter(s => s);
+          if (!subjectArr.includes(teacherSubject.trim())) {
+            subjectArr.push(teacherSubject.trim());
+            await updateDoc(docRef, { subject: subjectArr.join('، ') });
+          }
+          navigate('/teacher');
+          return;
+        }
+      }
 
       // 2. Check if user already exists in Firestore (added by admin)
       const userQuery = query(collection(db, 'users'), where('nationalId', '==', nationalId));
       const querySnapshot = await getDocs(userQuery);
       
       if (!querySnapshot.empty) {
-        await deleteUser(user);
+        if (!isExistingUser) await deleteUser(user);
         setError('هذا الحساب مضاف مسبقاً من الإدارة، الرجاء تسجيل الدخول مباشرة');
         return;
       }
@@ -148,7 +191,8 @@ export default function Login() {
           nationalId: nationalId,
           email: fakeEmail,
           name: name,
-          subject: '',
+          subject: teacherSubject.trim(),
+          whatsapp: '',
           role: 'teacher',
           createdAt: new Date()
         });
@@ -236,6 +280,19 @@ export default function Login() {
                       <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {role === 'teacher' && (
+                <div className="form-group">
+                  <label>المادة الدراسية</label>
+                  <input 
+                    type="text" 
+                    placeholder="مثال: رياضيات، لغتي" 
+                    required 
+                    value={teacherSubject}
+                    onChange={(e) => setTeacherSubject(e.target.value)}
+                  />
                 </div>
               )}
             </>

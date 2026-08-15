@@ -5,111 +5,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import MarkdownViewer from '../components/MarkdownViewer';
 import { Save, UploadCloud, Eye, Edit, Trash2, X, Image as ImageIcon, Loader } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-
-function MarkdownInput({ label, value, onChange, placeholder, height = '200px' }) {
-  const textareaRef = useRef(null);
-  const [isUploading, setIsUploading] = useState(false);
-
-  const insertTextAtCursor = (textToInsert) => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      onChange(value + textToInsert);
-      return;
-    }
-    const startPos = textarea.selectionStart;
-    const endPos = textarea.selectionEnd;
-    const beforeText = value.substring(0, startPos);
-    const afterText = value.substring(endPos, value.length);
-    const newValue = beforeText + textToInsert + afterText;
-    onChange(newValue);
-    setTimeout(() => {
-      textarea.selectionStart = textarea.selectionEnd = startPos + textToInsert.length;
-      textarea.focus();
-    }, 0);
-  };
-
-  const uploadImage = async (file) => {
-    setIsUploading(true);
-    try {
-      const storageRef = ref(storage, `preparations_inline/${Date.now()}_${file.name || 'image.png'}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      insertTextAtCursor(`\n![صورة](${url})\n`);
-    } catch (error) {
-      console.error('Error uploading inline image:', error);
-      alert('فشل رفع الصورة');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handlePaste = (e) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        e.preventDefault();
-        const file = items[i].getAsFile();
-        uploadImage(file);
-        break;
-      }
-    }
-  };
-
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      uploadImage(file);
-    }
-    e.target.value = null;
-  };
-
-  return (
-    <div className="form-group" style={{ marginBottom: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <label style={{ margin: 0 }}>{label} (يدعم LaTeX للرياضيات باستخدام $ و $$)</label>
-        <div style={{ position: 'relative' }}>
-          <input 
-            type="file" 
-            accept="image/*" 
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-            onChange={handleFileSelect}
-            title="إدراج صورة"
-          />
-          <button type="button" className="btn" style={{ padding: '6px 12px', fontSize: '12px', background: '#e2e8f0', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '6px' }}>
-            {isUploading ? <Loader size={14} className="spin" /> : <ImageIcon size={14} />}
-            {isUploading ? 'جاري الرفع...' : 'إدراج صورة'}
-          </button>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: '20px', height }}>
-        <div style={{ flex: 1, position: 'relative' }}>
-          <textarea 
-            ref={textareaRef}
-            className="input-field" 
-            style={{ width: '100%', resize: 'none', height: '100%', fontFamily: 'monospace', margin: 0 }}
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            onPaste={handlePaste}
-            placeholder={placeholder + "\n(يمكنك لصق الصور مباشرة هنا Ctrl+V)"}
-          />
-          {isUploading && (
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10, borderRadius: '8px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--color-primary)' }}>
-                <Loader className="spin" size={24} style={{ marginBottom: '8px' }} />
-                <span style={{ fontWeight: 'bold' }}>جاري رفع الصورة...</span>
-              </div>
-            </div>
-          )}
-        </div>
-        <div style={{ flex: 1, border: '1px solid var(--color-border)', borderRadius: '8px', padding: '16px', background: '#fff', overflowY: 'auto' }}>
-          <h4 style={{ margin: '0 0 10px 0', color: 'var(--color-text-muted)' }}>معاينة حية:</h4>
-          <MarkdownViewer content={value || '*(فارغ)*'} />
-        </div>
-      </div>
-    </div>
-  );
-}
+import MarkdownInput from '../components/MarkdownInput';
 
 export default function LessonPreparation() {
   const { userData } = useAuth();
@@ -135,8 +31,9 @@ export default function LessonPreparation() {
   
   // Form fields
   const [goals, setGoals] = useState('');
-  const [warmup, setWarmup] = useState('');
   const [portfolio, setPortfolio] = useState('');
+  const [warmup, setWarmup] = useState('');
+  const [strategy, setStrategy] = useState('');
   const [content, setContent] = useState('');
   const [resources, setResources] = useState('');
   const [formativeEval, setFormativeEval] = useState('');
@@ -245,7 +142,7 @@ export default function LessonPreparation() {
   // Fetch existing prep for selected class, subject, week, and period
   useEffect(() => {
     if (!teacherDocId || !selectedClass || !selectedSubject || !selectedWeek || !selectedPeriod) {
-      setGoals(''); setWarmup(''); setPortfolio(''); setContent(''); setResources(''); setFormativeEval(''); setSummativeEval(''); setHomework(''); setFileUrl(''); setFileName(''); setPrepDocId(null);
+      setGoals(''); setPortfolio(''); setWarmup(''); setStrategy(''); setContent(''); setResources(''); setFormativeEval(''); setSummativeEval(''); setHomework(''); setFileUrl(''); setFileName(''); setPrepDocId(null);
       return;
     }
     const q = query(
@@ -260,8 +157,9 @@ export default function LessonPreparation() {
       if (!snapshot.empty) {
         const data = snapshot.docs[0].data();
         setGoals(data.goals || '');
-        setWarmup(data.warmup || '');
         setPortfolio(data.portfolio || '');
+        setWarmup(data.warmup || '');
+        setStrategy(data.strategy || '');
         setContent(data.content || '');
         setResources(data.resources || '');
         setFormativeEval(data.formativeEval || '');
@@ -271,7 +169,7 @@ export default function LessonPreparation() {
         setFileName(data.fileName || '');
         setPrepDocId(snapshot.docs[0].id);
       } else {
-        setGoals(''); setWarmup(''); setPortfolio(''); setContent(''); setResources(''); setFormativeEval(''); setSummativeEval(''); setHomework(''); setFileUrl(''); setFileName(''); setPrepDocId(null);
+        setGoals(''); setPortfolio(''); setWarmup(''); setStrategy(''); setContent(''); setResources(''); setFormativeEval(''); setSummativeEval(''); setHomework(''); setFileUrl(''); setFileName(''); setPrepDocId(null);
       }
     });
     return () => unsub();
@@ -313,8 +211,9 @@ export default function LessonPreparation() {
         date: selectedDate,
         period: selectedPeriod,
         goals,
-        warmup,
         portfolio,
+        warmup,
+        strategy,
         content,
         resources,
         formativeEval,
@@ -470,6 +369,14 @@ export default function LessonPreparation() {
               />
 
               <MarkdownInput 
+                label="الحقبنة" 
+                value={portfolio} 
+                onChange={setPortfolio} 
+                placeholder="اربط اهداف درسك بالمعرفة السابقة للطالب..." 
+                height="150px" 
+              />
+
+              <MarkdownInput 
                 label="التهيئة" 
                 value={warmup} 
                 onChange={setWarmup} 
@@ -478,10 +385,10 @@ export default function LessonPreparation() {
               />
 
               <MarkdownInput 
-                label="الحقيبة" 
-                value={portfolio} 
-                onChange={setPortfolio} 
-                placeholder="اكتب الحقيبة هنا..." 
+                label="استراتيجيات التدريس" 
+                value={strategy} 
+                onChange={setStrategy} 
+                placeholder="اكتب استراتيجيات التدريس هنا..." 
                 height="150px" 
               />
 
@@ -598,12 +505,13 @@ export default function LessonPreparation() {
                 </div>
               )}
 
-              {['goals', 'warmup', 'portfolio', 'content', 'resources', 'formativeEval', 'summativeEval', 'homework'].map(field => {
+              {['goals', 'portfolio', 'warmup', 'strategy', 'content', 'resources', 'formativeEval', 'summativeEval', 'homework'].map(field => {
                 const titles = {
                   goals: 'الأهداف السلوكية',
+                  portfolio: 'الحقبنة',
                   warmup: 'التهيئة',
-                  portfolio: 'الحقيبة',
-                  content: 'المحتوى',
+                  strategy: 'استراتيجيات التدريس',
+                  content: 'محتوى الدرس',
                   resources: 'الوسائل ومصادر التعلم',
                   formativeEval: 'التقويم البنائي',
                   summativeEval: 'التقويم النهائي',
