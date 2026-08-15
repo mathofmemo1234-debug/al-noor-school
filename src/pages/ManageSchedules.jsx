@@ -12,7 +12,7 @@ export default function ManageSchedules() {
   const [subjects, setSubjects] = useState([]);
   
   const [selectedClass, setSelectedClass] = useState('');
-  const [academicYear, setAcademicYear] = useState('1445-1446');
+  const [academicYear, setAcademicYear] = useState('1447-1448');
   const [semester, setSemester] = useState('الفصل الأول');
   const [scheduleData, setScheduleData] = useState({});
   const [isSaving, setIsSaving] = useState(false);
@@ -172,14 +172,25 @@ export default function ManageSchedules() {
           </div>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>العام الدراسي</label>
-            <input type="text" className="input-field" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} style={{ marginBottom: 0, width: '150px' }} placeholder="مثال: 1445-1446" />
+            <select className="input-field" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} style={{ marginBottom: 0, width: '150px' }}>
+              <option value="1447-1448">1447-1448</option>
+              <option value="1448-1449">1448-1449</option>
+              <option value="1449-1450">1449-1450</option>
+              <option value="1450-1451">1450-1451</option>
+              <option value="1451-1452">1451-1452</option>
+              <option value="1452-1453">1452-1453</option>
+              <option value="1453-1454">1453-1454</option>
+              <option value="1454-1455">1454-1455</option>
+              <option value="1455-1456">1455-1456</option>
+              <option value="1456-1457">1456-1457</option>
+              <option value="1457-1458">1457-1458</option>
+            </select>
           </div>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>الفصل (الترم)</label>
             <select className="input-field" value={semester} onChange={(e) => setSemester(e.target.value)} style={{ marginBottom: 0, width: '150px' }}>
               <option value="الفصل الأول">الفصل الأول</option>
               <option value="الفصل الثاني">الفصل الثاني</option>
-              <option value="الفصل الثالث">الفصل الثالث</option>
             </select>
           </div>
           <div style={{ flex: 1, textAlign: 'left' }}>
