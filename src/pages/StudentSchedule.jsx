@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, onSnapshot, collection } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar } from 'lucide-react';
 
@@ -13,6 +13,23 @@ export default function StudentSchedule() {
   const [academicYear, setAcademicYear] = useState('');
   const [semester, setSemester] = useState('');
   const [teachers, setTeachers] = useState({});
+  const [studentClass, setStudentClass] = useState(null);
+
+  useEffect(() => {
+    if (userData?.nationalId) {
+      const unsub = onSnapshot(
+        query(collection(db, 'students'), where('nationalId', '==', userData.nationalId)),
+        (snap) => {
+          if (!snap.empty) {
+            setStudentClass(snap.docs[0].data().class);
+          } else {
+            setStudentClass(null);
+          }
+        }
+      );
+      return () => unsub();
+    }
+  }, [userData]);
 
   useEffect(() => {
     // Load all teachers for name mapping
@@ -24,9 +41,9 @@ export default function StudentSchedule() {
       setTeachers(tMap);
     });
 
-    if (userData?.class) {
+    if (studentClass) {
       // Load class schedule
-      const unsubSchedule = onSnapshot(doc(db, 'schedules', userData.class), (docSnap) => {
+      const unsubSchedule = onSnapshot(doc(db, 'schedules', studentClass), (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setScheduleData(data.matrix || {});
@@ -40,7 +57,7 @@ export default function StudentSchedule() {
     }
     
     return () => unsubTeachers();
-  }, [userData]);
+  }, [studentClass]);
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
