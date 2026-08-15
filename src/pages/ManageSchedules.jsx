@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { Calendar, BookOpen, Plus, Trash2, Save } from 'lucide-react';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-const PERIODS = [1, 2, 3, 4, 5, 6, 7];
+const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export default function ManageSchedules() {
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
   
-  const [selectedClass, setSelectedClass] = useState('');
   const [academicYear, setAcademicYear] = useState('1447-1448');
   const [semester, setSemester] = useState('الفصل الأول');
-  const [scheduleData, setScheduleData] = useState({});
+  
+  // Array of flat schedule entries
+  const [entries, setEntries] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   
   // For managing subjects
@@ -30,7 +31,6 @@ export default function ManageSchedules() {
     });
     const unsubSubjects = onSnapshot(collection(db, 'subjects'), (snap) => {
       let subs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Prepopulate if empty
       if (subs.length === 0) {
         const defaultSubjects = ['القرآن الكريم', 'التوحيد', 'الفقه', 'الحديث', 'لغتي', 'الرياضيات', 'العلوم', 'اللغة الإنجليزية', 'الدراسات الاجتماعية', 'التربية الفنية', 'التربية البدنية', 'المهارات الرقمية'];
         defaultSubjects.forEach(async (sub) => {
@@ -39,54 +39,104 @@ export default function ManageSchedules() {
       }
       setSubjects(subs);
     });
-
-    return () => { unsubClasses(); unsubTeachers(); unsubSubjects(); };
-  }, []);
-
-  // Load selected class schedule
-  useEffect(() => {
-    if (!selectedClass) {
-      setScheduleData({});
-      return;
-    }
     
-    // We store schedule as doc with ID = classId
-    const unsubSchedule = onSnapshot(doc(db, 'schedules', selectedClass), (docSnap) => {
-      if (docSnap.exists()) {
+    // Load existing schedules and flatten them
+    const unsubSchedules = onSnapshot(collection(db, 'schedules'), (snap) => {
+      let flatEntries = [];
+      snap.docs.forEach(docSnap => {
         const data = docSnap.data();
-        setScheduleData(data.matrix || {});
         if (data.academicYear) setAcademicYear(data.academicYear);
         if (data.semester) setSemester(data.semester);
-      } else {
-        setScheduleData({});
-      }
+        
+        const matrix = data.matrix || {};
+        const classId = docSnap.id;
+        
+        Object.keys(matrix).forEach(key => {
+          const [day, periodStr] = key.split('-');
+          const cell = matrix[key];
+          if (cell && (cell.subject || cell.teacherId)) {
+            flatEntries.push({
+              id: Math.random().toString(36).substr(2, 9),
+              classId,
+              day,
+              period: parseInt(periodStr),
+              subject: cell.subject,
+              teacherId: cell.teacherId
+            });
+          }
+        });
+      });
+      // Sort by day, period, class
+      flatEntries.sort((a, b) => {
+        if (DAYS.indexOf(a.day) !== DAYS.indexOf(b.day)) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
+        if (a.period !== b.period) return a.period - b.period;
+        return 0;
+      });
+      setEntries(flatEntries);
     });
-    return () => unsubSchedule();
-  }, [selectedClass]);
 
-  const handleCellChange = (day, period, field, value) => {
-    const key = `${day}-${period}`;
-    setScheduleData(prev => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        [field]: value
-      }
-    }));
+    return () => { unsubClasses(); unsubTeachers(); unsubSubjects(); unsubSchedules(); };
+  }, []);
+
+  const handleAddRow = () => {
+    setEntries([{
+      id: Math.random().toString(36).substr(2, 9),
+      classId: '',
+      day: DAYS[0],
+      period: 1,
+      subject: '',
+      teacherId: ''
+    }, ...entries]);
+  };
+
+  const handleRemoveRow = (id) => {
+    setEntries(entries.filter(e => e.id !== id));
+  };
+
+  const handleRowChange = (id, field, value) => {
+    setEntries(entries.map(e => e.id === id ? { ...e, [field]: value } : e));
   };
 
   const handleSaveSchedule = async () => {
-    if (!selectedClass) return alert('الرجاء اختيار الفصل');
     setIsSaving(true);
     try {
-      await setDoc(doc(db, 'schedules', selectedClass), {
-        classId: selectedClass,
-        academicYear,
-        semester,
-        matrix: scheduleData,
-        updatedAt: new Date().toISOString()
+      // Group entries by classId
+      const grouped = {};
+      entries.forEach(entry => {
+        if (!entry.classId || !entry.day || !entry.period) return;
+        if (!grouped[entry.classId]) grouped[entry.classId] = {};
+        
+        const key = `${entry.day}-${entry.period}`;
+        grouped[entry.classId][key] = {
+          subject: entry.subject || '',
+          teacherId: entry.teacherId || ''
+        };
       });
-      alert('تم حفظ الجدول بنجاح');
+
+      // We need to delete old classes that might no longer exist in grouped
+      const oldSchedulesSnap = await getDocs(collection(db, 'schedules'));
+      const batch = writeBatch(db);
+      
+      oldSchedulesSnap.docs.forEach(docSnap => {
+        if (!grouped[docSnap.id]) {
+          batch.delete(docSnap.ref);
+        }
+      });
+
+      // Write new grouped data
+      Object.keys(grouped).forEach(classId => {
+        const docRef = doc(db, 'schedules', classId);
+        batch.set(docRef, {
+          classId: classId,
+          academicYear,
+          semester,
+          matrix: grouped[classId],
+          updatedAt: new Date().toISOString()
+        });
+      });
+
+      await batch.commit();
+      alert('تم حفظ الجدول العام بنجاح');
     } catch (error) {
       console.error(error);
       alert('خطأ أثناء حفظ الجدول');
@@ -159,17 +209,10 @@ export default function ManageSchedules() {
       {/* Schedule Management */}
       <div className="glass-panel" style={{ padding: '24px' }}>
         <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: 'var(--color-primary-dark)' }}>
-          <Calendar size={24} /> إدارة جدول الحصص
+          <Calendar size={24} /> إدخال الجدول الشامل
         </h2>
         
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px', alignItems: 'flex-end' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>الفصل الدراسي</label>
-            <select className="input-field" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} style={{ marginBottom: 0, minWidth: '200px' }}>
-              <option value="">-- اختر الفصل --</option>
-              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>العام الدراسي</label>
             <select className="input-field" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} style={{ marginBottom: 0, width: '150px' }}>
@@ -193,64 +236,75 @@ export default function ManageSchedules() {
               <option value="الفصل الثاني">الفصل الثاني</option>
             </select>
           </div>
-          <div style={{ flex: 1, textAlign: 'left' }}>
-            <button onClick={handleSaveSchedule} disabled={!selectedClass || isSaving} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ الجدول'}
+          <div style={{ flex: 1, textAlign: 'left', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <button onClick={handleAddRow} className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <Plus size={18} /> إضافة حصة جديدة
+            </button>
+            <button onClick={handleSaveSchedule} disabled={isSaving} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ الجدول العام'}
             </button>
           </div>
         </div>
 
-        {selectedClass ? (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>المعلم</th>
+                <th>المادة</th>
+                <th>الفصل</th>
+                <th>اليوم</th>
+                <th>الحصة</th>
+                <th style={{ width: '50px' }}>حذف</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.length === 0 ? (
                 <tr>
-                  <th style={{ width: '100px' }}>اليوم</th>
-                  {PERIODS.map(p => <th key={p} style={{ textAlign: 'center' }}>الحصة {p}</th>)}
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
+                    لا توجد حصص مضافة. انقر على "إضافة حصة جديدة" للبدء.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {DAYS.map(day => (
-                  <tr key={day}>
-                    <td style={{ fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>{day}</td>
-                    {PERIODS.map(period => {
-                      const key = `${day}-${period}`;
-                      const cellData = scheduleData[key] || { subject: '', teacherId: '' };
-                      return (
-                        <td key={period} style={{ padding: '8px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <select 
-                              className="input-field" 
-                              style={{ padding: '4px 8px', fontSize: '12px', marginBottom: 0, height: 'auto' }}
-                              value={cellData.subject}
-                              onChange={(e) => handleCellChange(day, period, 'subject', e.target.value)}
-                            >
-                              <option value="">المادة...</option>
-                              {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                            </select>
-                            <select 
-                              className="input-field" 
-                              style={{ padding: '4px 8px', fontSize: '12px', marginBottom: 0, height: 'auto' }}
-                              value={cellData.teacherId}
-                              onChange={(e) => handleCellChange(day, period, 'teacherId', e.target.value)}
-                            >
-                              <option value="">المعلم...</option>
-                              {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                            </select>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
-            يرجى اختيار الفصل لعرض وتعديل جدوله الدراسي
-          </div>
-        )}
+              ) : entries.map(entry => (
+                <tr key={entry.id}>
+                  <td>
+                    <select className="input-field" value={entry.teacherId} onChange={(e) => handleRowChange(entry.id, 'teacherId', e.target.value)} style={{ marginBottom: 0 }}>
+                      <option value="">اختر المعلم...</option>
+                      {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <select className="input-field" value={entry.subject} onChange={(e) => handleRowChange(entry.id, 'subject', e.target.value)} style={{ marginBottom: 0 }}>
+                      <option value="">اختر المادة...</option>
+                      {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <select className="input-field" value={entry.classId} onChange={(e) => handleRowChange(entry.id, 'classId', e.target.value)} style={{ marginBottom: 0 }}>
+                      <option value="">اختر الفصل...</option>
+                      {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <select className="input-field" value={entry.day} onChange={(e) => handleRowChange(entry.id, 'day', e.target.value)} style={{ marginBottom: 0 }}>
+                      {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <select className="input-field" value={entry.period} onChange={(e) => handleRowChange(entry.id, 'period', parseInt(e.target.value))} style={{ marginBottom: 0 }}>
+                      {PERIODS.map(p => <option key={p} value={p}>الحصة {p}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <button onClick={() => handleRemoveRow(entry.id)} style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer' }}>
+                      <Trash2 size={20} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </div>

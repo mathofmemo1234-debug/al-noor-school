@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Calendar } from 'lucide-react';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-const PERIODS = [1, 2, 3, 4, 5, 6, 7];
+const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export default function TeacherSchedule() {
   const { currentUser } = useAuth();
