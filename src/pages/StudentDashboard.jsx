@@ -42,6 +42,8 @@ function StudentWeeklyPlan() {
   
   const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
   const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
+  const WEEKS = Array.from({length: 18}, (_, i) => `الأسبوع ${i + 1}`);
+  const [selectedWeek, setSelectedWeek] = useState(WEEKS[0]);
 
   useEffect(() => {
     if (studentClass) {
@@ -62,14 +64,18 @@ function StudentWeeklyPlan() {
 
   useEffect(() => {
     if (!studentClass) return;
-    const q = query(collection(db, 'weekly_plans'), where('className', '==', studentClass));
+    const q = query(
+      collection(db, 'weekly_plans'), 
+      where('className', '==', studentClass),
+      where('week', '==', selectedWeek)
+    );
     const unsubPlans = onSnapshot(q, (snapshot) => {
       const data = [];
       snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
       setPlans(data);
     });
     return () => unsubPlans();
-  }, [studentClass]);
+  }, [studentClass, selectedWeek]);
 
   useEffect(() => {
     const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
@@ -108,9 +114,21 @@ function StudentWeeklyPlan() {
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <h2>الخطة الأسبوعية - فصل {studentClass}</h2>
-        <p style={{ color: 'var(--color-text-muted)' }}>تفاصيل الدروس والأهداف مرتبطة بجدولك الدراسي.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <h2>الخطة الأسبوعية - فصل {studentClass}</h2>
+          <p style={{ color: 'var(--color-text-muted)' }}>تفاصيل الدروس والأهداف مرتبطة بجدولك الدراسي.</p>
+        </div>
+        <select 
+          className="input-field" 
+          style={{ width: '200px', marginBottom: 0 }}
+          value={selectedWeek} 
+          onChange={(e) => setSelectedWeek(e.target.value)}
+        >
+          {WEEKS.map(w => (
+            <option key={w} value={w}>{w}</option>
+          ))}
+        </select>
       </div>
 
       {Object.keys(scheduleData).length === 0 ? (

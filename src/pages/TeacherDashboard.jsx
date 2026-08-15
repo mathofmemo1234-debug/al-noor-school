@@ -124,8 +124,10 @@ function TeacherTasks() {
 
 function WeeklyPlan() {
   const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+  const WEEKS = Array.from({length: 18}, (_, i) => `الأسبوع ${i + 1}`);
   const [plan, setPlan] = useState({});
   const [selectedClass, setSelectedClass] = useState('');
+  const [selectedWeek, setSelectedWeek] = useState(WEEKS[0]);
   const [classesList, setClassesList] = useState([]);
   const [planDocId, setPlanDocId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -193,7 +195,8 @@ function WeeklyPlan() {
     const q = query(
       collection(db, 'weekly_plans'),
       where('teacherId', '==', teacherDocId),
-      where('className', '==', selectedClass)
+      where('className', '==', selectedClass),
+      where('week', '==', selectedWeek)
     );
     const unsub = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
@@ -205,7 +208,7 @@ function WeeklyPlan() {
       }
     });
     return () => unsub();
-  }, [selectedClass]);
+  }, [selectedClass, selectedWeek]);
 
   const handleChange = (day, field, value) => {
     setPlan(prev => ({
@@ -226,6 +229,7 @@ function WeeklyPlan() {
         teacherId: teacherDocId,
         teacherEmail: auth.currentUser.email,
         className: selectedClass,
+        week: selectedWeek,
         plan: plan,
         updatedAt: new Date().toISOString()
       };
@@ -258,6 +262,16 @@ function WeeklyPlan() {
             <option value="">اختر الفصل...</option>
             {classesList.map(c => (
               <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <select 
+            className="input-field" 
+            style={{ width: '200px', marginBottom: 0 }}
+            value={selectedWeek} 
+            onChange={(e) => setSelectedWeek(e.target.value)}
+          >
+            {WEEKS.map(w => (
+              <option key={w} value={w}>{w}</option>
             ))}
           </select>
           <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || !selectedClass}>
