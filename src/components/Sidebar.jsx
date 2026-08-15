@@ -21,12 +21,14 @@ export default function Sidebar({ role }) {
     { path: '/admin/teachers', icon: Users, label: 'إدارة المعلمين' },
     { path: '/admin/students', icon: Users, label: 'إدارة الطلاب' },
     { path: '/admin/classes', icon: BookOpen, label: 'الفصول الدراسية' },
+    { path: '/admin/schedule', icon: Calendar, label: 'إدارة الجداول' },
     { path: '/admin/settings', icon: Settings, label: 'الإعدادات' },
   ];
 
   const teacherLinks = [
     { path: '/teacher', icon: Home, label: 'المهام (الرئيسية)' },
     { path: '/teacher/weekly-plan', icon: Calendar, label: 'الخطة الأسبوعية' },
+    { path: '/teacher/schedule', icon: Calendar, label: 'الجدول الدراسي' },
     { path: '/teacher/assignments', icon: BookOpen, label: 'الواجبات' },
     { path: '/teacher/attendance', icon: Users, label: 'الغياب والحضور' },
     { path: '/teacher/settings', icon: Settings, label: 'تغيير كلمة المرور' },

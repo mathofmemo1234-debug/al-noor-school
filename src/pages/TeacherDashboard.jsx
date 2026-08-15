@@ -2,8 +2,9 @@ import Settings from './Settings';
 import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { CheckSquare, Square, Plus, Save, Trash2 } from 'lucide-react';
+import { Calendar, FileText, Users, X, Edit, Trash2, CheckSquare, Square, Plus, Save } from 'lucide-react';
 import { db, auth } from '../firebase';
+import TeacherSchedule from './TeacherSchedule';
 import { doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
 
 function TeacherTasks() {
@@ -577,6 +578,7 @@ export default function TeacherDashboard() {
       <Routes>
         <Route path="/" element={<TeacherTasks />} />
         <Route path="/weekly-plan" element={<WeeklyPlan />} />
+        <Route path="/schedule" element={<TeacherSchedule />} />
         <Route path="/assignments" element={<Assignments />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/settings" element={<Settings />} />

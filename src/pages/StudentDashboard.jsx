@@ -4,6 +4,7 @@ import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import StudentSchedule from './StudentSchedule';
 
 function StudentHome() {
   return (
@@ -130,17 +131,6 @@ function StudentAssignments() {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function StudentSchedule() {
-  return (
-    <div className="glass-panel" style={{ padding: '24px' }}>
-      <h2>الجدول الدراسي</h2>
-      <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-        سيتم إضافة الجدول الدراسي قريباً.
-      </p>
     </div>
   );
 }

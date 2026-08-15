@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Users, BookOpen, UserPlus, X, Edit, Trash2 } from 'lucide-react';
+import ManageSchedules from './ManageSchedules';
 import { db } from '../firebase';
 import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
 
@@ -681,6 +682,7 @@ export default function AdminDashboard() {
         <Route path="/teachers" element={<ManageTeachers />} />
         <Route path="/students" element={<ManageStudents />} />
         <Route path="/classes" element={<ManageClasses />} />
+        <Route path="/schedule" element={<ManageSchedules />} />
         <Route path="*" element={<AdminHome />} />
       </Routes>
     </Layout>
