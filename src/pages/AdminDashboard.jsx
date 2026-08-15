@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Users, BookOpen, UserPlus, X } from 'lucide-react';
+import { Users, BookOpen, UserPlus, X, Edit, Trash2 } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, addDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
 
 function AdminHome() {
   const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0 });
@@ -62,6 +62,7 @@ function ManageTeachers() {
   const [teachers, setTeachers] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
   const [isBulkAdding, setIsBulkAdding] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState(null);
   
   // Single Add
   const [name, setName] = useState('');
@@ -139,6 +140,41 @@ function ManageTeachers() {
     }
   };
 
+  const handleDelete = async (id, nationalId) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا المعلم؟')) return;
+    try {
+      await deleteDoc(doc(db, 'teachers', id));
+      const uq = query(collection(db, 'users'), where('nationalId', '==', nationalId));
+      const snap = await getDocs(uq);
+      snap.forEach(async (d) => await deleteDoc(doc(db, 'users', d.id)));
+    } catch (err) {
+      console.error(err);
+      alert('خطأ أثناء الحذف');
+    }
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'teachers', editingTeacher.id), {
+        name: editingTeacher.name,
+        subject: editingTeacher.subject
+      });
+      const uq = query(collection(db, 'users'), where('nationalId', '==', editingTeacher.nationalId));
+      const snap = await getDocs(uq);
+      snap.forEach(async (d) => await updateDoc(doc(db, 'users', d.id), {
+        name: editingTeacher.name
+      }));
+      setEditingTeacher(null);
+    } catch (err) {
+      console.error(err);
+      alert('خطأ أثناء التحديث');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -158,10 +194,14 @@ function ManageTeachers() {
           <p style={{ color: 'var(--color-text-muted)' }}>لا يوجد معلمين مضافين بعد.</p>
         ) : (
           teachers.map(t => (
-            <div key={t.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
+            <div key={t.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{t.name}</h3>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>رقم الهوية: {t.nationalId} • {t.subject}</p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setEditingTeacher(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
+                <button onClick={() => handleDelete(t.id, t.nationalId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4f' }}><Trash2 size={20} /></button>
               </div>
             </div>
           ))
@@ -187,6 +227,26 @@ function ManageTeachers() {
                 <input type="text" className="input-field" value={subject} onChange={e => setSubject(e.target.value)} placeholder="رياضيات، لغتي، الخ..." required />
               </div>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingTeacher && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+            <button onClick={() => setEditingTeacher(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>تعديل بيانات المعلم</h3>
+            <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم المعلم</label>
+                <input type="text" className="input-field" value={editingTeacher.name} onChange={e => setEditingTeacher({...editingTeacher, name: e.target.value})} placeholder="الاسم الرباعي" required />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>المادة الدراسية</label>
+                <input type="text" className="input-field" value={editingTeacher.subject} onChange={e => setEditingTeacher({...editingTeacher, subject: e.target.value})} placeholder="رياضيات، لغتي، الخ..." required />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}</button>
             </form>
           </div>
         </div>
@@ -225,6 +285,7 @@ function ManageStudents() {
   const [classesList, setClassesList] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
   const [isBulkAdding, setIsBulkAdding] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
   
   // Single Add
   const [name, setName] = useState('');
@@ -305,6 +366,41 @@ function ManageStudents() {
     }
   };
 
+  const handleDelete = async (id, nationalId) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الطالب؟')) return;
+    try {
+      await deleteDoc(doc(db, 'students', id));
+      const uq = query(collection(db, 'users'), where('nationalId', '==', nationalId));
+      const snap = await getDocs(uq);
+      snap.forEach(async (d) => await deleteDoc(doc(db, 'users', d.id)));
+    } catch (err) {
+      console.error(err);
+      alert('خطأ أثناء الحذف');
+    }
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'students', editingStudent.id), {
+        name: editingStudent.name,
+        class: editingStudent.class
+      });
+      const uq = query(collection(db, 'users'), where('nationalId', '==', editingStudent.nationalId));
+      const snap = await getDocs(uq);
+      snap.forEach(async (d) => await updateDoc(doc(db, 'users', d.id), {
+        name: editingStudent.name
+      }));
+      setEditingStudent(null);
+    } catch (err) {
+      console.error(err);
+      alert('خطأ أثناء التحديث');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -324,10 +420,14 @@ function ManageStudents() {
           <p style={{ color: 'var(--color-text-muted)' }}>لا يوجد طلاب مضافين بعد.</p>
         ) : (
           students.map(s => (
-            <div key={s.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
+            <div key={s.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{s.name}</h3>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>رقم الهوية: {s.nationalId} • فصل: {s.class}</p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setEditingStudent(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
+                <button onClick={() => handleDelete(s.id, s.nationalId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4f' }}><Trash2 size={20} /></button>
               </div>
             </div>
           ))
@@ -358,6 +458,31 @@ function ManageStudents() {
                 </select>
               </div>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingStudent && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+            <button onClick={() => setEditingStudent(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>تعديل بيانات الطالب</h3>
+            <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم الطالب</label>
+                <input type="text" className="input-field" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} placeholder="الاسم الرباعي" required />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>الفصل الدراسي</label>
+                <select className="input-field" value={editingStudent.class} onChange={e => setEditingStudent({...editingStudent, class: e.target.value})} required>
+                  <option value="">اختر الفصل...</option>
+                  {classesList.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}</button>
             </form>
           </div>
         </div>
@@ -396,6 +521,7 @@ function ManageClasses() {
   const [isAdding, setIsAdding] = useState(false);
   const [className, setClassName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [editingClass, setEditingClass] = useState(null);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
@@ -424,6 +550,32 @@ function ManageClasses() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الفصل؟')) return;
+    try {
+      await deleteDoc(doc(db, 'classes', id));
+    } catch (err) {
+      console.error(err);
+      alert('خطأ أثناء الحذف');
+    }
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'classes', editingClass.id), {
+        name: editingClass.name
+      });
+      setEditingClass(null);
+    } catch (err) {
+      console.error(err);
+      alert('خطأ أثناء التحديث');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -438,8 +590,12 @@ function ManageClasses() {
           <p style={{ color: 'var(--color-text-muted)' }}>لا توجد فصول مضافة بعد.</p>
         ) : (
           classes.map(cls => (
-            <div key={cls.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <div key={cls.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{cls.name}</h3>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setEditingClass(cls)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
+                <button onClick={() => handleDelete(cls.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4f' }}><Trash2 size={20} /></button>
+              </div>
             </div>
           ))
         )}
@@ -474,6 +630,40 @@ function ManageClasses() {
               </div>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>
                 {isSaving ? 'جاري الحفظ...' : 'حفظ الفصل'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingClass && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+            <button 
+              onClick={() => setEditingClass(null)} 
+              style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <X size={20} color="var(--color-text-muted)" />
+            </button>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>
+              تعديل بيانات الفصل
+            </h3>
+            <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم الفصل</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={editingClass.name}
+                  onChange={(e) => setEditingClass({...editingClass, name: e.target.value})}
+                  required
+                />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
               </button>
             </form>
           </div>

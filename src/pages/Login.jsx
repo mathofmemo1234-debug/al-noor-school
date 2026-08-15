@@ -52,7 +52,34 @@ export default function Login() {
       if (role === 'student') navigate('/student');
     } catch (err) {
       console.error("Login Error:", err);
-      setError('رقم الهوية أو كلمة المرور غير صحيحة');
+      
+      if (role !== 'admin' && (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password')) {
+        try {
+          const userQuery = query(collection(db, 'users'), where('nationalId', '==', nationalId));
+          const querySnapshot = await getDocs(userQuery);
+          
+          if (!querySnapshot.empty) {
+            if (password === nationalId) {
+              const fakeEmail = getFakeEmail(nationalId);
+              await createUserWithEmailAndPassword(auth, fakeEmail, password);
+              
+              const userData = querySnapshot.docs[0].data();
+              if (userData.role === 'teacher') navigate('/teacher');
+              if (userData.role === 'student') navigate('/student');
+              return;
+            } else {
+              setError('رقم الهوية أو كلمة المرور غير صحيحة');
+            }
+          } else {
+            setError('رقم الهوية أو كلمة المرور غير صحيحة');
+          }
+        } catch (dbErr) {
+          console.error("Firestore Error:", dbErr);
+          setError('رقم الهوية أو كلمة المرور غير صحيحة');
+        }
+      } else {
+        setError('رقم الهوية أو كلمة المرور غير صحيحة');
+      }
     } finally {
       setLoading(false);
     }
