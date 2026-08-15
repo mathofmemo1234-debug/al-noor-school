@@ -3,8 +3,10 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import MarkdownViewer from '../components/MarkdownViewer';
 import { Save } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function LessonPreparation() {
+  const { userData } = useAuth();
   const [classesList, setClassesList] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [subjects, setSubjects] = useState([]);
@@ -28,24 +30,17 @@ export default function LessonPreparation() {
 
   // Fetch teacher doc ID based on nationalId
   useEffect(() => {
-    if (auth.currentUser?.email) {
-      // Find teacher by email or Auth ID
-      const unsub = onSnapshot(query(collection(db, 'teachers')), (snap) => {
-        // Fallback: we know teacherId is used in schedules.
-        // Let's just find by nationalId if it exists in auth claims, or email
-        // Wait, auth.currentUser only has uid and email.
-        // We can fetch the teacher document where email matches or we just query by email
-        let found = false;
-        snap.docs.forEach(d => {
-          if (d.data().email === auth.currentUser.email || d.data().uid === auth.currentUser.uid) {
-            setTeacherDocId(d.id);
-            found = true;
-          }
-        });
+    if (userData?.nationalId) {
+      const unsub = onSnapshot(query(collection(db, 'teachers'), where('nationalId', '==', userData.nationalId)), (snap) => {
+        if (!snap.empty) {
+          setTeacherDocId(snap.docs[0].id);
+        } else {
+          setTeacherDocId(null);
+        }
       });
       return () => unsub();
     }
-  }, []);
+  }, [userData]);
 
   // Fetch available classes for this teacher based on their schedule
   useEffect(() => {
