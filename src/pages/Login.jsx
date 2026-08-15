@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, AlertCircle, UserPlus } from 'lucide-react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../firebase';
+import { auth, db } from '../firebase';
 import './Login.css';
 
 export default function Login() {
@@ -13,7 +13,7 @@ export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
   
   // Form fields
-  const [email, setEmail] = useState('');
+  const [nationalId, setNationalId] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [studentClass, setStudentClass] = useState('');
@@ -32,20 +32,27 @@ export default function Login() {
     return () => unsub();
   }, []);
 
+  const getFakeEmail = (id) => {
+    // Basic validation to ensure it's not already an email (like admin email)
+    if (id.includes('@')) return id;
+    return `${id}@school.local`;
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // Let ProtectedRoute handle navigation based on user role in context
+      const loginEmail = role === 'admin' ? nationalId : getFakeEmail(nationalId);
+      await signInWithEmailAndPassword(auth, loginEmail, password);
+      
       if (role === 'admin') navigate('/admin');
       if (role === 'teacher') navigate('/teacher');
       if (role === 'student') navigate('/student');
     } catch (err) {
       console.error("Login Error:", err);
-      setError('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+      setError('رقم الهوية أو كلمة المرور غير صحيحة');
     } finally {
       setLoading(false);
     }
@@ -58,6 +65,10 @@ export default function Login() {
       setError('الرجاء كتابة الاسم الرباعي (أو الثلاثي على الأقل)');
       return;
     }
+    if (!nationalId || nationalId.length < 10) {
+      setError('الرجاء إدخال رقم هوية صحيح (10 أرقام على الأقل)');
+      return;
+    }
     if (role === 'student' && !studentClass) {
       setError('الرجاء اختيار الفصل الدراسي');
       return;
@@ -66,13 +77,17 @@ export default function Login() {
     setLoading(true);
     
     try {
+      const fakeEmail = getFakeEmail(nationalId);
+      const defaultPassword = nationalId; // National ID as default password
+
       // 1. Create Firebase Auth user
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, defaultPassword);
       const user = userCredential.user;
 
       // 2. Add to 'users' collection for RBAC
       await addDoc(collection(db, 'users'), {
-        email: user.email,
+        nationalId: nationalId,
+        email: fakeEmail,
         role: role,
         name: name
       });
@@ -80,7 +95,8 @@ export default function Login() {
       // 3. Add to specific role collection
       if (role === 'student') {
         await addDoc(collection(db, 'students'), {
-          email: user.email,
+          nationalId: nationalId,
+          email: fakeEmail,
           name: name,
           class: studentClass,
           role: 'student',
@@ -89,9 +105,10 @@ export default function Login() {
         navigate('/student');
       } else if (role === 'teacher') {
         await addDoc(collection(db, 'teachers'), {
-          email: user.email,
+          nationalId: nationalId,
+          email: fakeEmail,
           name: name,
-          subject: '', // Can be updated later by teacher
+          subject: '',
           role: 'teacher',
           createdAt: new Date()
         });
@@ -100,83 +117,10 @@ export default function Login() {
     } catch (err) {
       console.error("Signup Error:", err);
       if (err.code === 'auth/email-already-in-use') {
-         setError('البريد الإلكتروني مسجل مسبقاً');
+         setError('رقم الهوية مسجل مسبقاً في النظام');
       } else {
          setError('حدث خطأ أثناء إنشاء الحساب');
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleAuth = async () => {
-    setError('');
-    
-    if (isSignup) {
-      if (!name || name.split(' ').length < 3) {
-        setError('الرجاء كتابة الاسم الرباعي قبل المتابعة مع Google');
-        return;
-      }
-      if (role === 'student' && !studentClass) {
-        setError('الرجاء اختيار الفصل الدراسي قبل المتابعة مع Google');
-        return;
-      }
-    }
-
-    setLoading(true);
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      
-      // Check if user exists in our DB
-      const q = query(collection(db, 'users'), where('email', '==', user.email));
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        if (!isSignup) {
-          setError('لا يوجد حساب مرتبط بهذا البريد. الرجاء إنشاء حساب جديد أولاً.');
-          // Optional: sign them out of firebase auth so they aren't stuck halfway
-          await auth.signOut();
-          setLoading(false);
-          return;
-        }
-
-        // New user signing up with Google
-        await addDoc(collection(db, 'users'), {
-          email: user.email,
-          role: role,
-          name: name
-        });
-
-        if (role === 'student') {
-          await addDoc(collection(db, 'students'), {
-            email: user.email,
-            name: name,
-            class: studentClass,
-            role: 'student',
-            createdAt: new Date()
-          });
-          navigate('/student');
-        } else if (role === 'teacher') {
-          await addDoc(collection(db, 'teachers'), {
-            email: user.email,
-            name: name,
-            subject: '',
-            role: 'teacher',
-            createdAt: new Date()
-          });
-          navigate('/teacher');
-        }
-      } else {
-        // User already exists, just log them in
-        const dbRole = querySnapshot.docs[0].data().role;
-        if (dbRole === 'admin') navigate('/admin');
-        else if (dbRole === 'teacher') navigate('/teacher');
-        else if (dbRole === 'student') navigate('/student');
-      }
-    } catch (err) {
-      console.error("Google Auth Error:", err);
-      setError('فشل تسجيل الدخول عبر Google');
     } finally {
       setLoading(false);
     }
@@ -258,47 +202,36 @@ export default function Login() {
           )}
 
           <div className="form-group">
-            <label>البريد الإلكتروني</label>
+            <label>{role === 'admin' ? 'البريد الإلكتروني للإدارة' : 'رقم الهوية الوطنية'}</label>
             <input 
-              type="email" 
-              placeholder="example@school.edu.sa" 
+              type={role === 'admin' ? 'email' : 'text'} 
+              placeholder={role === 'admin' ? 'admin@school.com' : '10xxxxxxxx'} 
               required 
               dir="ltr"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={nationalId}
+              onChange={(e) => setNationalId(e.target.value)}
             />
           </div>
           
-          <div className="form-group">
-            <label>كلمة المرور</label>
-            <input 
-              type="password" 
-              placeholder="••••••••" 
-              required 
-              dir="ltr"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
+          {!isSignup && (
+            <div className="form-group">
+              <label>كلمة المرور {role !== 'admin' && <span style={{fontSize:'12px', color:'#666'}}>(الافتراضية هي رقم الهوية)</span>}</label>
+              <input 
+                type="password" 
+                placeholder="••••••••" 
+                required 
+                dir="ltr"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          )}
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ marginBottom: '15px' }}>
             {loading ? 'جاري التحقق...' : (
               <>{isSignup ? <UserPlus size={18} /> : <LogIn size={18} />} {isSignup ? 'إنشاء حساب' : 'تسجيل الدخول'}</>
             )}
           </button>
-
-          {role !== 'admin' && (
-             <button 
-               type="button" 
-               className="btn btn-block" 
-               style={{ background: 'white', color: '#333', border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
-               onClick={handleGoogleAuth}
-               disabled={loading}
-             >
-               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: '18px' }} />
-               {isSignup ? 'التسجيل بواسطة Google' : 'تسجيل الدخول بواسطة Google'}
-             </button>
-          )}
         </form>
 
         <div style={{ marginTop: '20px', textAlign: 'center' }}>

@@ -29,6 +29,7 @@ export default function Sidebar({ role }) {
     { path: '/teacher/weekly-plan', icon: Calendar, label: 'الخطة الأسبوعية' },
     { path: '/teacher/assignments', icon: BookOpen, label: 'الواجبات' },
     { path: '/teacher/attendance', icon: Users, label: 'الغياب والحضور' },
+    { path: '/teacher/settings', icon: Settings, label: 'تغيير كلمة المرور' },
   ];
 
   const studentLinks = [
@@ -37,6 +38,7 @@ export default function Sidebar({ role }) {
     { path: '/student/schedule', icon: Calendar, label: 'الجدول الدراسي' },
     { path: '/student/assignments', icon: BookOpen, label: 'الواجبات' },
     { path: '/student/materials', icon: BookOpen, label: 'الملخصات' },
+    { path: '/student/settings', icon: Settings, label: 'تغيير كلمة المرور' },
   ];
 
   let links = [];

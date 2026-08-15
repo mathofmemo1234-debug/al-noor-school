@@ -1,3 +1,4 @@
+import Settings from './Settings';
 import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
@@ -155,6 +156,8 @@ function StudentMaterials() {
   );
 }
 
+
+
 export default function StudentDashboard() {
   return (
     <Layout role="student" title="لوحة تحكم الطالب">
@@ -164,6 +167,7 @@ export default function StudentDashboard() {
         <Route path="/assignments" element={<StudentAssignments />} />
         <Route path="/schedule" element={<StudentSchedule />} />
         <Route path="/materials" element={<StudentMaterials />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>
   );

@@ -1,3 +1,4 @@
+import Settings from './Settings';
 import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
@@ -580,6 +581,8 @@ function Attendance() {
   );
 }
 
+
+
 export default function TeacherDashboard() {
   return (
     <Layout role="teacher" title="لوحة تحكم المعلم">
@@ -588,6 +591,7 @@ export default function TeacherDashboard() {
         <Route path="/weekly-plan" element={<WeeklyPlan />} />
         <Route path="/assignments" element={<Assignments />} />
         <Route path="/attendance" element={<Attendance />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>
   );

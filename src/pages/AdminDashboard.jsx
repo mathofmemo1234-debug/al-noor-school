@@ -61,11 +61,17 @@ function AdminHome() {
 function ManageTeachers() {
   const [teachers, setTeachers] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [isBulkAdding, setIsBulkAdding] = useState(false);
+  
+  // Single Add
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [nationalId, setNationalId] = useState('');
   const [subject, setSubject] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Bulk Add
+  const [bulkData, setBulkData] = useState('');
+  
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'teachers'), (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -74,22 +80,60 @@ function ManageTeachers() {
     return () => unsub();
   }, []);
 
-  const handleSave = async (e) => {
+  const handleSaveSingle = async (e) => {
     e.preventDefault();
-    if (!name || !email) return;
+    if (!name || !nationalId) return;
     setIsSaving(true);
     try {
+      const fakeEmail = `${nationalId}@school.local`;
       await addDoc(collection(db, 'teachers'), {
-        name, email, subject, role: 'teacher', createdAt: new Date()
+        name, nationalId, email: fakeEmail, subject, role: 'teacher', createdAt: new Date()
       });
       await addDoc(collection(db, 'users'), {
-        email, role: 'teacher', name
+        nationalId, email: fakeEmail, role: 'teacher', name
       });
       setIsAdding(false);
-      setName(''); setEmail(''); setSubject('');
+      setName(''); setNationalId(''); setSubject('');
     } catch (err) {
       console.error(err);
       alert('خطأ في الحفظ. تأكد من الصلاحيات.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveBulk = async (e) => {
+    e.preventDefault();
+    if (!bulkData.trim()) return;
+    setIsSaving(true);
+    
+    try {
+      const lines = bulkData.trim().split('\n');
+      for (let line of lines) {
+        // Split by comma or tab
+        const parts = line.split(/[\t,]/).map(s => s.trim());
+        if (parts.length >= 2) {
+          const tId = parts[0];
+          const tName = parts[1];
+          const tSubj = parts[2] || '';
+          
+          if (tId && tName) {
+            const fakeEmail = `${tId}@school.local`;
+            await addDoc(collection(db, 'teachers'), {
+              name: tName, nationalId: tId, email: fakeEmail, subject: tSubj, role: 'teacher', createdAt: new Date()
+            });
+            await addDoc(collection(db, 'users'), {
+              nationalId: tId, email: fakeEmail, role: 'teacher', name: tName
+            });
+          }
+        }
+      }
+      setIsBulkAdding(false);
+      setBulkData('');
+      alert('تم إضافة المعلمين بنجاح');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء الرفع الجماعي.');
     } finally {
       setIsSaving(false);
     }
@@ -99,9 +143,14 @@ function ManageTeachers() {
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>إدارة المعلمين</h2>
-        <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
-          إضافة معلم جديد
-        </button>
+        <div style={{display: 'flex', gap: '10px'}}>
+          <button className="btn" style={{background: 'var(--color-surface)', color: 'var(--color-primary-dark)', border: '1px solid var(--color-border)'}} onClick={() => setIsBulkAdding(true)}>
+            رفع جماعي
+          </button>
+          <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
+            إضافة معلم جديد
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gap: '12px' }}>
@@ -112,7 +161,7 @@ function ManageTeachers() {
             <div key={t.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{t.name}</h3>
-                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>{t.email} • {t.subject}</p>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>رقم الهوية: {t.nationalId} • {t.subject}</p>
               </div>
             </div>
           ))
@@ -124,20 +173,45 @@ function ManageTeachers() {
           <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>إضافة معلم جديد</h3>
-            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleSaveSingle} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم المعلم</label>
                 <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="الاسم الرباعي" required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>البريد الإلكتروني</label>
-                <input type="email" className="input-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" required />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>رقم الهوية الوطنية</label>
+                <input type="text" className="input-field" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="10xxxxxxxx" required />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>المادة الدراسية</label>
                 <input type="text" className="input-field" value={subject} onChange={e => setSubject(e.target.value)} placeholder="رياضيات، لغتي، الخ..." required />
               </div>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isBulkAdding && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="glass-panel" style={{ width: '500px', padding: '24px', position: 'relative' }}>
+            <button onClick={() => setIsBulkAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
+            <h3 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--color-primary-dark)' }}>الرفع الجماعي للمعلمين</h3>
+            <p style={{fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '15px'}}>
+              قم بنسخ ولصق البيانات من ملف إكسل. (كل سطر يمثل معلماً).<br/>
+              الترتيب المطلوب: <strong>رقم الهوية، الاسم، المادة</strong> (مفصولة بفاصلة أو مسافة جدولة Tab)
+            </p>
+            <form onSubmit={handleSaveBulk} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <textarea 
+                className="input-field" 
+                rows="10" 
+                value={bulkData} 
+                onChange={e => setBulkData(e.target.value)} 
+                placeholder="1010101010, أحمد محمد, رياضيات&#10;1020202020, خالد عبدالله, علوم" 
+                required 
+                style={{resize: 'none'}}
+              />
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الرفع...' : 'رفع البيانات'}</button>
             </form>
           </div>
         </div>
@@ -150,10 +224,16 @@ function ManageStudents() {
   const [students, setStudents] = useState([]);
   const [classesList, setClassesList] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [isBulkAdding, setIsBulkAdding] = useState(false);
+  
+  // Single Add
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [nationalId, setNationalId] = useState('');
   const [studentClass, setStudentClass] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Bulk Add
+  const [bulkData, setBulkData] = useState('');
 
   useEffect(() => {
     const unsubStudents = onSnapshot(collection(db, 'students'), (snap) => {
@@ -167,22 +247,59 @@ function ManageStudents() {
     return () => { unsubStudents(); unsubClasses(); };
   }, []);
 
-  const handleSave = async (e) => {
+  const handleSaveSingle = async (e) => {
     e.preventDefault();
-    if (!name || !email || !studentClass) return;
+    if (!name || !nationalId || !studentClass) return;
     setIsSaving(true);
     try {
+      const fakeEmail = `${nationalId}@school.local`;
       await addDoc(collection(db, 'students'), {
-        name, email, class: studentClass, role: 'student', createdAt: new Date()
+        name, nationalId, email: fakeEmail, class: studentClass, role: 'student', createdAt: new Date()
       });
       await addDoc(collection(db, 'users'), {
-        email, role: 'student', name
+        nationalId, email: fakeEmail, role: 'student', name
       });
       setIsAdding(false);
-      setName(''); setEmail(''); setStudentClass('');
+      setName(''); setNationalId(''); setStudentClass('');
     } catch (err) {
       console.error(err);
       alert('خطأ في الحفظ. تأكد من الصلاحيات.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveBulk = async (e) => {
+    e.preventDefault();
+    if (!bulkData.trim()) return;
+    setIsSaving(true);
+    
+    try {
+      const lines = bulkData.trim().split('\n');
+      for (let line of lines) {
+        const parts = line.split(/[\t,]/).map(s => s.trim());
+        if (parts.length >= 2) {
+          const sId = parts[0];
+          const sName = parts[1];
+          const sClass = parts[2] || '';
+          
+          if (sId && sName) {
+            const fakeEmail = `${sId}@school.local`;
+            await addDoc(collection(db, 'students'), {
+              name: sName, nationalId: sId, email: fakeEmail, class: sClass, role: 'student', createdAt: new Date()
+            });
+            await addDoc(collection(db, 'users'), {
+              nationalId: sId, email: fakeEmail, role: 'student', name: sName
+            });
+          }
+        }
+      }
+      setIsBulkAdding(false);
+      setBulkData('');
+      alert('تم إضافة الطلاب بنجاح');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء الرفع الجماعي.');
     } finally {
       setIsSaving(false);
     }
@@ -192,9 +309,14 @@ function ManageStudents() {
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>إدارة الطلاب</h2>
-        <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
-          تسجيل طالب
-        </button>
+        <div style={{display: 'flex', gap: '10px'}}>
+          <button className="btn" style={{background: 'var(--color-surface)', color: 'var(--color-primary-dark)', border: '1px solid var(--color-border)'}} onClick={() => setIsBulkAdding(true)}>
+            رفع جماعي
+          </button>
+          <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
+            تسجيل طالب
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gap: '12px' }}>
@@ -205,7 +327,7 @@ function ManageStudents() {
             <div key={s.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{s.name}</h3>
-                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>{s.email} • فصل: {s.class}</p>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>رقم الهوية: {s.nationalId} • فصل: {s.class}</p>
               </div>
             </div>
           ))
@@ -217,14 +339,14 @@ function ManageStudents() {
           <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>تسجيل طالب جديد</h3>
-            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleSaveSingle} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم الطالب</label>
                 <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="الاسم الرباعي" required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>البريد الإلكتروني</label>
-                <input type="email" className="input-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" required />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>رقم الهوية الوطنية</label>
+                <input type="text" className="input-field" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="10xxxxxxxx" required />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>الفصل الدراسي</label>
@@ -236,6 +358,31 @@ function ManageStudents() {
                 </select>
               </div>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isBulkAdding && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="glass-panel" style={{ width: '500px', padding: '24px', position: 'relative' }}>
+            <button onClick={() => setIsBulkAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
+            <h3 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--color-primary-dark)' }}>الرفع الجماعي للطلاب</h3>
+            <p style={{fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '15px'}}>
+              قم بنسخ ولصق البيانات من ملف إكسل. (كل سطر يمثل طالباً).<br/>
+              الترتيب المطلوب: <strong>رقم الهوية، الاسم، الفصل</strong> (مفصولة بفاصلة أو مسافة جدولة Tab)
+            </p>
+            <form onSubmit={handleSaveBulk} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <textarea 
+                className="input-field" 
+                rows="10" 
+                value={bulkData} 
+                onChange={e => setBulkData(e.target.value)} 
+                placeholder="1010101010, أحمد محمد, 1/أ&#10;1020202020, خالد عبدالله, 2/ب" 
+                required 
+                style={{resize: 'none'}}
+              />
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الرفع...' : 'رفع البيانات'}</button>
             </form>
           </div>
         </div>
