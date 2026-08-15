@@ -43,9 +43,12 @@ export default function Login() {
     setError('');
     setLoading(true);
     
+    const trimmedId = nationalId.trim();
+    const trimmedPassword = password.trim();
+
     try {
-      const loginEmail = role === 'admin' ? nationalId : getFakeEmail(nationalId);
-      await signInWithEmailAndPassword(auth, loginEmail, password);
+      const loginEmail = role === 'admin' ? trimmedId : getFakeEmail(trimmedId);
+      await signInWithEmailAndPassword(auth, loginEmail, trimmedPassword);
       
       if (role === 'admin') navigate('/admin');
       if (role === 'teacher') navigate('/teacher');
@@ -53,12 +56,12 @@ export default function Login() {
     } catch (err) {
       console.error("Login Error:", err);
       
-      if (role !== 'admin' && (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password')) {
-        if (password === nationalId) {
-          const fakeEmail = getFakeEmail(nationalId);
+      if (role !== 'admin' && (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-email')) {
+        if (trimmedPassword === trimmedId) {
+          const fakeEmail = getFakeEmail(trimmedId);
           try {
-            const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, password);
-            const userQuery = query(collection(db, 'users'), where('nationalId', '==', nationalId));
+            const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, trimmedPassword);
+            const userQuery = query(collection(db, 'users'), where('nationalId', '==', trimmedId));
             const querySnapshot = await getDocs(userQuery);
             
             if (!querySnapshot.empty) {
