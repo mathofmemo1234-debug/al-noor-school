@@ -8,9 +8,27 @@ const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربع�
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export default function TeacherSchedule() {
-  const { currentUser } = useAuth();
+  const { userData } = useAuth();
   const [schedules, setSchedules] = useState([]);
   const [classes, setClasses] = useState({});
+  const [teacherDocId, setTeacherDocId] = useState(null);
+
+  useEffect(() => {
+    // Find the teacher document ID
+    if (userData?.nationalId) {
+      const unsubTeacher = onSnapshot(
+        query(collection(db, 'teachers'), where('nationalId', '==', userData.nationalId)),
+        (snap) => {
+          if (!snap.empty) {
+            setTeacherDocId(snap.docs[0].id);
+          } else {
+            setTeacherDocId(null);
+          }
+        }
+      );
+      return () => unsubTeacher();
+    }
+  }, [userData]);
 
   useEffect(() => {
     // Load all classes for name mapping
@@ -33,12 +51,13 @@ export default function TeacherSchedule() {
   // Filter schedule for this teacher
   // Find which class and subject the teacher is assigned to for each period
   const getTeacherCell = (day, period) => {
+    if (!teacherDocId) return null;
     const key = `${day}-${period}`;
     let result = null;
     
     // Loop through all classes schedules to see if the teacher has a class in this period
     for (const schedule of schedules) {
-      if (schedule.matrix && schedule.matrix[key] && schedule.matrix[key].teacherId === currentUser?.uid) {
+      if (schedule.matrix && schedule.matrix[key] && schedule.matrix[key].teacherId === teacherDocId) {
         result = {
           subject: schedule.matrix[key].subject,
           className: classes[schedule.classId] || 'فصل غير معروف',

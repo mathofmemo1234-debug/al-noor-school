@@ -6,6 +6,7 @@ import { Calendar, FileText, Users, X, Edit, Trash2, CheckSquare, Square, Plus, 
 import { db, auth } from '../firebase';
 import TeacherSchedule from './TeacherSchedule';
 import { doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
 
 function TeacherTasks() {
   const [tasks, setTasks] = useState([]);
@@ -129,13 +130,58 @@ function WeeklyPlan() {
   const [planDocId, setPlanDocId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch available classes
+  const { userData } = useAuth();
+  const [teacherDocId, setTeacherDocId] = useState(null);
+
+  // Fetch teacher doc ID based on nationalId
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
-      setClassesList(snap.docs.map(doc => doc.data().name));
+    if (userData?.nationalId) {
+      const unsub = onSnapshot(query(collection(db, 'teachers'), where('nationalId', '==', userData.nationalId)), (snap) => {
+        if (!snap.empty) {
+          setTeacherDocId(snap.docs[0].id);
+        } else {
+          setTeacherDocId(null);
+        }
+      });
+      return () => unsub();
+    }
+  }, [userData]);
+
+  // Fetch available classes for this teacher based on their schedule
+  useEffect(() => {
+    if (!teacherDocId) {
+      setClassesList([]);
+      return;
+    }
+    
+    // First fetch all classes to get their names
+    const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
+      const classNames = {};
+      classesSnap.docs.forEach(d => classNames[d.id] = d.data().name);
+      
+      // Then fetch schedules to see which classes this teacher teaches
+      const unsubSchedules = onSnapshot(collection(db, 'schedules'), (schedulesSnap) => {
+        const myClassNames = new Set();
+        schedulesSnap.docs.forEach(docSnap => {
+          const matrix = docSnap.data().matrix || {};
+          let isTeaching = false;
+          Object.values(matrix).forEach(cell => {
+            if (cell.teacherId === teacherDocId) {
+              isTeaching = true;
+            }
+          });
+          if (isTeaching && classNames[docSnap.id]) {
+            myClassNames.add(classNames[docSnap.id]);
+          }
+        });
+        setClassesList(Array.from(myClassNames));
+      });
+      
+      return () => unsubSchedules();
     });
-    return () => unsub();
-  }, []);
+    
+    return () => unsubClasses();
+  }, [teacherDocId]);
 
   // Fetch existing plan for selected class
   useEffect(() => {
