@@ -52,8 +52,9 @@ function AdminHome() {
       for (let i = 0; i < 5; i++) {
         const nid = `200000000${i+1}`;
         const email = `${nid}@school.local`;
+        const assignedClass = classNames[i % classNames.length];
         await addDoc(collection(db, 'students'), {
-          name: studentNames[i], nationalId: nid, email, className: "أول متوسط", role: 'student', createdAt: new Date()
+          name: studentNames[i], nationalId: nid, email, className: assignedClass, role: 'student', createdAt: new Date()
         });
         await addDoc(collection(db, 'users'), {
           nationalId: nid, email, role: 'student', name: studentNames[i]
@@ -68,8 +69,9 @@ function AdminHome() {
         classDocs.push({ id: docRef.id, name: cName });
       }
 
-      const targetClass = classDocs.find(c => c.name === "أول متوسط");
-      if (targetClass) {
+      // Assign schedule for the first 3 classes to show teachers teaching multiple classes
+      const targetClasses = classDocs.slice(0, 3);
+      for (let targetClass of targetClasses) {
         const matrix = {};
         matrix["الأحد-الحصة الأولى"] = { subject: "رياضيات", teacherId: teacherIds[0] };
         matrix["الأحد-الحصة الثانية"] = { subject: "لغتي", teacherId: teacherIds[1] };
@@ -78,7 +80,7 @@ function AdminHome() {
         matrix["الأربعاء-الحصة الرابعة"] = { subject: "فيزياء", teacherId: teacherIds[4] };
         
         await setDoc(doc(db, 'schedules', targetClass.id), {
-          className: "أول متوسط",
+          className: targetClass.name,
           matrix
         });
       }
