@@ -1,9 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
+import { db, auth, storage } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import MarkdownViewer from '../components/MarkdownViewer';
-import { Save } from 'lucide-react';
+import { Save, UploadCloud } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+
+function MarkdownInput({ label, value, onChange, placeholder, height = '200px' }) {
+  return (
+    <div className="form-group" style={{ marginBottom: 0 }}>
+      <label>{label} (يدعم LaTeX للرياضيات باستخدام $ و $$)</label>
+      <div style={{ display: 'flex', gap: '20px', height }}>
+        <textarea 
+          className="input-field" 
+          style={{ flex: 1, resize: 'none', height: '100%', fontFamily: 'monospace' }}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+        />
+        <div style={{ flex: 1, border: '1px solid var(--color-border)', borderRadius: '8px', padding: '16px', background: '#fff', overflowY: 'auto' }}>
+          <h4 style={{ margin: '0 0 10px 0', color: 'var(--color-text-muted)' }}>معاينة حية:</h4>
+          <MarkdownViewer content={value || '*(فارغ)*'} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LessonPreparation() {
   const { userData } = useAuth();
@@ -24,9 +46,18 @@ export default function LessonPreparation() {
   
   // Form fields
   const [goals, setGoals] = useState('');
+  const [warmup, setWarmup] = useState('');
+  const [portfolio, setPortfolio] = useState('');
   const [content, setContent] = useState('');
-  const [evaluation, setEvaluation] = useState('');
-  const [strategy, setStrategy] = useState('');
+  const [resources, setResources] = useState('');
+  const [formativeEval, setFormativeEval] = useState('');
+  const [summativeEval, setSummativeEval] = useState('');
+  const [homework, setHomework] = useState('');
+  
+  // File upload state
+  const [fileUrl, setFileUrl] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   // Fetch teacher doc ID based on nationalId
   useEffect(() => {
@@ -111,7 +142,7 @@ export default function LessonPreparation() {
   // Fetch existing prep for selected class, subject, week, and period
   useEffect(() => {
     if (!teacherDocId || !selectedClass || !selectedSubject || !selectedWeek || !selectedPeriod) {
-      setGoals(''); setContent(''); setEvaluation(''); setStrategy(''); setPrepDocId(null);
+      setGoals(''); setWarmup(''); setPortfolio(''); setContent(''); setResources(''); setFormativeEval(''); setSummativeEval(''); setHomework(''); setFileUrl(''); setFileName(''); setPrepDocId(null);
       return;
     }
     const q = query(
@@ -126,16 +157,42 @@ export default function LessonPreparation() {
       if (!snapshot.empty) {
         const data = snapshot.docs[0].data();
         setGoals(data.goals || '');
+        setWarmup(data.warmup || '');
+        setPortfolio(data.portfolio || '');
         setContent(data.content || '');
-        setEvaluation(data.evaluation || '');
-        setStrategy(data.strategy || '');
+        setResources(data.resources || '');
+        setFormativeEval(data.formativeEval || '');
+        setSummativeEval(data.summativeEval || '');
+        setHomework(data.homework || '');
+        setFileUrl(data.fileUrl || '');
+        setFileName(data.fileName || '');
         setPrepDocId(snapshot.docs[0].id);
       } else {
-        setGoals(''); setContent(''); setEvaluation(''); setStrategy(''); setPrepDocId(null);
+        setGoals(''); setWarmup(''); setPortfolio(''); setContent(''); setResources(''); setFormativeEval(''); setSummativeEval(''); setHomework(''); setFileUrl(''); setFileName(''); setPrepDocId(null);
       }
     });
     return () => unsub();
   }, [selectedClass, selectedSubject, teacherDocId, selectedWeek, selectedPeriod]);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setIsUploading(true);
+    try {
+      const storageRef = ref(storage, `preparations/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setFileUrl(url);
+      setFileName(file.name);
+      alert('تم رفع الملف بنجاح!');
+    } catch (error) {
+      console.error('Upload Error:', error);
+      alert('فشل رفع الملف.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!auth.currentUser) return alert('يجب تسجيل الدخول');
@@ -153,9 +210,15 @@ export default function LessonPreparation() {
         date: selectedDate,
         period: selectedPeriod,
         goals,
+        warmup,
+        portfolio,
         content,
-        evaluation,
-        strategy,
+        resources,
+        formativeEval,
+        summativeEval,
+        homework,
+        fileUrl,
+        fileName,
         updatedAt: new Date().toISOString()
       };
 
@@ -237,57 +300,85 @@ export default function LessonPreparation() {
           يرجى اختيار الفصل والمادة لبدء التحضير.
         </p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label>الأهداف السلوكية</label>
-            <textarea 
-              className="input-field" 
-              rows="3" 
-              value={goals}
-              onChange={e => setGoals(e.target.value)}
-              placeholder="مثال: أن يتعرف الطالب على..."
-            />
-          </div>
-
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label>محتوى الدرس (يدعم LaTeX للرياضيات باستخدام $ و $$)</label>
-            <div style={{ display: 'flex', gap: '20px', height: '300px' }}>
-              <textarea 
-                className="input-field" 
-                style={{ flex: 1, resize: 'none', height: '100%', fontFamily: 'monospace' }}
-                value={content}
-                onChange={e => setContent(e.target.value)}
-                placeholder="اكتب محتوى الدرس هنا... مثال: المعادلة التربيعية هي $$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$"
-              />
-              <div style={{ flex: 1, border: '1px solid var(--color-border)', borderRadius: '8px', padding: '16px', background: '#fff', overflowY: 'auto' }}>
-                <h4 style={{ margin: '0 0 10px 0', color: 'var(--color-text-muted)' }}>معاينة حية:</h4>
-                <MarkdownViewer content={content || '*(فارغ)*'} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>إرفاق ملف التحضير (PDF / JPG)</label>
+              <input type="file" accept=".pdf, .jpg, .jpeg, .png" onChange={handleFileUpload} disabled={isUploading} />
+            </div>
+            {isUploading && <div style={{ color: 'var(--color-primary)' }}>جاري الرفع...</div>}
+            {fileUrl && (
+              <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '8px 16px', borderRadius: '4px' }}>
+                تم إرفاق: <a href={fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', fontWeight: 'bold' }}>{fileName}</a>
               </div>
-            </div>
+            )}
           </div>
 
-          <div style={{ display: 'flex', gap: '20px' }}>
-            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-              <label>استراتيجيات التدريس</label>
-              <textarea 
-                className="input-field" 
-                rows="3" 
-                value={strategy}
-                onChange={e => setStrategy(e.target.value)}
-                placeholder="التعلم التعاوني، العصف الذهني..."
-              />
-            </div>
-            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-              <label>أساليب التقويم</label>
-              <textarea 
-                className="input-field" 
-                rows="3" 
-                value={evaluation}
-                onChange={e => setEvaluation(e.target.value)}
-                placeholder="أسئلة شفوية، ورقة عمل..."
-              />
-            </div>
-          </div>
+          <MarkdownInput 
+            label="الأهداف السلوكية" 
+            value={goals} 
+            onChange={setGoals} 
+            placeholder="مثال: أن يتعرف الطالب على..." 
+            height="150px" 
+          />
+
+          <MarkdownInput 
+            label="التهيئة" 
+            value={warmup} 
+            onChange={setWarmup} 
+            placeholder="اكتب التهيئة هنا..." 
+            height="150px" 
+          />
+
+          <MarkdownInput 
+            label="الحقيبة" 
+            value={portfolio} 
+            onChange={setPortfolio} 
+            placeholder="اكتب الحقيبة هنا..." 
+            height="150px" 
+          />
+
+          <MarkdownInput 
+            label="محتوى الدرس" 
+            value={content} 
+            onChange={setContent} 
+            placeholder="اكتب محتوى الدرس هنا... مثال: المعادلة التربيعية هي $$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$" 
+            height="250px" 
+          />
+
+          <MarkdownInput 
+            label="الوسائل ومصادر التعلم" 
+            value={resources} 
+            onChange={setResources} 
+            placeholder="اكتب الوسائل ومصادر التعلم..." 
+            height="150px" 
+          />
+
+          <MarkdownInput 
+            label="التقويم البنائي" 
+            value={formativeEval} 
+            onChange={setFormativeEval} 
+            placeholder="اكتب التقويم البنائي..." 
+            height="150px" 
+          />
+
+          <MarkdownInput 
+            label="التقويم النهائي" 
+            value={summativeEval} 
+            onChange={setSummativeEval} 
+            placeholder="اكتب التقويم النهائي..." 
+            height="150px" 
+          />
+
+          <MarkdownInput 
+            label="الواجبات" 
+            value={homework} 
+            onChange={setHomework} 
+            placeholder="اكتب الواجبات..." 
+            height="150px" 
+          />
+
         </div>
       )}
     </div>

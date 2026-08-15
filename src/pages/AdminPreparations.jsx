@@ -96,28 +96,33 @@ export default function AdminPreparations() {
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>الأهداف:</h4>
-                  <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>{p.goals || 'لم تُحدد'}</div>
-                </div>
+                {p.fileUrl && (
+                  <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '12px 16px', borderRadius: '8px' }}>
+                    <strong>ملف مرفق:</strong> <a href={p.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', textDecoration: 'underline' }}>{p.fileName}</a>
+                  </div>
+                )}
                 
-                <div>
-                  <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>المحتوى:</h4>
-                  <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                    <MarkdownViewer content={p.content || '*(فارغ)*'} />
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '20px' }}>
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>استراتيجيات التدريس:</h4>
-                    <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>{p.strategy || 'لم تُحدد'}</div>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>أساليب التقويم:</h4>
-                    <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>{p.evaluation || 'لم تُحدد'}</div>
-                  </div>
-                </div>
+                {['goals', 'warmup', 'portfolio', 'content', 'resources', 'formativeEval', 'summativeEval', 'homework'].map(field => {
+                  const titles = {
+                    goals: 'الأهداف السلوكية',
+                    warmup: 'التهيئة',
+                    portfolio: 'الحقيبة',
+                    content: 'المحتوى',
+                    resources: 'الوسائل ومصادر التعلم',
+                    formativeEval: 'التقويم البنائي',
+                    summativeEval: 'التقويم النهائي',
+                    homework: 'الواجبات'
+                  };
+                  if (!p[field]) return null;
+                  return (
+                    <div key={field}>
+                      <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>{titles[field]}:</h4>
+                      <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                        <MarkdownViewer content={p[field]} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
