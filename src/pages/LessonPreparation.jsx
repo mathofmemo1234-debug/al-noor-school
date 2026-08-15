@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth, storage } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import MarkdownViewer from '../components/MarkdownViewer';
-import { Save, UploadCloud } from 'lucide-react';
+import { Save, UploadCloud, Eye, Edit, Trash2, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 function MarkdownInput({ label, value, onChange, placeholder, height = '200px' }) {
@@ -37,6 +37,11 @@ export default function LessonPreparation() {
   const [isSaving, setIsSaving] = useState(false);
   const [prepDocId, setPrepDocId] = useState(null);
   
+  // Tabs and History states
+  const [activeTab, setActiveTab] = useState('form'); // 'form' | 'list'
+  const [allPreparations, setAllPreparations] = useState([]);
+  const [previewPrep, setPreviewPrep] = useState(null);
+
   // New States
   const [weeks] = useState(Array.from({length: 18}, (_, i) => `الأسبوع ${i + 1}`));
   const [selectedWeek, setSelectedWeek] = useState('الأسبوع 1');
@@ -72,6 +77,20 @@ export default function LessonPreparation() {
       return () => unsub();
     }
   }, [userData]);
+
+  // Fetch all preps for this teacher
+  useEffect(() => {
+    if (!teacherDocId) return;
+    const q = query(collection(db, 'preparations'), where('teacherId', '==', teacherDocId));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const data = [];
+      snapshot.forEach(d => data.push({ id: d.id, ...d.data() }));
+      // Sort by updatedAt descending
+      data.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      setAllPreparations(data);
+    });
+    return () => unsub();
+  }, [teacherDocId]);
 
   // Fetch available classes for this teacher based on their schedule
   useEffect(() => {
@@ -236,149 +255,288 @@ export default function LessonPreparation() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا التحضير نهائياً؟')) {
+      try {
+        await deleteDoc(doc(db, 'preparations', id));
+        alert('تم الحذف بنجاح');
+      } catch (err) {
+        console.error(err);
+        alert('حدث خطأ أثناء الحذف');
+      }
+    }
+  };
+
+  const handleEdit = (prep) => {
+    setSelectedClass(prep.className);
+    setSelectedSubject(prep.subject);
+    setSelectedWeek(prep.week);
+    setSelectedDate(prep.date);
+    // Timeout needed slightly for available periods to fetch based on subject/class, 
+    // although period might not be in the initial list if not loaded yet.
+    setTimeout(() => {
+      setSelectedPeriod(prep.period);
+    }, 500);
+    setActiveTab('form');
+  };
+
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2>تحضير الدروس</h2>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <select 
-            className="input-field" 
-            style={{ width: '150px', marginBottom: 0 }}
-            value={selectedClass} 
-            onChange={(e) => setSelectedClass(e.target.value)}
-          >
-            <option value="">اختر الفصل...</option>
-            {classesList.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-
-          <select 
-            className="input-field" 
-            style={{ width: '150px', marginBottom: 0 }}
-            value={selectedSubject} 
-            onChange={(e) => setSelectedSubject(e.target.value)}
-          >
-            <option value="">اختر المادة...</option>
-            {subjects.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-
-          <select 
-            className="input-field" 
-            style={{ width: '130px', marginBottom: 0 }}
-            value={selectedWeek} 
-            onChange={(e) => setSelectedWeek(e.target.value)}
-          >
-            {weeks.map(w => <option key={w} value={w}>{w}</option>)}
-          </select>
-
-          <input 
-            type="date"
-            className="input-field"
-            style={{ width: '150px', marginBottom: 0 }}
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-          />
-
-          <select 
-            className="input-field" 
-            style={{ width: '150px', marginBottom: 0 }}
-            value={selectedPeriod} 
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            disabled={!availablePeriods.length}
-          >
-            <option value="">{availablePeriods.length ? 'اختر الحصة...' : 'لا توجد حصص'}</option>
-            {availablePeriods.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-
-          <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || !selectedClass || !selectedSubject || !selectedPeriod}>
-            <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ التحضير'}
-          </button>
-        </div>
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '2px solid #e2e8f0', paddingBottom: '16px' }}>
+        <button 
+          className={`btn ${activeTab === 'form' ? 'btn-primary' : ''}`}
+          style={{ background: activeTab === 'form' ? '' : 'transparent', color: activeTab === 'form' ? '' : 'var(--color-text)' }}
+          onClick={() => setActiveTab('form')}
+        >
+          إضافة / تعديل تحضير
+        </button>
+        <button 
+          className={`btn ${activeTab === 'list' ? 'btn-primary' : ''}`}
+          style={{ background: activeTab === 'list' ? '' : 'transparent', color: activeTab === 'list' ? '' : 'var(--color-text)' }}
+          onClick={() => setActiveTab('list')}
+        >
+          سجل التحضيرات ({allPreparations.length})
+        </button>
       </div>
-      
-      {!selectedClass || !selectedSubject ? (
-        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-          يرجى اختيار الفصل والمادة لبدء التحضير.
-        </p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>إرفاق ملف التحضير (PDF / JPG)</label>
-              <input type="file" accept=".pdf, .jpg, .jpeg, .png" onChange={handleFileUpload} disabled={isUploading} />
+
+      {activeTab === 'form' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <select 
+                className="input-field" 
+                style={{ width: '150px', marginBottom: 0 }}
+                value={selectedClass} 
+                onChange={(e) => setSelectedClass(e.target.value)}
+              >
+                <option value="">اختر الفصل...</option>
+                {classesList.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+
+              <select 
+                className="input-field" 
+                style={{ width: '150px', marginBottom: 0 }}
+                value={selectedSubject} 
+                onChange={(e) => setSelectedSubject(e.target.value)}
+              >
+                <option value="">اختر المادة...</option>
+                {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+
+              <select 
+                className="input-field" 
+                style={{ width: '130px', marginBottom: 0 }}
+                value={selectedWeek} 
+                onChange={(e) => setSelectedWeek(e.target.value)}
+              >
+                {weeks.map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
+
+              <input 
+                type="date"
+                className="input-field"
+                style={{ width: '150px', marginBottom: 0 }}
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+              />
+
+              <select 
+                className="input-field" 
+                style={{ width: '150px', marginBottom: 0 }}
+                value={selectedPeriod} 
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                disabled={!availablePeriods.length}
+              >
+                <option value="">{availablePeriods.length ? 'اختر الحصة...' : 'لا توجد حصص'}</option>
+                {availablePeriods.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+
+              <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || !selectedClass || !selectedSubject || !selectedPeriod}>
+                <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ التحضير'}
+              </button>
             </div>
-            {isUploading && <div style={{ color: 'var(--color-primary)' }}>جاري الرفع...</div>}
-            {fileUrl && (
-              <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '8px 16px', borderRadius: '4px' }}>
-                تم إرفاق: <a href={fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', fontWeight: 'bold' }}>{fileName}</a>
-              </div>
-            )}
           </div>
+          
+          {!selectedClass || !selectedSubject ? (
+            <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
+              يرجى اختيار الفصل والمادة لبدء التحضير.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>إرفاق ملف التحضير (PDF / JPG)</label>
+                  <input type="file" accept=".pdf, .jpg, .jpeg, .png" onChange={handleFileUpload} disabled={isUploading} />
+                </div>
+                {isUploading && <div style={{ color: 'var(--color-primary)' }}>جاري الرفع...</div>}
+                {fileUrl && (
+                  <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '8px 16px', borderRadius: '4px' }}>
+                    تم إرفاق: <a href={fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', fontWeight: 'bold' }}>{fileName}</a>
+                  </div>
+                )}
+              </div>
 
-          <MarkdownInput 
-            label="الأهداف السلوكية" 
-            value={goals} 
-            onChange={setGoals} 
-            placeholder="مثال: أن يتعرف الطالب على..." 
-            height="150px" 
-          />
+              <MarkdownInput 
+                label="الأهداف السلوكية" 
+                value={goals} 
+                onChange={setGoals} 
+                placeholder="مثال: أن يتعرف الطالب على..." 
+                height="150px" 
+              />
 
-          <MarkdownInput 
-            label="التهيئة" 
-            value={warmup} 
-            onChange={setWarmup} 
-            placeholder="اكتب التهيئة هنا..." 
-            height="150px" 
-          />
+              <MarkdownInput 
+                label="التهيئة" 
+                value={warmup} 
+                onChange={setWarmup} 
+                placeholder="اكتب التهيئة هنا..." 
+                height="150px" 
+              />
 
-          <MarkdownInput 
-            label="الحقيبة" 
-            value={portfolio} 
-            onChange={setPortfolio} 
-            placeholder="اكتب الحقيبة هنا..." 
-            height="150px" 
-          />
+              <MarkdownInput 
+                label="الحقيبة" 
+                value={portfolio} 
+                onChange={setPortfolio} 
+                placeholder="اكتب الحقيبة هنا..." 
+                height="150px" 
+              />
 
-          <MarkdownInput 
-            label="محتوى الدرس" 
-            value={content} 
-            onChange={setContent} 
-            placeholder="اكتب محتوى الدرس هنا... مثال: المعادلة التربيعية هي $$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$" 
-            height="250px" 
-          />
+              <MarkdownInput 
+                label="محتوى الدرس" 
+                value={content} 
+                onChange={setContent} 
+                placeholder="اكتب محتوى الدرس هنا... مثال: المعادلة التربيعية هي $$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$" 
+                height="250px" 
+              />
 
-          <MarkdownInput 
-            label="الوسائل ومصادر التعلم" 
-            value={resources} 
-            onChange={setResources} 
-            placeholder="اكتب الوسائل ومصادر التعلم..." 
-            height="150px" 
-          />
+              <MarkdownInput 
+                label="الوسائل ومصادر التعلم" 
+                value={resources} 
+                onChange={setResources} 
+                placeholder="اكتب الوسائل ومصادر التعلم..." 
+                height="150px" 
+              />
 
-          <MarkdownInput 
-            label="التقويم البنائي" 
-            value={formativeEval} 
-            onChange={setFormativeEval} 
-            placeholder="اكتب التقويم البنائي..." 
-            height="150px" 
-          />
+              <MarkdownInput 
+                label="التقويم البنائي" 
+                value={formativeEval} 
+                onChange={setFormativeEval} 
+                placeholder="اكتب التقويم البنائي..." 
+                height="150px" 
+              />
 
-          <MarkdownInput 
-            label="التقويم النهائي" 
-            value={summativeEval} 
-            onChange={setSummativeEval} 
-            placeholder="اكتب التقويم النهائي..." 
-            height="150px" 
-          />
+              <MarkdownInput 
+                label="التقويم النهائي" 
+                value={summativeEval} 
+                onChange={setSummativeEval} 
+                placeholder="اكتب التقويم النهائي..." 
+                height="150px" 
+              />
 
-          <MarkdownInput 
-            label="الواجبات" 
-            value={homework} 
-            onChange={setHomework} 
-            placeholder="اكتب الواجبات..." 
-            height="150px" 
-          />
+              <MarkdownInput 
+                label="الواجبات" 
+                value={homework} 
+                onChange={setHomework} 
+                placeholder="اكتب الواجبات..." 
+                height="150px" 
+              />
 
+            </div>
+          )}
+        </>
+      )}
+
+      {activeTab === 'list' && (
+        <div>
+          {allPreparations.length === 0 ? (
+            <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>
+              لا توجد تحضيرات محفوظة مسبقاً.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {allPreparations.map(p => (
+                <div key={p.id} style={{ background: '#fff', border: '1px solid #e2e8f0', padding: '20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{p.subject} - فصل {p.className}</h3>
+                    <div style={{ display: 'flex', gap: '16px', color: 'var(--color-text-muted)', fontSize: '14px' }}>
+                      <span>{p.week}</span>
+                      <span>التاريخ: {p.date}</span>
+                      <span>الحصة: {p.period}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn" style={{ padding: '8px', background: '#e0f2fe', color: '#0284c7' }} onClick={() => setPreviewPrep(p)} title="معاينة">
+                      <Eye size={20} />
+                    </button>
+                    <button className="btn" style={{ padding: '8px', background: '#fef3c7', color: '#d97706' }} onClick={() => handleEdit(p)} title="تعديل">
+                      <Edit size={20} />
+                    </button>
+                    <button className="btn" style={{ padding: '8px', background: '#fee2e2', color: '#dc2626' }} onClick={() => handleDelete(p.id)} title="حذف">
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Preview Modal */}
+      {previewPrep && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div style={{
+            background: '#fff', width: '90%', maxWidth: '900px', maxHeight: '90vh',
+            borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden'
+          }}>
+            <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+              <h2 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>
+                معاينة التحضير: {previewPrep.subject} - {previewPrep.className}
+              </h2>
+              <button className="btn" style={{ padding: '8px', background: 'transparent' }} onClick={() => setPreviewPrep(null)}>
+                <X size={24} color="#64748b" />
+              </button>
+            </div>
+            <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              <div style={{ display: 'flex', gap: '24px', color: 'var(--color-text-muted)', fontWeight: 'bold' }}>
+                <span>{previewPrep.week}</span>
+                <span>الحصة: {previewPrep.period}</span>
+                <span>التاريخ: {previewPrep.date}</span>
+              </div>
+
+              {previewPrep.fileUrl && (
+                <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '12px 16px', borderRadius: '8px' }}>
+                  <strong>ملف مرفق:</strong> <a href={previewPrep.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', textDecoration: 'underline' }}>{previewPrep.fileName}</a>
+                </div>
+              )}
+
+              {['goals', 'warmup', 'portfolio', 'content', 'resources', 'formativeEval', 'summativeEval', 'homework'].map(field => {
+                const titles = {
+                  goals: 'الأهداف السلوكية',
+                  warmup: 'التهيئة',
+                  portfolio: 'الحقيبة',
+                  content: 'المحتوى',
+                  resources: 'الوسائل ومصادر التعلم',
+                  formativeEval: 'التقويم البنائي',
+                  summativeEval: 'التقويم النهائي',
+                  homework: 'الواجبات'
+                };
+                if (!previewPrep[field]) return null;
+                return (
+                  <div key={field}>
+                    <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>{titles[field]}:</h4>
+                    <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                      <MarkdownViewer content={previewPrep[field]} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>
