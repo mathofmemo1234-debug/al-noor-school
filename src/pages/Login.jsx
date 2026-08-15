@@ -215,11 +215,7 @@ export default function Login() {
       <div className="login-card glass-panel" style={{ maxWidth: '450px' }}>
         <div className="login-header">
           <div className="logo-container" style={{ width: '100px', height: '100px', background: 'transparent', boxShadow: 'none' }}>
-            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-              <path d="M100 20 L40 140 H70 L100 80 L130 140 H160 Z" fill="#63B2C6" />
-              <path d="M50 110 Q100 80 150 110 L140 130 Q100 100 60 130 Z" fill="#B4D396" />
-              <text x="100" y="155" fontFamily="Arial" fontSize="12" fill="#B4D396" textAnchor="middle" fontWeight="bold">1995 - 1416</text>
-            </svg>
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="شعار المدارس" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} />
           </div>
           <h1>المدارس المتقدمة للتعلم الذكي</h1>
           <p>{isSignup ? 'إنشاء حساب جديد' : 'بوابة الدخول الموحدة'}</p>
