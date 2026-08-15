@@ -15,6 +15,8 @@ export default function StudentSchedule() {
   const [teachers, setTeachers] = useState({});
   const [studentClass, setStudentClass] = useState(null);
 
+  const [classId, setClassId] = useState(null);
+
   useEffect(() => {
     if (userData?.nationalId) {
       const unsub = onSnapshot(
@@ -32,6 +34,23 @@ export default function StudentSchedule() {
   }, [userData]);
 
   useEffect(() => {
+    if (studentClass) {
+      const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
+        let foundId = null;
+        classesSnap.docs.forEach(doc => {
+          if (doc.data().name === studentClass) {
+            foundId = doc.id;
+          }
+        });
+        setClassId(foundId);
+      });
+      return () => unsubClasses();
+    } else {
+      setClassId(null);
+    }
+  }, [studentClass]);
+
+  useEffect(() => {
     // Load all teachers for name mapping
     const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
       const tMap = {};
@@ -41,9 +60,9 @@ export default function StudentSchedule() {
       setTeachers(tMap);
     });
 
-    if (studentClass) {
-      // Load class schedule
-      const unsubSchedule = onSnapshot(doc(db, 'schedules', studentClass), (docSnap) => {
+    if (classId) {
+      // Load class schedule using the actual classId
+      const unsubSchedule = onSnapshot(doc(db, 'schedules', classId), (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setScheduleData(data.matrix || {});
@@ -57,7 +76,7 @@ export default function StudentSchedule() {
     }
     
     return () => unsubTeachers();
-  }, [studentClass]);
+  }, [classId]);
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
@@ -70,7 +89,7 @@ export default function StudentSchedule() {
         </div>
       )}
       
-      {!userData?.class ? (
+      {!studentClass ? (
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
           لست مسجلاً في أي فصل دراسي بعد.
         </div>
