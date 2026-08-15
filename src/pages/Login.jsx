@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, AlertCircle, UserPlus } from 'lucide-react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import './Login.css';
@@ -54,27 +54,27 @@ export default function Login() {
       console.error("Login Error:", err);
       
       if (role !== 'admin' && (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password')) {
-        try {
-          const userQuery = query(collection(db, 'users'), where('nationalId', '==', nationalId));
-          const querySnapshot = await getDocs(userQuery);
-          
-          if (!querySnapshot.empty) {
-            if (password === nationalId) {
-              const fakeEmail = getFakeEmail(nationalId);
-              await createUserWithEmailAndPassword(auth, fakeEmail, password);
-              
+        if (password === nationalId) {
+          const fakeEmail = getFakeEmail(nationalId);
+          try {
+            const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, password);
+            const userQuery = query(collection(db, 'users'), where('nationalId', '==', nationalId));
+            const querySnapshot = await getDocs(userQuery);
+            
+            if (!querySnapshot.empty) {
               const userData = querySnapshot.docs[0].data();
               if (userData.role === 'teacher') navigate('/teacher');
               if (userData.role === 'student') navigate('/student');
               return;
             } else {
-              setError('رقم الهوية أو كلمة المرور غير صحيحة');
+              await deleteUser(userCredential.user);
+              setError('رقم الهوية غير مسجل في النظام. يرجى مراجعة الإدارة.');
             }
-          } else {
+          } catch (createErr) {
+            console.error("Create Error:", createErr);
             setError('رقم الهوية أو كلمة المرور غير صحيحة');
           }
-        } catch (dbErr) {
-          console.error("Firestore Error:", dbErr);
+        } else {
           setError('رقم الهوية أو كلمة المرور غير صحيحة');
         }
       } else {
@@ -111,7 +111,17 @@ export default function Login() {
       const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, defaultPassword);
       const user = userCredential.user;
 
-      // 2. Add to 'users' collection for RBAC
+      // 2. Check if user already exists in Firestore (added by admin)
+      const userQuery = query(collection(db, 'users'), where('nationalId', '==', nationalId));
+      const querySnapshot = await getDocs(userQuery);
+      
+      if (!querySnapshot.empty) {
+        await deleteUser(user);
+        setError('هذا الحساب مضاف مسبقاً من الإدارة، الرجاء تسجيل الدخول مباشرة');
+        return;
+      }
+
+      // 3. Add to 'users' collection for RBAC
       await addDoc(collection(db, 'users'), {
         nationalId: nationalId,
         email: fakeEmail,
@@ -119,7 +129,7 @@ export default function Login() {
         name: name
       });
 
-      // 3. Add to specific role collection
+      // 4. Add to specific role collection
       if (role === 'student') {
         await addDoc(collection(db, 'students'), {
           nationalId: nationalId,
