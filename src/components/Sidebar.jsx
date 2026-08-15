@@ -22,14 +22,17 @@ export default function Sidebar({ role }) {
     { path: '/admin/students', icon: Users, label: 'إدارة الطلاب' },
     { path: '/admin/classes', icon: BookOpen, label: 'الفصول الدراسية' },
     { path: '/admin/schedule', icon: Calendar, label: 'إدارة الجداول' },
+    { path: '/admin/preparations', icon: BookOpen, label: 'متابعة التحضيرات' },
     { path: '/admin/settings', icon: Settings, label: 'الإعدادات' },
   ];
 
   const teacherLinks = [
     { path: '/teacher', icon: Home, label: 'المهام (الرئيسية)' },
+    { path: '/teacher/preparation', icon: BookOpen, label: 'تحضير الدروس' },
     { path: '/teacher/weekly-plan', icon: Calendar, label: 'الخطة الأسبوعية' },
     { path: '/teacher/schedule', icon: Calendar, label: 'الجدول الدراسي' },
     { path: '/teacher/assignments', icon: BookOpen, label: 'الواجبات' },
+    { path: '/teacher/materials', icon: BookOpen, label: 'الملخصات' },
     { path: '/teacher/attendance', icon: Users, label: 'الغياب والحضور' },
     { path: '/teacher/settings', icon: Settings, label: 'تغيير كلمة المرور' },
   ];
@@ -40,6 +43,7 @@ export default function Sidebar({ role }) {
     { path: '/student/schedule', icon: Calendar, label: 'الجدول الدراسي' },
     { path: '/student/assignments', icon: BookOpen, label: 'الواجبات' },
     { path: '/student/materials', icon: BookOpen, label: 'الملخصات' },
+    { path: '/student/preparations', icon: BookOpen, label: 'تحضير الدروس' },
     { path: '/student/settings', icon: Settings, label: 'تغيير كلمة المرور' },
   ];
 

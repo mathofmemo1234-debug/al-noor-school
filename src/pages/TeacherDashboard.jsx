@@ -7,7 +7,8 @@ import { db, auth } from '../firebase';
 import TeacherSchedule from './TeacherSchedule';
 import { doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-
+import LessonPreparation from './LessonPreparation';
+import MaterialsUpload from './MaterialsUpload';
 function TeacherTasks() {
   const [tasks, setTasks] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -637,8 +638,10 @@ export default function TeacherDashboard() {
     <Layout role="teacher" title="لوحة تحكم المعلم">
       <Routes>
         <Route path="/" element={<TeacherTasks />} />
-        <Route path="/weekly-plan" element={<WeeklyPlan />} />
         <Route path="/schedule" element={<TeacherSchedule />} />
+        <Route path="/weekly-plan" element={<WeeklyPlan />} />
+        <Route path="/preparation" element={<LessonPreparation />} />
+        <Route path="/materials" element={<MaterialsUpload />} />
         <Route path="/assignments" element={<Assignments />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/settings" element={<Settings />} />

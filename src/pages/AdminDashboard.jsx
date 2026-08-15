@@ -5,6 +5,7 @@ import { Users, BookOpen, UserPlus, X, Edit, Trash2 } from 'lucide-react';
 import ManageSchedules from './ManageSchedules';
 import { db } from '../firebase';
 import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
+import AdminPreparations from './AdminPreparations';
 
 function AdminHome() {
   const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0 });
@@ -683,6 +684,7 @@ export default function AdminDashboard() {
         <Route path="/students" element={<ManageStudents />} />
         <Route path="/classes" element={<ManageClasses />} />
         <Route path="/schedule" element={<ManageSchedules />} />
+        <Route path="/preparations" element={<AdminPreparations />} />
         <Route path="*" element={<AdminHome />} />
       </Routes>
     </Layout>

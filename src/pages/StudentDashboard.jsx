@@ -237,13 +237,159 @@ function StudentAssignments() {
   );
 }
 
+import MarkdownViewer from '../components/MarkdownViewer';
+import { Download, Link as LinkIcon } from 'lucide-react';
+
 function StudentMaterials() {
+  const studentClass = useStudentClass();
+  const [materials, setMaterials] = useState([]);
+
+  useEffect(() => {
+    if (!studentClass) return;
+    const q = query(collection(db, 'materials'), where('className', '==', studentClass));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const data = [];
+      snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
+      setMaterials(data);
+    });
+    return () => unsub();
+  }, [studentClass]);
+
+  if (!studentClass) {
+    return <div className="glass-panel" style={{ padding: '24px' }}>جاري تحميل البيانات...</div>;
+  }
+
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <h2>الملخصات والمراجعات</h2>
-      <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-        سيتم إضافة قسم الملخصات قريباً.
-      </p>
+      <div style={{ marginBottom: '24px' }}>
+        <h2>الملخصات والمصادر الإضافية - فصل {studentClass}</h2>
+        <p style={{ color: 'var(--color-text-muted)' }}>جميع المرفقات والروابط التي شاركها معلموك.</p>
+      </div>
+
+      {materials.length === 0 ? (
+        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>
+          لا توجد ملخصات مضافة لهذا الفصل حالياً.
+        </p>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+          {materials.map(m => (
+            <div key={m.id} style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ padding: '12px', background: 'rgba(99,178,198,0.1)', borderRadius: '12px', color: 'var(--color-primary)' }}>
+                  {m.type === 'file' ? <Download size={24} /> : <LinkIcon size={24} />}
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', color: 'var(--color-primary-dark)' }}>{m.title}</h4>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>المادة: {m.subject} | المعلم: {m.teacherEmail}</div>
+                </div>
+              </div>
+              <div style={{ marginTop: 'auto' }}>
+                <a 
+                  href={m.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="btn btn-primary" 
+                  style={{ width: '100%', textAlign: 'center', display: 'block' }}
+                >
+                  {m.type === 'file' ? 'تحميل / فتح الملف' : 'فتح الرابط'}
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudentPreparations() {
+  const studentClass = useStudentClass();
+  const [preparations, setPreparations] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState('');
+
+  useEffect(() => {
+    if (!studentClass) return;
+    const q = query(collection(db, 'preparations'), where('className', '==', studentClass));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const data = [];
+      snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
+      setPreparations(data);
+    });
+    return () => unsub();
+  }, [studentClass]);
+
+  if (!studentClass) {
+    return <div className="glass-panel" style={{ padding: '24px' }}>جاري تحميل البيانات...</div>;
+  }
+
+  // Get unique subjects
+  const subjects = [...new Set(preparations.map(p => p.subject))];
+  
+  // Filter by selected subject
+  const filtered = selectedSubject ? preparations.filter(p => p.subject === selectedSubject) : preparations;
+
+  return (
+    <div className="glass-panel" style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <h2>تحضير الدروس - فصل {studentClass}</h2>
+          <p style={{ color: 'var(--color-text-muted)' }}>اطلع على المحتوى والأهداف لكل مادة.</p>
+        </div>
+        
+        {subjects.length > 0 && (
+          <select 
+            className="input-field" 
+            style={{ width: '200px', marginBottom: 0 }}
+            value={selectedSubject} 
+            onChange={(e) => setSelectedSubject(e.target.value)}
+          >
+            <option value="">جميع المواد</option>
+            {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
+      </div>
+
+      {preparations.length === 0 ? (
+        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>
+          لا توجد تحضيرات مضافة لهذا الفصل حالياً.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {filtered.map(p => (
+            <div key={p.id} style={{ background: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <div style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
+                <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>المادة: {p.subject}</h3>
+                <span style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>المعلم: {p.teacherEmail}</span>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>الأهداف:</h4>
+                  <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>{p.goals || 'لم تُحدد'}</div>
+                </div>
+                
+                <div>
+                  <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>المحتوى (يدعم المعادلات الرياضية):</h4>
+                  <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                    <MarkdownViewer content={p.content || '*(فارغ)*'} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '20px' }}>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>استراتيجيات التدريس:</h4>
+                    <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>{p.strategy || 'لم تُحدد'}</div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>أساليب التقويم:</h4>
+                    <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>{p.evaluation || 'لم تُحدد'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -259,6 +405,7 @@ export default function StudentDashboard() {
         <Route path="/assignments" element={<StudentAssignments />} />
         <Route path="/schedule" element={<StudentSchedule />} />
         <Route path="/materials" element={<StudentMaterials />} />
+        <Route path="/preparations" element={<StudentPreparations />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>
