@@ -175,18 +175,6 @@ function WeeklyPlan() {
     if (!selectedClass) return alert('يرجى اختيار الفصل');
     setIsSaving(true);
     try {
-      // Fetch teacher's name
-      let teacherName = auth.currentUser.email;
-      const userQ = query(collection(db, 'users'), where('email', '==', auth.currentUser.email));
-      const userSnap = await getDoc(userQ); // Wait, we can't use getDoc with query directly, we use getDocs
-      // Let's use getDocs
-      // Actually we don't need to import getDocs if we didn't, but wait, let me check imports.
-      // We'll just save teacherEmail and fetch name in student dashboard, or we can use getDocs.
-      // Since getDocs is not imported in this block, I will import it or just use teacherEmail.
-      // Wait, let's just assume we can fetch teacher name in student dashboard using the email.
-      // Or I can just import getDocs at the top. Let's just use the email as fallback, but if we want the name, let's just query it in student dashboard.
-      // Actually, I can just save teacherEmail.
-      // Let's use teacherEmail instead of teacherName.
       const payload = {
         teacherId: auth.currentUser.uid,
         teacherEmail: auth.currentUser.email,
