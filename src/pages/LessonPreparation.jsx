@@ -13,6 +13,13 @@ export default function LessonPreparation() {
   const [isSaving, setIsSaving] = useState(false);
   const [prepDocId, setPrepDocId] = useState(null);
   
+  // New States
+  const [weeks] = useState(Array.from({length: 18}, (_, i) => `الأسبوع ${i + 1}`));
+  const [selectedWeek, setSelectedWeek] = useState('الأسبوع 1');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [availablePeriods, setAvailablePeriods] = useState([]);
+  const [selectedPeriod, setSelectedPeriod] = useState('');
+  
   // Form fields
   const [goals, setGoals] = useState('');
   const [content, setContent] = useState('');
@@ -72,9 +79,43 @@ export default function LessonPreparation() {
     return () => unsubClasses();
   }, [teacherDocId]);
 
-  // Fetch existing prep for selected class and subject
+  // Fetch available periods based on selected class and subject
   useEffect(() => {
     if (!teacherDocId || !selectedClass || !selectedSubject) {
+      setAvailablePeriods([]);
+      setSelectedPeriod('');
+      return;
+    }
+
+    const unsubClasses = onSnapshot(query(collection(db, 'classes'), where('name', '==', selectedClass)), (classSnap) => {
+      if (classSnap.empty) return;
+      const classId = classSnap.docs[0].id;
+      
+      const unsubSchedule = onSnapshot(doc(db, 'schedules', classId), (docSnap) => {
+        if (docSnap.exists()) {
+          const matrix = docSnap.data().matrix || {};
+          const periods = [];
+          
+          Object.entries(matrix).forEach(([key, cell]) => {
+            if (cell.teacherId === teacherDocId && cell.subject === selectedSubject) {
+              const [day, period] = key.split('-');
+              periods.push(`${day} - ${period}`);
+            }
+          });
+          
+          setAvailablePeriods(periods);
+          if (periods.length > 0) setSelectedPeriod(periods[0]);
+          else setSelectedPeriod('');
+        }
+      });
+      return () => unsubSchedule();
+    });
+    return () => unsubClasses();
+  }, [teacherDocId, selectedClass, selectedSubject]);
+
+  // Fetch existing prep for selected class, subject, week, and period
+  useEffect(() => {
+    if (!teacherDocId || !selectedClass || !selectedSubject || !selectedWeek || !selectedPeriod) {
       setGoals(''); setContent(''); setEvaluation(''); setStrategy(''); setPrepDocId(null);
       return;
     }
@@ -82,7 +123,9 @@ export default function LessonPreparation() {
       collection(db, 'preparations'),
       where('teacherId', '==', teacherDocId),
       where('className', '==', selectedClass),
-      where('subject', '==', selectedSubject)
+      where('subject', '==', selectedSubject),
+      where('week', '==', selectedWeek),
+      where('period', '==', selectedPeriod)
     );
     const unsub = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
@@ -97,11 +140,13 @@ export default function LessonPreparation() {
       }
     });
     return () => unsub();
-  }, [selectedClass, selectedSubject, teacherDocId]);
+  }, [selectedClass, selectedSubject, teacherDocId, selectedWeek, selectedPeriod]);
 
   const handleSave = async () => {
     if (!auth.currentUser) return alert('يجب تسجيل الدخول');
     if (!selectedClass || !selectedSubject) return alert('يرجى اختيار الفصل والمادة');
+    if (!selectedPeriod) return alert('يرجى اختيار الحصة');
+    
     setIsSaving(true);
     try {
       const payload = {
@@ -109,6 +154,9 @@ export default function LessonPreparation() {
         teacherEmail: auth.currentUser.email,
         className: selectedClass,
         subject: selectedSubject,
+        week: selectedWeek,
+        date: selectedDate,
+        period: selectedPeriod,
         goals,
         content,
         evaluation,
@@ -155,7 +203,35 @@ export default function LessonPreparation() {
             {subjects.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
 
-          <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || !selectedClass || !selectedSubject}>
+          <select 
+            className="input-field" 
+            style={{ width: '130px', marginBottom: 0 }}
+            value={selectedWeek} 
+            onChange={(e) => setSelectedWeek(e.target.value)}
+          >
+            {weeks.map(w => <option key={w} value={w}>{w}</option>)}
+          </select>
+
+          <input 
+            type="date"
+            className="input-field"
+            style={{ width: '150px', marginBottom: 0 }}
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
+
+          <select 
+            className="input-field" 
+            style={{ width: '150px', marginBottom: 0 }}
+            value={selectedPeriod} 
+            onChange={(e) => setSelectedPeriod(e.target.value)}
+            disabled={!availablePeriods.length}
+          >
+            <option value="">{availablePeriods.length ? 'اختر الحصة...' : 'لا توجد حصص'}</option>
+            {availablePeriods.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+
+          <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || !selectedClass || !selectedSubject || !selectedPeriod}>
             <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ التحضير'}
           </button>
         </div>

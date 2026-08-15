@@ -357,9 +357,16 @@ function StudentPreparations() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {filtered.map(p => (
             <div key={p.id} style={{ background: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <div style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
-                <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>المادة: {p.subject}</h3>
-                <span style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>المعلم: {p.teacherEmail}</span>
+              <div style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>المادة: {p.subject}</h3>
+                  <div style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '4px' }}>المعلم: {p.teacherEmail}</div>
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>{p.week || 'الأسبوع 1'}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>التاريخ: {p.date || '-'}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>الحصة: {p.period || '-'}</div>
+                </div>
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
