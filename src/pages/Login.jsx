@@ -342,7 +342,17 @@ export default function Login() {
           <div className="login-card glass-panel" style={{ maxWidth: '450px' }}>
             <div className="login-header">
               <div className="logo-container" style={{ width: '100px', height: '100px', background: 'transparent', boxShadow: 'none' }}>
-                <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="شعار المدارس" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} />
+                <img 
+                  src={`${import.meta.env.BASE_URL}logo.webp`} 
+                  alt="شعار المدارس" 
+                  width="100"
+                  height="100"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                  }}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} 
+                />
               </div>
               <h1>{t('login.title')}</h1>
               <p>{isSignup ? t('login.signupSubtitle') : t('login.loginSubtitle')}</p>

@@ -62,12 +62,20 @@ export default function Sidebar({ role }) {
 
   const links = role === 'superadmin' ? superAdminLinks : role === 'admin' ? adminLinks : role === 'teacher' ? teacherLinks : studentLinks;
   
-  const logoSrc = userData?.logoUrl || '/logo.png';
+  const logoSrc = userData?.logoUrl || `${import.meta.env.BASE_URL}logo.webp`;
 
   return (
     <div className="sidebar">
       <div className="sidebar-logo" style={{ flexDirection: 'column', padding: '20px 0', gap: '10px' }}>
-        <img src={logoSrc} alt="School Logo" style={{ maxWidth: '140px', maxHeight: '140px', objectFit: 'contain' }} />
+        <img 
+          src={logoSrc} 
+          alt="School Logo" 
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+          }}
+          style={{ maxWidth: '140px', maxHeight: '140px', objectFit: 'contain' }} 
+        />
       </div>
       
       <nav className="sidebar-nav">
