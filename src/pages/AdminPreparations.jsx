@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import MarkdownViewer from '../components/MarkdownViewer';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -12,35 +12,45 @@ export default function AdminPreparations({ schoolId }) {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState('');
 
-  // Fetch classes
+  // Fetch classes with fallback
   useEffect(() => {
-    if (!schoolId) return;
-    const q = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
-    const unsub = onSnapshot(q, (snap) => {
-      setClassesList(snap.docs.map(doc => doc.data().name));
+    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
+      const docs = snap.docs.map(doc => doc.data());
+      const filtered = (!schoolId || schoolId === 'ALL')
+        ? docs
+        : docs.filter(d => !d.schoolId || d.schoolId === schoolId);
+      setClassesList(Array.from(new Set(filtered.map(d => d.name).filter(Boolean))));
     });
     return () => unsub();
   }, [schoolId]);
 
   // Fetch teachers for name mapping
   useEffect(() => {
-    if (!schoolId) return;
-    const q = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(collection(db, 'teachers'), (snap) => {
       const map = {};
-      snap.docs.forEach(d => map[d.id] = d.data().name);
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (!schoolId || schoolId === 'ALL' || !data.schoolId || data.schoolId === schoolId) {
+          map[d.id] = data.name;
+          if (data.nationalId) map[data.nationalId] = data.name;
+        }
+      });
       setTeachersList(map);
     });
     return () => unsub();
   }, [schoolId]);
 
-  // Fetch all preparations
+  // Fetch all preparations with schoolId fallback
   useEffect(() => {
-    if (!schoolId) return;
-    const q = query(collection(db, 'preparations'), where('schoolId', '==', schoolId));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(collection(db, 'preparations'), (snap) => {
       const data = [];
-      snap.docs.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+      snap.docs.forEach(doc => {
+        const item = { id: doc.id, ...doc.data() };
+        if (!schoolId || schoolId === 'ALL' || !item.schoolId || item.schoolId === schoolId) {
+          data.push(item);
+        }
+      });
+      data.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
       setPreparations(data);
     });
     return () => unsub();
@@ -48,12 +58,18 @@ export default function AdminPreparations({ schoolId }) {
 
   let filtered = preparations;
   if (selectedClass) filtered = filtered.filter(p => p.className === selectedClass);
-  if (selectedTeacher) filtered = filtered.filter(p => p.teacherId === selectedTeacher);
+  if (selectedTeacher) {
+    filtered = filtered.filter(p => 
+      p.teacherId === selectedTeacher || 
+      p.teacherNationalId === selectedTeacher ||
+      p.teacherName === teachersList[selectedTeacher]
+    );
+  }
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2>{t('adminPreparations.title')}</h2>
+        <h2>{t('adminPreparations.title')} ({filtered.length})</h2>
       </div>
 
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
@@ -90,15 +106,19 @@ export default function AdminPreparations({ schoolId }) {
             <div key={p.id} style={{ background: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
               <div style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{t('adminPreparations.classPrefix')}{p.className}{t('adminPreparations.subjectPrefix')}{p.subject}</h3>
-                  <div style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '8px' }}>{t('adminPreparations.teacherPrefix')}{teachersList[p.teacherId] || p.teacherEmail}</div>
+                  <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>
+                    {t('adminPreparations.classPrefix')} {p.className} - {t('adminPreparations.subjectPrefix')} {p.subject}
+                  </h3>
+                  <div style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '8px' }}>
+                    {t('adminPreparations.teacherPrefix')} {p.teacherName || teachersList[p.teacherId] || teachersList[p.teacherNationalId] || p.teacherEmail}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>{p.week || t('adminPreparations.week1')}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{t('adminPreparations.datePrefix')}{p.date || '-'}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{t('adminPreparations.periodPrefix')}{p.period || '-'}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{t('adminPreparations.datePrefix')} {p.date || '-'}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{t('adminPreparations.periodPrefix')} {p.period || '-'}</div>
                   <div style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '8px' }}>
-                    {t('adminPreparations.updatedPrefix')}{new Date(p.updatedAt).toLocaleDateString('ar-EG')}
+                    {t('adminPreparations.updatedPrefix')} {p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('ar-EG') : '-'}
                   </div>
                 </div>
               </div>
@@ -125,7 +145,7 @@ export default function AdminPreparations({ schoolId }) {
                   if (!p[field]) return null;
                   return (
                     <div key={field}>
-                      <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>{titles[field]}:</h4>
+                      <h4 style={{ color: 'var(--color-secondary-dark)', margin: '0 0 8px 0' }}>{titles[field]}</h4>
                       <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                         <MarkdownViewer content={p[field]} />
                       </div>

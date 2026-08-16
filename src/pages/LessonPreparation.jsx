@@ -239,8 +239,11 @@ export default function LessonPreparation() {
     setIsSaving(true);
     try {
       const payload = {
-        teacherId: teacherDocId,
+        teacherId: teacherDocId || userData?.nationalId || auth.currentUser.uid,
+        teacherName: userData?.name || 'معلم',
+        teacherNationalId: userData?.nationalId || '',
         teacherEmail: auth.currentUser.email,
+        schoolId: userData?.schoolId || 'default_school_1',
         className: selectedClass,
         subject: selectedSubject,
         week: selectedWeek,
