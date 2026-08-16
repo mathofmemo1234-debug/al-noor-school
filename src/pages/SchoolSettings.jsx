@@ -4,8 +4,10 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Save, Upload, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ChangePassword from '../components/ChangePassword';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function SchoolSettings({ schoolId }) {
+  const { t } = useLanguage();
   const { userData } = useAuth();
   const [logoBase64, setLogoBase64] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -27,7 +29,7 @@ export default function SchoolSettings({ schoolId }) {
     if (!file) return;
     
     if (file.size > 1024 * 1024) { // 1MB limit
-      alert('حجم الصورة كبير جداً. الرجاء اختيار صورة أقل من 1 ميجابايت.');
+      alert(t('schoolSettings.imageTooLarge'));
       return;
     }
 
@@ -47,11 +49,11 @@ export default function SchoolSettings({ schoolId }) {
         await updateDoc(doc(db, 'schools', schoolId), {
           logoUrl: logoBase64
         });
-        alert('تم حفظ الإعدادات بنجاح. يرجى تحديث الصفحة لمشاهدة التغيير.');
+        alert(t('schoolSettings.settingsSaved'));
       }
     } catch (error) {
       console.error(error);
-      alert('حدث خطأ أثناء الحفظ.');
+      alert(t('schoolSettings.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -59,10 +61,10 @@ export default function SchoolSettings({ schoolId }) {
 
   return (
     <div className="glass-panel" style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
-      <h2 style={{ color: 'var(--color-primary-dark)', marginBottom: '24px' }}>إعدادات المجمع</h2>
+      <h2 style={{ color: 'var(--color-primary-dark)', marginBottom: '24px' }}>{t('schoolSettings.title')}</h2>
       
       <div style={{ marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '1.1em', marginBottom: '16px' }}>شعار المجمع (اللوجو)</h3>
+        <h3 style={{ fontSize: '1.1em', marginBottom: '16px' }}>{t('schoolSettings.logoTitle')}</h3>
         
         <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
           <div style={{ 
@@ -80,13 +82,13 @@ export default function SchoolSettings({ schoolId }) {
           
           <div style={{ flex: 1 }}>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9em', marginBottom: '12px', lineHeight: '1.6' }}>
-              قم برفع شعار المجمع الخاص بك ليتم عرضه في القائمة الجانبية لجميع المعلمين والطلاب. 
+              {t('schoolSettings.logoDescription1')}
               <br/>
-              يفضل أن تكون الصورة بخلفية شفافة (PNG) وألا يزيد حجمها عن 1 ميجابايت.
+              {t('schoolSettings.logoDescription2')}
             </p>
             <label className="btn" style={{ background: 'var(--color-secondary)', display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
               <Upload size={18} />
-              اختر صورة
+              {t('schoolSettings.chooseImage')}
               <input type="file" accept="image/png, image/jpeg" style={{ display: 'none' }} onChange={handleImageChange} />
             </label>
           </div>
@@ -96,7 +98,7 @@ export default function SchoolSettings({ schoolId }) {
       <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
         <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || !logoBase64} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Save size={18} />
-          {isSaving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+          {isSaving ? t('schoolSettings.saving') : t('schoolSettings.saveChanges')}
         </button>
       </div>
       

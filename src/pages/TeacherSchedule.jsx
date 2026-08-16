@@ -3,11 +3,20 @@ import { db } from '../firebase';
 import { collection, onSnapshot, query, where, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar, Link as LinkIcon, Edit2, X, Check } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+const dayMap = {
+  'الأحد': 'sunday',
+  'الإثنين': 'monday',
+  'الثلاثاء': 'tuesday',
+  'الأربعاء': 'wednesday',
+  'الخميس': 'thursday'
+};
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export default function TeacherSchedule() {
+  const { t } = useLanguage();
   const { userData } = useAuth();
   const [schedules, setSchedules] = useState([]);
   const [classes, setClasses] = useState({});
@@ -66,7 +75,7 @@ export default function TeacherSchedule() {
           scheduleId: schedule.id, // doc id
           key: key,
           subject: schedule.matrix[key].subject,
-          className: classes[schedule.id] || 'فصل غير معروف',
+          className: classes[schedule.id] || t('teacherSchedule.unknownClass'),
           virtualLink: schedule.matrix[key].virtualLink || ''
         };
         break; // A teacher can only be in one class per period
@@ -88,7 +97,7 @@ export default function TeacherSchedule() {
       setLinkInput('');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء حفظ الرابط.');
+      alert(t('teacherSchedule.saveLinkFail'));
     } finally {
       setIsSaving(false);
     }
@@ -97,21 +106,21 @@ export default function TeacherSchedule() {
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px', color: 'var(--color-primary-dark)' }}>
-        <Calendar size={24} /> جدولي الدراسي
+        <Calendar size={24} /> {t('teacherSchedule.mySchedule')}
       </h2>
       
       <div style={{ overflowX: 'auto' }}>
         <table className="data-table">
           <thead>
             <tr>
-              <th style={{ width: '100px' }}>اليوم</th>
-              {PERIODS.map(p => <th key={p} style={{ textAlign: 'center' }}>الحصة {p}</th>)}
+              <th style={{ width: '100px' }}>{t('teacherSchedule.day')}</th>
+              {PERIODS.map(p => <th key={p} style={{ textAlign: 'center' }}>{t('teacherSchedule.period')} {p}</th>)}
             </tr>
           </thead>
           <tbody>
             {DAYS.map(day => (
               <tr key={day}>
-                <td style={{ fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>{day}</td>
+                <td style={{ fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>{t(`days.${dayMap[day]}`)}</td>
                 {PERIODS.map(period => {
                   const cell = getTeacherCell(day, period);
                   return (
@@ -129,7 +138,7 @@ export default function TeacherSchedule() {
                                   type="url" 
                                   value={linkInput} 
                                   onChange={e => setLinkInput(e.target.value)} 
-                                  placeholder="رابط المنصة..."
+                                  placeholder={t('teacherSchedule.platformLink')}
                                   style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #ccc', borderRadius: '4px' }}
                                 />
                                 <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
@@ -141,10 +150,10 @@ export default function TeacherSchedule() {
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                                 {cell.virtualLink ? (
                                   <a href={cell.virtualLink} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: '#25D366', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
-                                    <LinkIcon size={12} /> رابط الحصة
+                                    <LinkIcon size={12} /> {t('teacherSchedule.lessonLink')}
                                   </a>
                                 ) : (
-                                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>لا يوجد رابط</span>
+                                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>{t('teacherSchedule.noLink')}</span>
                                 )}
                                 <button 
                                   onClick={() => {
@@ -152,7 +161,7 @@ export default function TeacherSchedule() {
                                     setLinkInput(cell.virtualLink);
                                   }} 
                                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#64748b' }}
-                                  title="إضافة / تعديل رابط الحصة الافتراضية"
+                                  title={t('teacherSchedule.addEditLink')}
                                 >
                                   <Edit2 size={12} />
                                 </button>

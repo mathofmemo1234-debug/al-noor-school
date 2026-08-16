@@ -4,9 +4,11 @@ import { auth, db } from '../firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { Key, Phone } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function Settings() {
   const { userData } = useAuth();
+  const { t } = useLanguage();
   
   // Password State
   const [newPassword, setNewPassword] = useState('');
@@ -41,7 +43,7 @@ export default function Settings() {
     setError('');
     
     if (newPassword.length < 6) {
-      setError('كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
+      setError(t('settings.passwordLengthError'));
       return;
     }
 
@@ -49,17 +51,17 @@ export default function Settings() {
     try {
       if (auth.currentUser) {
         await updatePassword(auth.currentUser, newPassword);
-        setMessage('تم تحديث كلمة المرور بنجاح.');
+        setMessage(t('settings.passwordUpdated'));
         setNewPassword('');
       } else {
-        setError('لا يوجد مستخدم مسجل الدخول.');
+        setError(t('settings.noUser'));
       }
     } catch (err) {
       console.error(err);
       if (err.code === 'auth/requires-recent-login') {
-        setError('يرجى تسجيل الخروج وتسجيل الدخول مرة أخرى لإتمام هذا الإجراء.');
+        setError(t('settings.reloginRequired'));
       } else {
-        setError('حدث خطأ أثناء التحديث.');
+        setError(t('settings.updateError'));
       }
     } finally {
       setLoading(false);
@@ -72,17 +74,17 @@ export default function Settings() {
     setWaError('');
 
     if (!teacherDocId) {
-      setWaError('تعذر العثور على بيانات المعلم.');
+      setWaError(t('settings.teacherNotFound'));
       return;
     }
 
     setWaLoading(true);
     try {
       await updateDoc(doc(db, 'teachers', teacherDocId), { whatsapp });
-      setWaMessage('تم تحديث رقم الواتساب بنجاح.');
+      setWaMessage(t('settings.whatsappUpdated'));
     } catch (err) {
       console.error(err);
-      setWaError('حدث خطأ أثناء تحديث رقم الواتساب.');
+      setWaError(t('settings.whatsappUpdateError'));
     } finally {
       setWaLoading(false);
     }
@@ -95,11 +97,11 @@ export default function Settings() {
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
           <Key size={24} color="var(--color-primary)" />
-          <h2 style={{ margin: 0 }}>تغيير كلمة المرور</h2>
+          <h2 style={{ margin: 0 }}>{t('settings.changePasswordTitle')}</h2>
         </div>
         
         <p style={{ color: 'var(--color-text-muted)', marginBottom: '20px' }}>
-          ينصح بتغيير كلمة المرور بشكل دوري للحفاظ على أمان حسابك (للمعلمين والطلاب).
+          {t('settings.passwordAdvice')}
         </p>
 
         {message && <div style={{ background: '#dcfce7', color: '#166534', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>{message}</div>}
@@ -107,7 +109,7 @@ export default function Settings() {
 
         <form onSubmit={handleUpdatePassword} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div>
-            <label style={{ display: 'block', marginBottom: '5px' }}>كلمة المرور الجديدة</label>
+            <label style={{ display: 'block', marginBottom: '5px' }}>{t('settings.newPassword')}</label>
             <input 
               type="password" 
               className="input-field" 
@@ -119,7 +121,7 @@ export default function Settings() {
             />
           </div>
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'جاري التحديث...' : 'تحديث كلمة المرور'}
+            {loading ? t('settings.updating') : t('settings.updatePasswordBtn')}
           </button>
         </form>
       </div>
@@ -129,11 +131,11 @@ export default function Settings() {
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <Phone size={24} color="#25D366" />
-            <h2 style={{ margin: 0 }}>تحديث رقم الواتساب</h2>
+            <h2 style={{ margin: 0 }}>{t('settings.updateWhatsappTitle')}</h2>
           </div>
           
           <p style={{ color: 'var(--color-text-muted)', marginBottom: '20px' }}>
-            أدخل رقم الواتساب الخاص بك ليتمكن الطلاب من التواصل معك. يفضل إدخال الرقم مع رمز الدولة (مثال: 966500000000).
+            {t('settings.whatsappAdvice')}
           </p>
 
           {waMessage && <div style={{ background: '#dcfce7', color: '#166534', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>{waMessage}</div>}
@@ -141,7 +143,7 @@ export default function Settings() {
 
           <form onSubmit={handleUpdateWhatsapp} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <div>
-              <label style={{ display: 'block', marginBottom: '5px' }}>رقم الواتساب</label>
+              <label style={{ display: 'block', marginBottom: '5px' }}>{t('settings.whatsappNumber')}</label>
               <input 
                 type="text" 
                 className="input-field" 
@@ -152,7 +154,7 @@ export default function Settings() {
               />
             </div>
             <button type="submit" className="btn btn-primary" disabled={waLoading} style={{ background: '#25D366', borderColor: '#25D366' }}>
-              {waLoading ? 'جاري التحديث...' : 'حفظ الرقم'}
+              {waLoading ? t('settings.updating') : t('settings.saveNumberBtn')}
             </button>
           </form>
         </div>

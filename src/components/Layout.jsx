@@ -1,9 +1,11 @@
 import React from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { useLanguage } from '../contexts/LanguageContext';
 import './Layout.css';
 
 export default function Layout({ role, title, children }) {
+  const { t } = useLanguage();
   return (
     <div className="layout-container" style={{ position: 'relative' }}>
       <Sidebar role={role} />
@@ -24,7 +26,7 @@ export default function Layout({ role, title, children }) {
         pointerEvents: 'none',
         direction: 'rtl'
       }}>
-        مصمم الموقع : محمد عبدالله جمعة | جوال : 0545841974
+        {t('layout.designerInfo')}
       </div>
     </div>
   );

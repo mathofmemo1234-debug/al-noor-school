@@ -6,8 +6,10 @@ import MarkdownViewer from '../components/MarkdownViewer';
 import { Save, UploadCloud, Eye, Edit, Trash2, X, Image as ImageIcon, Loader } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import MarkdownInput from '../components/MarkdownInput';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function LessonPreparation() {
+  const { t } = useLanguage();
   const { userData } = useAuth();
   const [classesList, setClassesList] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
@@ -186,19 +188,19 @@ export default function LessonPreparation() {
       const url = await getDownloadURL(storageRef);
       setFileUrl(url);
       setFileName(file.name);
-      alert('تم رفع الملف بنجاح!');
+      alert(t('lessonPreparation.uploadSuccess'));
     } catch (error) {
       console.error('Upload Error:', error);
-      alert('فشل رفع الملف.');
+      alert(t('lessonPreparation.uploadFail'));
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!auth.currentUser) return alert('يجب تسجيل الدخول');
-    if (!selectedClass || !selectedSubject) return alert('يرجى اختيار الفصل والمادة');
-    if (!selectedPeriod) return alert('يرجى اختيار الحصة');
+    if (!auth.currentUser) return alert(t('lessonPreparation.mustLogin'));
+    if (!selectedClass || !selectedSubject) return alert(t('lessonPreparation.mustSelectClassSubj'));
+    if (!selectedPeriod) return alert(t('lessonPreparation.mustSelectPeriod'));
     
     setIsSaving(true);
     try {
@@ -229,23 +231,23 @@ export default function LessonPreparation() {
       } else {
         await addDoc(collection(db, 'preparations'), payload);
       }
-      alert('تم حفظ التحضير بنجاح!');
+      alert(t('lessonPreparation.saveSuccess'));
     } catch (error) {
       console.error("Error saving prep:", error);
-      alert('حدث خطأ أثناء الحفظ');
+      alert(t('lessonPreparation.saveFail'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا التحضير نهائياً؟')) {
+    if (window.confirm(t('lessonPreparation.confirmDelete'))) {
       try {
         await deleteDoc(doc(db, 'preparations', id));
-        alert('تم الحذف بنجاح');
+        alert(t('lessonPreparation.deleteSuccess'));
       } catch (err) {
         console.error(err);
-        alert('حدث خطأ أثناء الحذف');
+        alert(t('lessonPreparation.deleteFail'));
       }
     }
   };
@@ -271,14 +273,14 @@ export default function LessonPreparation() {
           style={{ background: activeTab === 'form' ? '' : 'transparent', color: activeTab === 'form' ? '' : 'var(--color-text)' }}
           onClick={() => setActiveTab('form')}
         >
-          إضافة / تعديل تحضير
+          {t('lessonPreparation.addEditPrep')}
         </button>
         <button 
           className={`btn ${activeTab === 'list' ? 'btn-primary' : ''}`}
           style={{ background: activeTab === 'list' ? '' : 'transparent', color: activeTab === 'list' ? '' : 'var(--color-text)' }}
           onClick={() => setActiveTab('list')}
         >
-          سجل التحضيرات ({allPreparations.length})
+          {t('lessonPreparation.prepRecord')} ({allPreparations.length})
         </button>
       </div>
 
@@ -292,7 +294,7 @@ export default function LessonPreparation() {
                 value={selectedClass} 
                 onChange={(e) => setSelectedClass(e.target.value)}
               >
-                <option value="">اختر الفصل...</option>
+                <option value="">{t('lessonPreparation.selectClass')}</option>
                 {classesList.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
 
@@ -302,7 +304,7 @@ export default function LessonPreparation() {
                 value={selectedSubject} 
                 onChange={(e) => setSelectedSubject(e.target.value)}
               >
-                <option value="">اختر المادة...</option>
+                <option value="">{t('lessonPreparation.selectSubject')}</option>
                 {subjects.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
 
@@ -312,7 +314,7 @@ export default function LessonPreparation() {
                 value={selectedWeek} 
                 onChange={(e) => setSelectedWeek(e.target.value)}
               >
-                {weeks.map(w => <option key={w} value={w}>{w}</option>)}
+                {weeks.map(w => <option key={w} value={w}>{w.replace('الأسبوع', t('lessonPreparation.weekPrefix'))}</option>)}
               </select>
 
               <input 
@@ -330,105 +332,105 @@ export default function LessonPreparation() {
                 onChange={(e) => setSelectedPeriod(e.target.value)}
                 disabled={!availablePeriods.length}
               >
-                <option value="">{availablePeriods.length ? 'اختر الحصة...' : 'لا توجد حصص'}</option>
+                <option value="">{availablePeriods.length ? t('lessonPreparation.selectPeriod') : t('lessonPreparation.noPeriods')}</option>
                 {availablePeriods.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
 
               <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || !selectedClass || !selectedSubject || !selectedPeriod}>
-                <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ التحضير'}
+                <Save size={18} /> {isSaving ? t('lessonPreparation.saving') : t('lessonPreparation.savePrep')}
               </button>
             </div>
           </div>
           
           {!selectedClass || !selectedSubject ? (
             <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-              يرجى اختيار الفصل والمادة لبدء التحضير.
+              {t('lessonPreparation.pleaseSelectClassSubj')}
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>إرفاق ملف التحضير (PDF / JPG)</label>
+                  <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>{t('lessonPreparation.attachPrepFile')}</label>
                   <input type="file" accept=".pdf, .jpg, .jpeg, .png" onChange={handleFileUpload} disabled={isUploading} />
                 </div>
-                {isUploading && <div style={{ color: 'var(--color-primary)' }}>جاري الرفع...</div>}
+                {isUploading && <div style={{ color: 'var(--color-primary)' }}>{t('lessonPreparation.uploading')}</div>}
                 {fileUrl && (
                   <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '8px 16px', borderRadius: '4px' }}>
-                    تم إرفاق: <a href={fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', fontWeight: 'bold' }}>{fileName}</a>
+                    {t('lessonPreparation.attached')} <a href={fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', fontWeight: 'bold' }}>{fileName}</a>
                   </div>
                 )}
               </div>
 
               <MarkdownInput 
-                label="الأهداف السلوكية" 
+                label={t('lessonPreparation.behavioralGoals')} 
                 value={goals} 
                 onChange={setGoals} 
-                placeholder="مثال: أن يتعرف الطالب على..." 
+                placeholder={t('lessonPreparation.behavioralGoalsPlaceholder')} 
                 height="150px" 
               />
 
               <MarkdownInput 
-                label="الحقبنة" 
+                label={t('lessonPreparation.portfolio')} 
                 value={portfolio} 
                 onChange={setPortfolio} 
-                placeholder="اربط اهداف درسك بالمعرفة السابقة للطالب..." 
+                placeholder={t('lessonPreparation.portfolioPlaceholder')} 
                 height="150px" 
               />
 
               <MarkdownInput 
-                label="التهيئة" 
+                label={t('lessonPreparation.warmup')} 
                 value={warmup} 
                 onChange={setWarmup} 
-                placeholder="اكتب التهيئة هنا..." 
+                placeholder={t('lessonPreparation.warmupPlaceholder')} 
                 height="150px" 
               />
 
               <MarkdownInput 
-                label="استراتيجيات التدريس" 
+                label={t('lessonPreparation.teachingStrategies')} 
                 value={strategy} 
                 onChange={setStrategy} 
-                placeholder="اكتب استراتيجيات التدريس هنا..." 
+                placeholder={t('lessonPreparation.teachingStrategiesPlaceholder')} 
                 height="150px" 
               />
 
               <MarkdownInput 
-                label="محتوى الدرس" 
+                label={t('lessonPreparation.lessonContent')} 
                 value={content} 
                 onChange={setContent} 
-                placeholder="اكتب محتوى الدرس هنا... مثال: المعادلة التربيعية هي $$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$" 
+                placeholder={t('lessonPreparation.lessonContentPlaceholder')} 
                 height="250px" 
               />
 
               <MarkdownInput 
-                label="الوسائل ومصادر التعلم" 
+                label={t('lessonPreparation.resources')} 
                 value={resources} 
                 onChange={setResources} 
-                placeholder="اكتب الوسائل ومصادر التعلم..." 
+                placeholder={t('lessonPreparation.resourcesPlaceholder')} 
                 height="150px" 
               />
 
               <MarkdownInput 
-                label="التقويم البنائي" 
+                label={t('lessonPreparation.formativeEval')} 
                 value={formativeEval} 
                 onChange={setFormativeEval} 
-                placeholder="اكتب التقويم البنائي..." 
+                placeholder={t('lessonPreparation.formativeEvalPlaceholder')} 
                 height="150px" 
               />
 
               <MarkdownInput 
-                label="التقويم النهائي" 
+                label={t('lessonPreparation.summativeEval')} 
                 value={summativeEval} 
                 onChange={setSummativeEval} 
-                placeholder="اكتب التقويم النهائي..." 
+                placeholder={t('lessonPreparation.summativeEvalPlaceholder')} 
                 height="150px" 
               />
 
               <MarkdownInput 
-                label="الواجبات" 
+                label={t('lessonPreparation.homework')} 
                 value={homework} 
                 onChange={setHomework} 
-                placeholder="اكتب الواجبات..." 
+                placeholder={t('lessonPreparation.homeworkPlaceholder')} 
                 height="150px" 
               />
 
@@ -441,28 +443,28 @@ export default function LessonPreparation() {
         <div>
           {allPreparations.length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>
-              لا توجد تحضيرات محفوظة مسبقاً.
+              {t('lessonPreparation.noSavedPreps')}
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {allPreparations.map(p => (
                 <div key={p.id} style={{ background: '#fff', border: '1px solid #e2e8f0', padding: '20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{p.subject} - فصل {p.className}</h3>
+                    <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{p.subject} - {t('lessonPreparation.classWord')} {p.className}</h3>
                     <div style={{ display: 'flex', gap: '16px', color: 'var(--color-text-muted)', fontSize: '14px' }}>
-                      <span>{p.week}</span>
-                      <span>التاريخ: {p.date}</span>
-                      <span>الحصة: {p.period}</span>
+                      <span>{p.week.replace('الأسبوع', t('lessonPreparation.weekPrefix'))}</span>
+                      <span>{t('lessonPreparation.date')} {p.date}</span>
+                      <span>{t('lessonPreparation.periodLabel')} {p.period}</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="btn" style={{ padding: '8px', background: '#e0f2fe', color: '#0284c7' }} onClick={() => setPreviewPrep(p)} title="معاينة">
+                    <button className="btn" style={{ padding: '8px', background: '#e0f2fe', color: '#0284c7' }} onClick={() => setPreviewPrep(p)} title={t('lessonPreparation.preview')}>
                       <Eye size={20} />
                     </button>
-                    <button className="btn" style={{ padding: '8px', background: '#fef3c7', color: '#d97706' }} onClick={() => handleEdit(p)} title="تعديل">
+                    <button className="btn" style={{ padding: '8px', background: '#fef3c7', color: '#d97706' }} onClick={() => handleEdit(p)} title={t('lessonPreparation.edit')}>
                       <Edit size={20} />
                     </button>
-                    <button className="btn" style={{ padding: '8px', background: '#fee2e2', color: '#dc2626' }} onClick={() => handleDelete(p.id)} title="حذف">
+                    <button className="btn" style={{ padding: '8px', background: '#fee2e2', color: '#dc2626' }} onClick={() => handleDelete(p.id)} title={t('lessonPreparation.delete')}>
                       <Trash2 size={20} />
                     </button>
                   </div>
@@ -485,7 +487,7 @@ export default function LessonPreparation() {
           }}>
             <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
               <h2 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>
-                معاينة التحضير: {previewPrep.subject} - {previewPrep.className}
+                {t('lessonPreparation.previewPrep')} {previewPrep.subject} - {previewPrep.className}
               </h2>
               <button className="btn" style={{ padding: '8px', background: 'transparent' }} onClick={() => setPreviewPrep(null)}>
                 <X size={24} color="#64748b" />
@@ -494,28 +496,28 @@ export default function LessonPreparation() {
             <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
               <div style={{ display: 'flex', gap: '24px', color: 'var(--color-text-muted)', fontWeight: 'bold' }}>
-                <span>{previewPrep.week}</span>
-                <span>الحصة: {previewPrep.period}</span>
-                <span>التاريخ: {previewPrep.date}</span>
+                <span>{previewPrep.week.replace('الأسبوع', t('lessonPreparation.weekPrefix'))}</span>
+                <span>{t('lessonPreparation.periodLabel')} {previewPrep.period}</span>
+                <span>{t('lessonPreparation.date')} {previewPrep.date}</span>
               </div>
 
               {previewPrep.fileUrl && (
                 <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '12px 16px', borderRadius: '8px' }}>
-                  <strong>ملف مرفق:</strong> <a href={previewPrep.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', textDecoration: 'underline' }}>{previewPrep.fileName}</a>
+                  <strong>{t('lessonPreparation.attachedFile')}</strong> <a href={previewPrep.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', textDecoration: 'underline' }}>{previewPrep.fileName}</a>
                 </div>
               )}
 
               {['goals', 'portfolio', 'warmup', 'strategy', 'content', 'resources', 'formativeEval', 'summativeEval', 'homework'].map(field => {
                 const titles = {
-                  goals: 'الأهداف السلوكية',
-                  portfolio: 'الحقبنة',
-                  warmup: 'التهيئة',
-                  strategy: 'استراتيجيات التدريس',
-                  content: 'محتوى الدرس',
-                  resources: 'الوسائل ومصادر التعلم',
-                  formativeEval: 'التقويم البنائي',
-                  summativeEval: 'التقويم النهائي',
-                  homework: 'الواجبات'
+                  goals: t('lessonPreparation.behavioralGoals'),
+                  portfolio: t('lessonPreparation.portfolio'),
+                  warmup: t('lessonPreparation.warmup'),
+                  strategy: t('lessonPreparation.teachingStrategies'),
+                  content: t('lessonPreparation.lessonContent'),
+                  resources: t('lessonPreparation.resources'),
+                  formativeEval: t('lessonPreparation.formativeEval'),
+                  summativeEval: t('lessonPreparation.summativeEval'),
+                  homework: t('lessonPreparation.homework')
                 };
                 if (!previewPrep[field]) return null;
                 return (

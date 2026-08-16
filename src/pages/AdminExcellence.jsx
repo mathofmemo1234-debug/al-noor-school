@@ -3,8 +3,10 @@ import { db } from '../firebase';
 import { collection, query, where, onSnapshot, getDocs, orderBy } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Star, FileText, Image as ImageIcon } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function AdminExcellence({ schoolId }) {
+  const { t } = useLanguage();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState(null);
@@ -45,17 +47,17 @@ export default function AdminExcellence({ schoolId }) {
       }
 
       if (!finalBase64) {
-        alert('الملف غير موجود');
+        alert(t('adminExcellence.fileNotFound'));
         return;
       }
 
       const link = document.createElement('a');
       link.href = finalBase64;
-      link.download = f.fileName || 'ملف_تميز';
+      link.download = f.fileName || t('adminExcellence.excellenceFile');
       link.click();
     } catch (error) {
       console.error(error);
-      alert('حدث خطأ أثناء تحميل الملف');
+      alert(t('adminExcellence.downloadError'));
     } finally {
       setDownloadingId(null);
     }
@@ -65,21 +67,21 @@ export default function AdminExcellence({ schoolId }) {
     <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
         <Star size={32} color="var(--color-primary-dark)" />
-        <h1 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>ملفات التميز والمبادرات</h1>
+        <h1 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{t('adminExcellence.title')}</h1>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
         {loading ? (
-          <p>جاري التحميل...</p>
+          <p>{t('adminExcellence.loading')}</p>
         ) : files.length === 0 ? (
-          <p style={{ color: 'var(--color-text-muted)', gridColumn: '1 / -1' }}>لم يتم رفع أي ملفات تميز من قبل المعلمين بعد.</p>
+          <p style={{ color: 'var(--color-text-muted)', gridColumn: '1 / -1' }}>{t('adminExcellence.noFiles')}</p>
         ) : (
           files.map(f => (
             <div key={f.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '12px', marginBottom: '8px' }}>
                 <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{f.title}</h3>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85em', color: 'var(--color-text-muted)' }}>
-                  <span>بواسطة: <strong>{f.teacherName}</strong></span>
+                  <span>{t('adminExcellence.by')}<strong>{f.teacherName}</strong></span>
                   <span>{f.createdAt?.toDate().toLocaleDateString('ar-EG')}</span>
                 </div>
               </div>
@@ -94,7 +96,7 @@ export default function AdminExcellence({ schoolId }) {
                   style={{ background: 'var(--color-secondary)', display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#fff', width: '100%', justifyContent: 'center' }}
                 >
                   {f.attachmentType === 'image' ? <ImageIcon size={18} /> : <FileText size={18} />}
-                  {downloadingId === f.id ? 'جاري تجهيز الملف...' : `تحميل / عرض (${f.fileName || 'المرفق'})`}
+                  {downloadingId === f.id ? t('adminExcellence.preparingFile') : `${t('adminExcellence.downloadViewPrefix')}${f.fileName || t('adminExcellence.attachment')}${t('adminExcellence.downloadViewSuffix')}`}
                 </button>
               </div>
             </div>

@@ -4,8 +4,10 @@ import { collection, query, where, onSnapshot, addDoc, getDocs, serverTimestamp 
 import { useAuth } from '../contexts/AuthContext';
 import { FileText, Clock, Play, CheckCircle } from 'lucide-react';
 import MarkdownViewer from '../components/MarkdownViewer';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function StudentExams() {
+  const { t } = useLanguage();
   const { userData } = useAuth();
   const [exams, setExams] = useState([]);
   const [studentClass, setStudentClass] = useState('');
@@ -77,7 +79,7 @@ export default function StudentExams() {
 
   const startExam = (exam) => {
     if (!canTakeExam(exam)) {
-      alert('لا يمكنك الدخول لهذا الاختبار الآن.');
+      alert(t('studentExams.cannotEnterNow'));
       return;
     }
     setActiveExam(exam);
@@ -90,7 +92,7 @@ export default function StudentExams() {
     
     // Check if all answered
     if (Object.keys(answers).length < activeExam.questions.length) {
-      if (!window.confirm('لم تقم بالإجابة على جميع الأسئلة. هل أنت متأكد من رغبتك في التسليم؟')) {
+      if (!window.confirm(t('studentExams.confirmIncompleteSubmit'))) {
         return;
       }
     }
@@ -120,7 +122,7 @@ export default function StudentExams() {
       });
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء إرسال الاختبار');
+      alert(t('studentExams.submitFail'));
     } finally {
       setIsSubmitting(false);
     }
@@ -130,12 +132,12 @@ export default function StudentExams() {
     return (
       <div className="glass-panel" style={{ padding: '40px', textAlign: 'center' }}>
         <CheckCircle size={64} color="#25D366" style={{ margin: '0 auto 20px auto' }} />
-        <h2 style={{ color: 'var(--color-primary-dark)' }}>تم تسليم الاختبار بنجاح!</h2>
+        <h2 style={{ color: 'var(--color-primary-dark)' }}>{t('studentExams.examDelivered')}</h2>
         <div style={{ fontSize: '24px', margin: '20px 0', background: 'rgba(255,255,255,0.5)', padding: '20px', borderRadius: '12px', display: 'inline-block' }}>
-          الدرجة: <strong style={{ color: scoreView.score === scoreView.total ? '#25D366' : 'var(--color-primary)' }}>{scoreView.score}</strong> / {scoreView.total}
+          {t('studentExams.grade')} <strong style={{ color: scoreView.score === scoreView.total ? '#25D366' : 'var(--color-primary)' }}>{scoreView.score}</strong> / {scoreView.total}
         </div>
         <div>
-          <button className="btn btn-primary" onClick={() => { setActiveExam(null); setScoreView(null); }}>العودة للقائمة</button>
+          <button className="btn btn-primary" onClick={() => { setActiveExam(null); setScoreView(null); }}>{t('studentExams.backToList')}</button>
         </div>
       </div>
     );
@@ -148,7 +150,7 @@ export default function StudentExams() {
           <h2>{activeExam.title}</h2>
           <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-primary)' }}>
             <Clock size={20} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
-            المدة: {activeExam.duration} دقيقة
+            {t('studentExams.durationLabel')} {activeExam.duration} {t('studentExams.minutes')}
           </div>
         </div>
 
@@ -186,7 +188,7 @@ export default function StudentExams() {
 
         <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'center' }}>
           <button className="btn btn-primary" style={{ padding: '12px 40px', fontSize: '18px' }} onClick={submitExam} disabled={isSubmitting}>
-            {isSubmitting ? 'جاري الإرسال...' : 'تسليم الاختبار'}
+            {isSubmitting ? t('studentExams.submitting') : t('studentExams.submitExam')}
           </button>
         </div>
       </div>
@@ -195,11 +197,11 @@ export default function StudentExams() {
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <h2 style={{ marginBottom: '24px' }}><FileText style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} /> الاختبارات</h2>
+      <h2 style={{ marginBottom: '24px' }}><FileText style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} /> {t('studentExams.exams')}</h2>
       
       {exams.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
-          لا توجد اختبارات متاحة حالياً.
+          {t('studentExams.noExamsAvailable')}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
@@ -212,23 +214,23 @@ export default function StudentExams() {
               <div key={exam.id} style={{ background: 'rgba(255,255,255,0.7)', padding: '24px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
                 <h3 style={{ margin: '0 0 10px 0', color: 'var(--color-primary-dark)' }}>{exam.title}</h3>
                 <div style={{ color: '#64748b', fontSize: '14px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div>المادة: {exam.subject}</div>
-                  <div>وقت البدء: {exam.examDate} الساعة {exam.startTime}</div>
-                  <div>المدة: {exam.duration} دقيقة</div>
-                  <div>عدد الأسئلة: {exam.questions.length}</div>
+                  <div>{t('studentExams.subjectLabel')} {exam.subject}</div>
+                  <div>{t('studentExams.startTimeLabel')} {exam.examDate} {t('studentExams.hourLabel')} {exam.startTime}</div>
+                  <div>{t('studentExams.durationMins')} {exam.duration} {t('studentExams.minutes')}</div>
+                  <div>{t('studentExams.numQuestionsLabel')} {exam.questions.length}</div>
                 </div>
 
                 {hasTaken ? (
                   <div style={{ background: '#dcfce7', color: '#166534', padding: '12px', borderRadius: '8px', textAlign: 'center', fontWeight: 'bold' }}>
-                    تم التسليم - الدرجة: {examResults[exam.id].score} / {examResults[exam.id].totalQuestions}
+                    {t('studentExams.deliveredGrade')} {examResults[exam.id].score} / {examResults[exam.id].totalQuestions}
                   </div>
                 ) : upcoming ? (
                   <div style={{ background: '#f1f5f9', color: '#64748b', padding: '12px', borderRadius: '8px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                    <Clock size={18} /> متاح قريباً
+                    <Clock size={18} /> {t('studentExams.availableSoon')}
                   </div>
                 ) : canTake ? (
                   <button className="btn btn-primary" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }} onClick={() => startExam(exam)}>
-                    <Play size={18} /> بدء الاختبار
+                    <Play size={18} /> {t('studentExams.startExam')}
                   </button>
                 ) : null}
               </div>

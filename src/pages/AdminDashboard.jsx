@@ -10,8 +10,10 @@ import AdminPreparations from './AdminPreparations';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import SchoolSettings from './SchoolSettings';
 import AdminExcellence from './AdminExcellence';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function AdminHome({ schoolId }) {
+  const { t } = useLanguage();
   const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0 });
 
   useEffect(() => {
@@ -34,7 +36,7 @@ function AdminHome({ schoolId }) {
 
   const handleSeedData = async () => {
     try {
-      alert("جاري إضافة البيانات...");
+      alert(t('adminDashboard.addingData'));
       
       const teacherIds = [];
       const teachers = [
@@ -95,10 +97,10 @@ function AdminHome({ schoolId }) {
         });
       }
 
-      alert("تم إضافة 5 معلمين، 5 طلاب، والفصول، وجدول تجريبي بنجاح!");
+      alert(t('adminDashboard.seedSuccess'));
     } catch (err) {
       console.error(err);
-      alert("خطأ: " + err.message);
+      alert(t('adminDashboard.errorPrefix') + err.message);
     }
   };
 
@@ -106,7 +108,7 @@ function AdminHome({ schoolId }) {
     <div>
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
         <button onClick={handleSeedData} className="btn btn-primary">
-          إضافة بيانات تجريبية (5 معلمين، 5 طلاب، فصول، جدول)
+          {t('adminDashboard.addSeedData')}
         </button>
       </div>
       <div className="stats-grid">
@@ -115,7 +117,7 @@ function AdminHome({ schoolId }) {
             <Users size={32} />
           </div>
           <div className="stat-info">
-            <p>إجمالي المعلمين</p>
+            <p>{t('adminDashboard.totalTeachers')}</p>
             <h3>{stats.teachers}</h3>
           </div>
         </div>
@@ -125,7 +127,7 @@ function AdminHome({ schoolId }) {
             <Users size={32} />
           </div>
           <div className="stat-info">
-            <p>إجمالي الطلاب</p>
+            <p>{t('adminDashboard.totalStudents')}</p>
             <h3>{stats.students}</h3>
           </div>
         </div>
@@ -135,7 +137,7 @@ function AdminHome({ schoolId }) {
             <BookOpen size={32} />
           </div>
           <div className="stat-info">
-            <p>الفصول الدراسية</p>
+            <p>{t('adminDashboard.totalClasses')}</p>
             <h3>{stats.classes}</h3>
           </div>
         </div>
@@ -145,6 +147,7 @@ function AdminHome({ schoolId }) {
 }
 
 function ManageTeachers({ schoolId }) {
+  const { t } = useLanguage();
   const [teachers, setTeachers] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
   const [isBulkAdding, setIsBulkAdding] = useState(false);
@@ -185,7 +188,7 @@ function ManageTeachers({ schoolId }) {
       setName(''); setNationalId(''); setSubject('');
     } catch (err) {
       console.error(err);
-      alert('خطأ في الحفظ. تأكد من الصلاحيات.');
+      alert(t('adminDashboard.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -219,17 +222,17 @@ function ManageTeachers({ schoolId }) {
       }
       setIsBulkAdding(false);
       setBulkData('');
-      alert('تم إضافة المعلمين بنجاح');
+      alert(t('adminDashboard.teachersAddedSuccess'));
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء الرفع الجماعي.');
+      alert(t('adminDashboard.bulkUploadError'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (id, nationalId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا المعلم؟')) return;
+    if (!window.confirm(t('adminDashboard.confirmDeleteTeacher'))) return;
     try {
       await deleteDoc(doc(db, 'teachers', id));
       const uq = query(collection(db, 'users'), where('nationalId', '==', nationalId));
@@ -237,7 +240,7 @@ function ManageTeachers({ schoolId }) {
       snap.forEach(async (d) => await deleteDoc(doc(db, 'users', d.id)));
     } catch (err) {
       console.error(err);
-      alert('خطأ أثناء الحذف');
+      alert(t('adminDashboard.deleteError'));
     }
   };
 
@@ -258,7 +261,7 @@ function ManageTeachers({ schoolId }) {
       setEditingTeacher(null);
     } catch (err) {
       console.error(err);
-      alert('خطأ أثناء التحديث');
+      alert(t('adminDashboard.updateError'));
     } finally {
       setIsSaving(false);
     }
@@ -267,30 +270,30 @@ function ManageTeachers({ schoolId }) {
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>إدارة المعلمين</h2>
+        <h2>{t('adminDashboard.manageTeachersTitle')}</h2>
         <div style={{display: 'flex', gap: '10px'}}>
           <button className="btn" style={{background: 'var(--color-surface)', color: 'var(--color-primary-dark)', border: '1px solid var(--color-border)'}} onClick={() => setIsBulkAdding(true)}>
-            رفع جماعي
+            {t('adminDashboard.bulkUpload')}
           </button>
           <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
-            إضافة معلم جديد
+            {t('adminDashboard.addNewTeacher')}
           </button>
         </div>
       </div>
 
       <div style={{ display: 'grid', gap: '12px' }}>
         {teachers.length === 0 ? (
-          <p style={{ color: 'var(--color-text-muted)' }}>لا يوجد معلمين مضافين بعد.</p>
+          <p style={{ color: 'var(--color-text-muted)' }}>{t('adminDashboard.noTeachersAdded')}</p>
         ) : (
-          teachers.map(t => (
-            <div key={t.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          teachers.map(tData => (
+            <div key={tData.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{t.name}</h3>
-                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>رقم الهوية: {t.nationalId} • {t.subject} {t.whatsapp ? `• واتساب: ${t.whatsapp}` : ''}</p>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{tData.name}</h3>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalIdLabel')}{tData.nationalId} • {tData.subject} {tData.whatsapp ? `${t('adminDashboard.whatsappLabel')}${tData.whatsapp}` : ''}</p>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setEditingTeacher(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
-                <button onClick={() => handleDelete(t.id, t.nationalId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4f' }}><Trash2 size={20} /></button>
+                <button onClick={() => setEditingTeacher(tData)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
+                <button onClick={() => handleDelete(tData.id, tData.nationalId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4f' }}><Trash2 size={20} /></button>
               </div>
             </div>
           ))
@@ -301,21 +304,21 @@ function ManageTeachers({ schoolId }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
-            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>إضافة معلم جديد</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.addNewTeacher')}</h3>
             <form onSubmit={handleSaveSingle} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم المعلم</label>
-                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="الاسم الرباعي" required />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.teacherName')}</label>
+                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder={t('adminDashboard.fullNamePlaceholder')} required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>رقم الهوية الوطنية</label>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalId')}</label>
                 <input type="text" className="input-field" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="10xxxxxxxx" required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>المادة الدراسية</label>
-                <input type="text" className="input-field" value={subject} onChange={e => setSubject(e.target.value)} placeholder="رياضيات، لغتي، الخ..." required />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.subject')}</label>
+                <input type="text" className="input-field" value={subject} onChange={e => setSubject(e.target.value)} placeholder={t('adminDashboard.subjectPlaceholder')} required />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.saving') : t('adminDashboard.saveData')}</button>
             </form>
           </div>
         </div>
@@ -325,21 +328,21 @@ function ManageTeachers({ schoolId }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setEditingTeacher(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
-            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>تعديل بيانات المعلم</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.editTeacherTitle')}</h3>
             <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم المعلم</label>
-                <input type="text" className="input-field" value={editingTeacher.name} onChange={e => setEditingTeacher({...editingTeacher, name: e.target.value})} placeholder="الاسم الرباعي" required />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.teacherName')}</label>
+                <input type="text" className="input-field" value={editingTeacher.name} onChange={e => setEditingTeacher({...editingTeacher, name: e.target.value})} placeholder={t('adminDashboard.fullNamePlaceholder')} required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>المادة الدراسية</label>
-                <input type="text" className="input-field" value={editingTeacher.subject} onChange={e => setEditingTeacher({...editingTeacher, subject: e.target.value})} placeholder="رياضيات، لغتي، الخ..." required />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.subject')}</label>
+                <input type="text" className="input-field" value={editingTeacher.subject} onChange={e => setEditingTeacher({...editingTeacher, subject: e.target.value})} placeholder={t('adminDashboard.subjectPlaceholder')} required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>رقم الواتساب (اختياري)</label>
-                <input type="text" className="input-field" value={editingTeacher.whatsapp || ''} onChange={e => setEditingTeacher({...editingTeacher, whatsapp: e.target.value})} placeholder="مثال: 05xxxxxxx" />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.whatsappOptional')}</label>
+                <input type="text" className="input-field" value={editingTeacher.whatsapp || ''} onChange={e => setEditingTeacher({...editingTeacher, whatsapp: e.target.value})} placeholder={t('adminDashboard.whatsappPlaceholder')} />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.saving') : t('adminDashboard.saveChanges')}</button>
             </form>
           </div>
         </div>
@@ -349,10 +352,10 @@ function ManageTeachers({ schoolId }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass-panel" style={{ width: '500px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsBulkAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
-            <h3 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--color-primary-dark)' }}>الرفع الجماعي للمعلمين</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.bulkUploadTeachersTitle')}</h3>
             <p style={{fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '15px'}}>
-              قم بنسخ ولصق البيانات من ملف إكسل. (كل سطر يمثل معلماً).<br/>
-              الترتيب المطلوب: <strong>رقم الهوية، الاسم، المادة</strong> (مفصولة بفاصلة أو مسافة جدولة Tab)
+              {t('adminDashboard.bulkUploadTeachersInstruction1')}<br/>
+              {t('adminDashboard.requiredOrder')}<strong>{t('adminDashboard.idNameSubject')}</strong>{t('adminDashboard.separatedByCommaOrTab')}
             </p>
             <form onSubmit={handleSaveBulk} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <textarea 
@@ -364,7 +367,7 @@ function ManageTeachers({ schoolId }) {
                 required 
                 style={{resize: 'none'}}
               />
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الرفع...' : 'رفع البيانات'}</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.uploading') : t('adminDashboard.uploadData')}</button>
             </form>
           </div>
         </div>
@@ -374,6 +377,7 @@ function ManageTeachers({ schoolId }) {
 }
 
 function ManageStudents({ schoolId }) {
+  const { t } = useLanguage();
   const [students, setStudents] = useState([]);
   const [classesList, setClassesList] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
@@ -421,7 +425,7 @@ function ManageStudents({ schoolId }) {
       setName(''); setNationalId(''); setStudentClass('');
     } catch (err) {
       console.error(err);
-      alert('خطأ في الحفظ. تأكد من الصلاحيات.');
+      alert(t('adminDashboard.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -454,17 +458,17 @@ function ManageStudents({ schoolId }) {
       }
       setIsBulkAdding(false);
       setBulkData('');
-      alert('تم إضافة الطلاب بنجاح');
+      alert(t('adminDashboard.studentsAddedSuccess'));
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء الرفع الجماعي.');
+      alert(t('adminDashboard.bulkUploadError'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (id, nationalId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الطالب؟')) return;
+    if (!window.confirm(t('adminDashboard.confirmDeleteStudent'))) return;
     try {
       await deleteDoc(doc(db, 'students', id));
       const uq = query(collection(db, 'users'), where('nationalId', '==', nationalId));
@@ -472,7 +476,7 @@ function ManageStudents({ schoolId }) {
       snap.forEach(async (d) => await deleteDoc(doc(db, 'users', d.id)));
     } catch (err) {
       console.error(err);
-      alert('خطأ أثناء الحذف');
+      alert(t('adminDashboard.deleteError'));
     }
   };
 
@@ -492,7 +496,7 @@ function ManageStudents({ schoolId }) {
       setEditingStudent(null);
     } catch (err) {
       console.error(err);
-      alert('خطأ أثناء التحديث');
+      alert(t('adminDashboard.updateError'));
     } finally {
       setIsSaving(false);
     }
@@ -501,26 +505,26 @@ function ManageStudents({ schoolId }) {
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>إدارة الطلاب</h2>
+        <h2>{t('adminDashboard.manageStudentsTitle')}</h2>
         <div style={{display: 'flex', gap: '10px'}}>
           <button className="btn" style={{background: 'var(--color-surface)', color: 'var(--color-primary-dark)', border: '1px solid var(--color-border)'}} onClick={() => setIsBulkAdding(true)}>
-            رفع جماعي
+            {t('adminDashboard.bulkUpload')}
           </button>
           <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
-            تسجيل طالب
+            {t('adminDashboard.registerStudent')}
           </button>
         </div>
       </div>
 
       <div style={{ display: 'grid', gap: '12px' }}>
         {students.length === 0 ? (
-          <p style={{ color: 'var(--color-text-muted)' }}>لا يوجد طلاب مضافين بعد.</p>
+          <p style={{ color: 'var(--color-text-muted)' }}>{t('adminDashboard.noStudentsAdded')}</p>
         ) : (
           students.map(s => (
             <div key={s.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{s.name}</h3>
-                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>رقم الهوية: {s.nationalId} • فصل: {s.class}</p>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalIdLabel')}{s.nationalId}{t('adminDashboard.classLabel')}{s.class}</p>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => setEditingStudent(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
@@ -535,26 +539,26 @@ function ManageStudents({ schoolId }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
-            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>تسجيل طالب جديد</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.registerNewStudentTitle')}</h3>
             <form onSubmit={handleSaveSingle} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم الطالب</label>
-                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="الاسم الرباعي" required />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.studentName')}</label>
+                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder={t('adminDashboard.fullNamePlaceholder')} required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>رقم الهوية الوطنية</label>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalId')}</label>
                 <input type="text" className="input-field" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="10xxxxxxxx" required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>الفصل الدراسي</label>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.class')}</label>
                 <select className="input-field" value={studentClass} onChange={e => setStudentClass(e.target.value)} required>
-                  <option value="">اختر الفصل...</option>
+                  <option value="">{t('adminDashboard.selectClass')}</option>
                   {classesList.map(c => (
                     <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
                 </select>
               </div>
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.saving') : t('adminDashboard.saveData')}</button>
             </form>
           </div>
         </div>
@@ -564,22 +568,22 @@ function ManageStudents({ schoolId }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setEditingStudent(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
-            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>تعديل بيانات الطالب</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.editStudentTitle')}</h3>
             <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم الطالب</label>
-                <input type="text" className="input-field" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} placeholder="الاسم الرباعي" required />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.studentName')}</label>
+                <input type="text" className="input-field" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} placeholder={t('adminDashboard.fullNamePlaceholder')} required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>الفصل الدراسي</label>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.class')}</label>
                 <select className="input-field" value={editingStudent.class} onChange={e => setEditingStudent({...editingStudent, class: e.target.value})} required>
-                  <option value="">اختر الفصل...</option>
+                  <option value="">{t('adminDashboard.selectClass')}</option>
                   {classesList.map(c => (
                     <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
                 </select>
               </div>
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.saving') : t('adminDashboard.saveChanges')}</button>
             </form>
           </div>
         </div>
@@ -589,10 +593,10 @@ function ManageStudents({ schoolId }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass-panel" style={{ width: '500px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsBulkAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
-            <h3 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--color-primary-dark)' }}>الرفع الجماعي للطلاب</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.bulkUploadStudentsTitle')}</h3>
             <p style={{fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '15px'}}>
-              قم بنسخ ولصق البيانات من ملف إكسل. (كل سطر يمثل طالباً).<br/>
-              الترتيب المطلوب: <strong>رقم الهوية، الاسم، الفصل</strong> (مفصولة بفاصلة أو مسافة جدولة Tab)
+              {t('adminDashboard.bulkUploadStudentsInstruction1')}<br/>
+              {t('adminDashboard.requiredOrder')}<strong>{t('adminDashboard.idNameClass')}</strong>{t('adminDashboard.separatedByCommaOrTab')}
             </p>
             <form onSubmit={handleSaveBulk} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <textarea 
@@ -604,7 +608,7 @@ function ManageStudents({ schoolId }) {
                 required 
                 style={{resize: 'none'}}
               />
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'جاري الرفع...' : 'رفع البيانات'}</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.uploading') : t('adminDashboard.uploadData')}</button>
             </form>
           </div>
         </div>
@@ -614,6 +618,7 @@ function ManageStudents({ schoolId }) {
 }
 
 function ManageClasses({ schoolId }) {
+  const { t } = useLanguage();
   const [classes, setClasses] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
   const [className, setClassName] = useState('');
@@ -644,19 +649,19 @@ function ManageClasses({ schoolId }) {
       setClassName('');
     } catch (err) {
       console.error(err);
-      alert('خطأ في الحفظ. تأكد من الصلاحيات.');
+      alert(t('adminDashboard.saveError'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الفصل؟')) return;
+    if (!window.confirm(t('adminDashboard.confirmDeleteClass'))) return;
     try {
       await deleteDoc(doc(db, 'classes', id));
     } catch (err) {
       console.error(err);
-      alert('خطأ أثناء الحذف');
+      alert(t('adminDashboard.deleteError'));
     }
   };
 
@@ -670,7 +675,7 @@ function ManageClasses({ schoolId }) {
       setEditingClass(null);
     } catch (err) {
       console.error(err);
-      alert('خطأ أثناء التحديث');
+      alert(t('adminDashboard.updateError'));
     } finally {
       setIsSaving(false);
     }
@@ -679,15 +684,15 @@ function ManageClasses({ schoolId }) {
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>الفصول الدراسية</h2>
+        <h2>{t('adminDashboard.totalClasses')}</h2>
         <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
-          إضافة فصل جديد
+          {t('adminDashboard.addNewClass')}
         </button>
       </div>
       
       <div style={{ display: 'grid', gap: '12px' }}>
         {classes.length === 0 ? (
-          <p style={{ color: 'var(--color-text-muted)' }}>لا توجد فصول مضافة بعد.</p>
+          <p style={{ color: 'var(--color-text-muted)' }}>{t('adminDashboard.noClassesAdded')}</p>
         ) : (
           classes.map(cls => (
             <div key={cls.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -714,22 +719,22 @@ function ManageClasses({ schoolId }) {
               <X size={20} color="var(--color-text-muted)" />
             </button>
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>
-              إضافة فصل دراسي
+              {t('adminDashboard.addClassTitle')}
             </h3>
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم الفصل (مثال: 1/أ)</label>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.classNamePlaceholderLabel')}</label>
                 <input 
                   type="text" 
                   className="input-field" 
                   value={className}
                   onChange={(e) => setClassName(e.target.value)}
-                  placeholder="اسم الفصل"
+                  placeholder={t('adminDashboard.className')}
                   required
                 />
               </div>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                {isSaving ? 'جاري الحفظ...' : 'حفظ الفصل'}
+                {isSaving ? t('adminDashboard.saving') : t('adminDashboard.saveClass')}
               </button>
             </form>
           </div>
@@ -749,11 +754,11 @@ function ManageClasses({ schoolId }) {
               <X size={20} color="var(--color-text-muted)" />
             </button>
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>
-              تعديل بيانات الفصل
+              {t('adminDashboard.editClassTitle')}
             </h3>
             <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم الفصل</label>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.className')}</label>
                 <input 
                   type="text" 
                   className="input-field" 
@@ -763,7 +768,7 @@ function ManageClasses({ schoolId }) {
                 />
               </div>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+                {isSaving ? t('adminDashboard.saving') : t('adminDashboard.saveChanges')}
               </button>
             </form>
           </div>
@@ -775,8 +780,9 @@ function ManageClasses({ schoolId }) {
 
 export default function AdminDashboard() {
   const { userData } = useAuth();
+  const { t } = useLanguage();
   return (
-    <Layout role="admin" title="لوحة تحكم الإدارة">
+    <Layout role="admin" title={t('adminDashboard.adminDashboardTitle')}>
       <Routes>
         <Route path="/" element={<AdminHome schoolId={userData?.schoolId} />} />
         <Route path="/teachers" element={<ManageTeachers schoolId={userData?.schoolId} />} />

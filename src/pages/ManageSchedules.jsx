@@ -2,17 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, writeBatch, query, where } from 'firebase/firestore';
 import { Calendar, BookOpen, Plus, Trash2, Save } from 'lucide-react';
-
-const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function ManageSchedules({ schoolId }) {
+  const { t } = useLanguage();
+  const DAYS = [
+    t('manageSchedules.sunday'),
+    t('manageSchedules.monday'),
+    t('manageSchedules.tuesday'),
+    t('manageSchedules.wednesday'),
+    t('manageSchedules.thursday')
+  ];
+  const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
+
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
   
   const [academicYear, setAcademicYear] = useState('1447-1448');
-  const [semester, setSemester] = useState('الفصل الأول');
+  const [semester, setSemester] = useState(t('manageSchedules.firstSemester'));
   
   // Array of flat schedule entries
   const [entries, setEntries] = useState([]);
@@ -39,7 +47,12 @@ export default function ManageSchedules({ schoolId }) {
     const unsubSubjects = onSnapshot(qSubjects, (snap) => {
       let subs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (subs.length === 0) {
-        const defaultSubjects = ['القرآن الكريم', 'التفسير', 'التوحيد', 'الفقه', 'الحديث', 'اللغة العربية', 'الرياضيات', 'العلوم الطبيعية', 'الدراسات الاجتماعية', 'اللغة الإنجليزية', 'التربية الفنية', 'التربية البدنية'];
+        const defaultSubjects = [
+          t('manageSchedules.quran'), t('manageSchedules.tafsir'), t('manageSchedules.tawhid'),
+          t('manageSchedules.fiqh'), t('manageSchedules.hadith'), t('manageSchedules.arabic'),
+          t('manageSchedules.math'), t('manageSchedules.science'), t('manageSchedules.socialStudies'),
+          t('manageSchedules.english'), t('manageSchedules.art'), t('manageSchedules.pe')
+        ];
         defaultSubjects.forEach(async (sub) => {
           await addDoc(collection(db, 'subjects'), { name: sub, schoolId });
         });
@@ -146,10 +159,10 @@ export default function ManageSchedules({ schoolId }) {
       });
 
       await batch.commit();
-      alert('تم حفظ الجدول العام بنجاح');
+      alert(t('manageSchedules.scheduleSaved'));
     } catch (error) {
       console.error(error);
-      alert('خطأ أثناء حفظ الجدول');
+      alert(t('manageSchedules.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -167,7 +180,7 @@ export default function ManageSchedules({ schoolId }) {
   };
 
   const handleDeleteSubject = async (id) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذه المادة؟')) return;
+    if (!window.confirm(t('manageSchedules.confirmDeleteSubject'))) return;
     try {
       await deleteDoc(doc(db, 'subjects', id));
     } catch (err) {
@@ -181,19 +194,19 @@ export default function ManageSchedules({ schoolId }) {
       {/* Subjects Management */}
       <div className="glass-panel" style={{ padding: '24px' }}>
         <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: 'var(--color-primary-dark)' }}>
-          <BookOpen size={24} /> إدارة المواد الدراسية
+          <BookOpen size={24} /> {t('manageSchedules.manageSubjectsTitle')}
         </h2>
         <form onSubmit={handleAddSubject} style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
           <input 
             type="text" 
             className="input-field" 
-            placeholder="اسم المادة الجديدة..." 
+            placeholder={t('manageSchedules.newSubjectPlaceholder')} 
             value={newSubject}
             onChange={(e) => setNewSubject(e.target.value)}
             style={{ marginBottom: 0, flex: 1, maxWidth: '300px' }}
           />
           <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Plus size={18} /> إضافة مادة
+            <Plus size={18} /> {t('manageSchedules.addSubject')}
           </button>
         </form>
         
@@ -207,7 +220,7 @@ export default function ManageSchedules({ schoolId }) {
               <button 
                 onClick={() => handleDeleteSubject(sub.id)}
                 style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: 0, display: 'flex' }}
-                title="حذف"
+                title={t('manageSchedules.delete')}
               >
                 <Trash2 size={16} />
               </button>
@@ -219,12 +232,12 @@ export default function ManageSchedules({ schoolId }) {
       {/* Schedule Management */}
       <div className="glass-panel" style={{ padding: '24px' }}>
         <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: 'var(--color-primary-dark)' }}>
-          <Calendar size={24} /> إدخال الجدول الشامل
+          <Calendar size={24} /> {t('manageSchedules.manageScheduleTitle')}
         </h2>
         
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px', alignItems: 'flex-end' }}>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>العام الدراسي</label>
+            <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('manageSchedules.academicYear')}</label>
             <select className="input-field" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} style={{ marginBottom: 0, width: '150px' }}>
               <option value="1447-1448">1447-1448</option>
               <option value="1448-1449">1448-1449</option>
@@ -240,18 +253,18 @@ export default function ManageSchedules({ schoolId }) {
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>الفصل (الترم)</label>
+            <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('manageSchedules.semester')}</label>
             <select className="input-field" value={semester} onChange={(e) => setSemester(e.target.value)} style={{ marginBottom: 0, width: '150px' }}>
-              <option value="الفصل الأول">الفصل الأول</option>
-              <option value="الفصل الثاني">الفصل الثاني</option>
+              <option value={t('manageSchedules.firstSemester')}>{t('manageSchedules.firstSemester')}</option>
+              <option value={t('manageSchedules.secondSemester')}>{t('manageSchedules.secondSemester')}</option>
             </select>
           </div>
           <div style={{ flex: 1, textAlign: 'left', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
             <button onClick={handleAddRow} className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <Plus size={18} /> إضافة حصة جديدة
+              <Plus size={18} /> {t('manageSchedules.addNewPeriod')}
             </button>
             <button onClick={handleSaveSchedule} disabled={isSaving} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ الجدول العام'}
+              <Save size={18} /> {isSaving ? t('manageSchedules.saving') : t('manageSchedules.saveGeneralSchedule')}
             </button>
           </div>
         </div>
@@ -260,38 +273,38 @@ export default function ManageSchedules({ schoolId }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>المعلم</th>
-                <th>المادة</th>
-                <th>الفصل</th>
-                <th>اليوم</th>
-                <th>الحصة</th>
-                <th style={{ width: '50px' }}>حذف</th>
+                <th>{t('manageSchedules.teacher')}</th>
+                <th>{t('manageSchedules.subject')}</th>
+                <th>{t('manageSchedules.class')}</th>
+                <th>{t('manageSchedules.day')}</th>
+                <th>{t('manageSchedules.period')}</th>
+                <th style={{ width: '50px' }}>{t('manageSchedules.delete')}</th>
               </tr>
             </thead>
             <tbody>
               {entries.length === 0 ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
-                    لا توجد حصص مضافة. انقر على "إضافة حصة جديدة" للبدء.
+                    {t('manageSchedules.noPeriodsAdded')}
                   </td>
                 </tr>
               ) : entries.map(entry => (
                 <tr key={entry.id}>
                   <td>
                     <select className="input-field" value={entry.teacherId} onChange={(e) => handleRowChange(entry.id, 'teacherId', e.target.value)} style={{ marginBottom: 0 }}>
-                      <option value="">اختر المعلم...</option>
-                      {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      <option value="">{t('manageSchedules.selectTeacher')}</option>
+                      {teachers.map(tData => <option key={tData.id} value={tData.id}>{tData.name}</option>)}
                     </select>
                   </td>
                   <td>
                     <select className="input-field" value={entry.subject} onChange={(e) => handleRowChange(entry.id, 'subject', e.target.value)} style={{ marginBottom: 0 }}>
-                      <option value="">اختر المادة...</option>
+                      <option value="">{t('manageSchedules.selectSubject')}</option>
                       {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                     </select>
                   </td>
                   <td>
                     <select className="input-field" value={entry.classId} onChange={(e) => handleRowChange(entry.id, 'classId', e.target.value)} style={{ marginBottom: 0 }}>
-                      <option value="">اختر الفصل...</option>
+                      <option value="">{t('manageSchedules.selectClass')}</option>
                       {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </td>
@@ -302,7 +315,7 @@ export default function ManageSchedules({ schoolId }) {
                   </td>
                   <td>
                     <select className="input-field" value={entry.period} onChange={(e) => handleRowChange(entry.id, 'period', parseInt(e.target.value))} style={{ marginBottom: 0 }}>
-                      {PERIODS.map(p => <option key={p} value={p}>الحصة {p}</option>)}
+                      {PERIODS.map(p => <option key={p} value={p}>{t('manageSchedules.periodPrefix')}{p}</option>)}
                     </select>
                   </td>
                   <td style={{ textAlign: 'center' }}>

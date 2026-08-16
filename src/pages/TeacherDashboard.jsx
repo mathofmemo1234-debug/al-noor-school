@@ -11,8 +11,10 @@ import LessonPreparation from './LessonPreparation';
 import MaterialsUpload from './MaterialsUpload';
 import TeacherExams from './TeacherExams';
 import TeacherExcellence from './TeacherExcellence';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function TeacherTasks() {
+  const { t } = useLanguage();
   const [tasks, setTasks] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -53,7 +55,7 @@ function TeacherTasks() {
       setNewTaskTitle('');
     } catch (error) {
       console.error("Error adding task:", error);
-      alert('تعذر إضافة المهمة، يرجى التأكد من صلاحيات قاعدة البيانات');
+      alert(t('teacherDashboard.addTaskFail'));
     } finally {
       setIsAdding(false);
     }
@@ -80,25 +82,25 @@ function TeacherTasks() {
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>مهام اليوم</h2>
+        <h2>{t('teacherDashboard.todayTasks')}</h2>
       </div>
       
       <form onSubmit={handleAddTask} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
         <input 
           type="text" 
-          placeholder="أدخل مهمة جديدة..." 
+          placeholder={t('teacherDashboard.enterNewTask')} 
           value={newTaskTitle}
           onChange={(e) => setNewTaskTitle(e.target.value)}
           style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
         />
         <button type="submit" className="btn btn-primary" disabled={isAdding || !newTaskTitle.trim()}>
-          <Plus size={16} /> إضافة مهمة
+          <Plus size={16} /> {t('teacherDashboard.addTask')}
         </button>
       </form>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {tasks.length === 0 ? (
-          <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '20px' }}>لا توجد مهام حالياً. يمكنك إضافة مهام جديدة!</p>
+          <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '20px' }}>{t('teacherDashboard.noTasks')}</p>
         ) : (
           tasks.map(task => (
             <div key={task.id} style={{ 
@@ -127,7 +129,8 @@ function TeacherTasks() {
 }
 
 function WeeklyPlan() {
-  const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+  const { t } = useLanguage();
+  const daysKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'];
   const WEEKS = Array.from({length: 18}, (_, i) => `الأسبوع ${i + 1}`);
   const [plan, setPlan] = useState({});
   const [selectedClass, setSelectedClass] = useState('');
@@ -225,8 +228,8 @@ function WeeklyPlan() {
   };
 
   const handleSave = async () => {
-    if (!auth.currentUser) return alert('يجب تسجيل الدخول أولاً');
-    if (!selectedClass) return alert('يرجى اختيار الفصل');
+    if (!auth.currentUser) return alert(t('teacherDashboard.mustLogin'));
+    if (!selectedClass) return alert(t('teacherDashboard.mustSelectClass'));
     setIsSaving(true);
     try {
       const payload = {
@@ -243,10 +246,10 @@ function WeeklyPlan() {
       } else {
         await addDoc(collection(db, 'weekly_plans'), payload);
       }
-      alert('تم حفظ الخطة الأسبوعية بنجاح!');
+      alert(t('teacherDashboard.planSaveSuccess'));
     } catch (error) {
       console.error("Error saving plan:", error);
-      alert('حدث خطأ أثناء الحفظ. (ربما بسبب صلاحيات Firebase)');
+      alert(t('teacherDashboard.planSaveFail'));
     } finally {
       setIsSaving(false);
     }
@@ -255,7 +258,7 @@ function WeeklyPlan() {
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2>الخطة الأسبوعية</h2>
+        <h2>{t('teacherDashboard.weeklyPlan')}</h2>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <select 
             className="input-field" 
@@ -263,7 +266,7 @@ function WeeklyPlan() {
             value={selectedClass} 
             onChange={(e) => setSelectedClass(e.target.value)}
           >
-            <option value="">اختر الفصل...</option>
+            <option value="">{t('teacherDashboard.selectClass')}</option>
             {classesList.map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
@@ -275,42 +278,42 @@ function WeeklyPlan() {
             onChange={(e) => setSelectedWeek(e.target.value)}
           >
             {WEEKS.map(w => (
-              <option key={w} value={w}>{w}</option>
+              <option key={w} value={w}>{w.replace('الأسبوع', t('lessonPreparation.weekPrefix'))}</option>
             ))}
           </select>
           <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || !selectedClass}>
-            <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ الخطة'}
+            <Save size={18} /> {isSaving ? t('teacherDashboard.saving') : t('teacherDashboard.savePlan')}
           </button>
         </div>
       </div>
       
       {!selectedClass ? (
         <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-          يرجى اختيار الفصل من القائمة أعلاه لعرض وتعديل الخطة الأسبوعية.
+          {t('teacherDashboard.pleaseSelectClassPlan')}
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {days.map(day => (
-            <div key={day} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-              <h3 style={{ borderBottom: '2px solid var(--color-bg)', paddingBottom: '10px', marginBottom: '16px', color: 'var(--color-primary-dark)' }}>{day}</h3>
+          {daysKeys.map(dayKey => (
+            <div key={dayKey} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+              <h3 style={{ borderBottom: '2px solid var(--color-bg)', paddingBottom: '10px', marginBottom: '16px', color: 'var(--color-primary-dark)' }}>{t(`days.${dayKey}`)}</h3>
               
               <div style={{ display: 'flex', gap: '16px' }}>
                 <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                  <label>موضوع الدرس</label>
+                  <label>{t('teacherDashboard.lessonTopicLabel')}</label>
                   <input 
                     type="text" 
-                    placeholder="اكتب عنوان وموضوع الدرس هنا..." 
-                    value={plan[day]?.topic || ''}
-                    onChange={(e) => handleChange(day, 'topic', e.target.value)}
+                    placeholder={t('teacherDashboard.lessonTopicPlaceholder')} 
+                    value={plan[dayKey]?.topic || ''}
+                    onChange={(e) => handleChange(dayKey, 'topic', e.target.value)}
                   />
                 </div>
                 <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                  <label>الأهداف التعليمية</label>
+                  <label>{t('teacherDashboard.lessonGoalsLabel')}</label>
                   <input 
                     type="text" 
-                    placeholder="ما الذي سيتعلمه الطالب؟" 
-                    value={plan[day]?.goals || ''}
-                    onChange={(e) => handleChange(day, 'goals', e.target.value)}
+                    placeholder={t('teacherDashboard.lessonGoalsPlaceholder')} 
+                    value={plan[dayKey]?.goals || ''}
+                    onChange={(e) => handleChange(dayKey, 'goals', e.target.value)}
                   />
                 </div>
               </div>
@@ -324,6 +327,7 @@ function WeeklyPlan() {
 }
 
 function Assignments() {
+  const { t } = useLanguage();
   const [assignments, setAssignments] = useState([]);
   const [classesList, setClassesList] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
@@ -380,7 +384,7 @@ function Assignments() {
       setNewDueDate('');
     } catch (error) {
       console.error("Error adding assignment:", error);
-      alert('حدث خطأ أثناء إضافة الواجب');
+      alert(t('teacherDashboard.addAssignmentFail'));
     } finally {
       setIsAdding(false);
     }
@@ -397,14 +401,14 @@ function Assignments() {
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2>إدارة الواجبات</h2>
+        <h2>{t('teacherDashboard.assignmentsManagement')}</h2>
         <select 
           className="input-field" 
           style={{ width: '200px', marginBottom: 0 }}
           value={selectedClass} 
           onChange={(e) => setSelectedClass(e.target.value)}
         >
-          <option value="">اختر الفصل...</option>
+          <option value="">{t('teacherDashboard.selectClass')}</option>
           {classesList.map(c => (
             <option key={c} value={c}>{c}</option>
           ))}
@@ -413,14 +417,14 @@ function Assignments() {
       
       {!selectedClass ? (
         <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-          يرجى اختيار الفصل لعرض وإضافة الواجبات.
+          {t('teacherDashboard.pleaseSelectClassAssignments')}
         </p>
       ) : (
         <>
           <form onSubmit={handleAddAssignment} style={{ display: 'flex', gap: '10px', marginBottom: '20px', background: 'white', padding: '16px', borderRadius: '8px' }}>
             <input 
               type="text" 
-              placeholder="عنوان الواجب (مثال: حل تمارين صـ 15)" 
+              placeholder={t('teacherDashboard.assignmentTitlePlaceholder')} 
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               style={{ flex: 2, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
@@ -434,13 +438,13 @@ function Assignments() {
               required
             />
             <button type="submit" className="btn btn-primary" disabled={isAdding}>
-              <Plus size={16} /> إضافة واجب
+              <Plus size={16} /> {t('teacherDashboard.addAssignment')}
             </button>
           </form>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {assignments.length === 0 ? (
-              <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>لا توجد واجبات مضافة حالياً.</p>
+              <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>{t('teacherDashboard.noAssignments')}</p>
             ) : (
               assignments.map(assignment => (
                 <div key={assignment.id} style={{ 
@@ -454,7 +458,7 @@ function Assignments() {
                 }}>
                   <div>
                     <h4 style={{ margin: '0 0 5px 0' }}>{assignment.title}</h4>
-                    <small style={{ color: 'var(--color-text-muted)' }}>آخر موعد للتسليم: {assignment.dueDate}</small>
+                    <small style={{ color: 'var(--color-text-muted)' }}>{t('teacherDashboard.lastDeliveryDate')} {assignment.dueDate}</small>
                   </div>
                   <button onClick={() => deleteAssignment(assignment.id)} style={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}>
                     <Trash2 size={18} />
@@ -470,6 +474,7 @@ function Assignments() {
 }
 
 function Attendance() {
+  const { t } = useLanguage();
   const [classesList, setClassesList] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [students, setStudents] = useState([]);
@@ -543,10 +548,10 @@ function Attendance() {
         updatedAt: new Date().toISOString()
       }, { merge: true });
       
-      alert('تم حفظ سجل الغياب والحضور بنجاح!');
+      alert(t('teacherDashboard.attendanceSaveSuccess'));
     } catch (error) {
       console.error("Error saving attendance:", error);
-      alert('حدث خطأ أثناء الحفظ');
+      alert(t('teacherDashboard.attendanceSaveFail'));
     } finally {
       setIsSaving(false);
     }
@@ -555,7 +560,7 @@ function Attendance() {
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2>سجل الغياب والحضور - اليوم: {today}</h2>
+        <h2>{t('teacherDashboard.attendanceRecord')} {today}</h2>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <select 
             className="input-field" 
@@ -563,34 +568,34 @@ function Attendance() {
             value={selectedClass} 
             onChange={(e) => setSelectedClass(e.target.value)}
           >
-            <option value="">اختر الفصل...</option>
+            <option value="">{t('teacherDashboard.selectClass')}</option>
             {classesList.map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
           <button className="btn btn-primary" onClick={handleSaveAttendance} disabled={isSaving || !selectedClass}>
-            <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ السجل'}
+            <Save size={18} /> {isSaving ? t('teacherDashboard.saving') : t('teacherDashboard.saveRecord')}
           </button>
         </div>
       </div>
       
       {!selectedClass ? (
         <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-          يرجى اختيار الفصل لعرض قائمة الطلاب وتسجيل الحضور.
+          {t('teacherDashboard.pleaseSelectClassAttendance')}
         </p>
       ) : students.length === 0 ? (
         <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-          لا يوجد طلاب مسجلين في هذا الفصل حالياً.
+          {t('teacherDashboard.noStudentsClass')}
         </p>
       ) : (
         <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
               <tr>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>اسم الطالب</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>حاضر</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>غائب</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>متأخر</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>{t('teacherDashboard.studentName')}</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>{t('teacherDashboard.present')}</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>{t('teacherDashboard.absent')}</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>{t('teacherDashboard.late')}</th>
               </tr>
             </thead>
             <tbody>
@@ -637,8 +642,9 @@ function Attendance() {
 
 
 export default function TeacherDashboard() {
+  const { t } = useLanguage();
   return (
-    <Layout role="teacher" title="لوحة تحكم المعلم">
+    <Layout role="teacher" title={t('teacherDashboard.pageTitle')}>
       <Routes>
         <Route path="/" element={<TeacherTasks />} />
         <Route path="/schedule" element={<TeacherSchedule />} />

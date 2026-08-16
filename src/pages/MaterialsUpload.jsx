@@ -3,8 +3,10 @@ import { db, auth, storage } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { UploadCloud, Link as LinkIcon, Trash2 } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function MaterialsUpload() {
+  const { t } = useLanguage();
   const [classesList, setClassesList] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [subjects, setSubjects] = useState([]);
@@ -91,10 +93,10 @@ export default function MaterialsUpload() {
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!auth.currentUser || !selectedClass || !selectedSubject) return;
-    if (!title.trim()) return alert('يرجى إدخال عنوان الملخص');
+    if (!title.trim()) return alert(t('materialsUpload.enterTitle'));
     
-    if (uploadType === 'link' && !linkUrl.trim()) return alert('يرجى إدخال الرابط');
-    if (uploadType === 'file' && !file) return alert('يرجى اختيار ملف');
+    if (uploadType === 'link' && !linkUrl.trim()) return alert(t('materialsUpload.enterLink'));
+    if (uploadType === 'file' && !file) return alert(t('materialsUpload.selectFile'));
 
     setIsUploading(true);
 
@@ -137,17 +139,17 @@ export default function MaterialsUpload() {
       setLinkUrl('');
       setFile(null);
       setProgress(0);
-      alert('تم إضافة الملخص بنجاح!');
+      alert(t('materialsUpload.addedSuccess'));
     } catch (error) {
       console.error("Error adding material:", error);
-      alert('حدث خطأ أثناء الإضافة. تأكد من إعدادات Firebase Storage.');
+      alert(t('materialsUpload.addError'));
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm('هل أنت متأكد من حذف هذا الملخص؟')) {
+    if(window.confirm(t('materialsUpload.confirmDelete'))) {
       await deleteDoc(doc(db, 'materials', id));
     }
   };
@@ -155,7 +157,7 @@ export default function MaterialsUpload() {
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2>الملخصات والمصادر الإضافية</h2>
+        <h2>{t('materialsUpload.title')}</h2>
       </div>
 
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
@@ -165,7 +167,7 @@ export default function MaterialsUpload() {
           value={selectedClass} 
           onChange={(e) => setSelectedClass(e.target.value)}
         >
-          <option value="">اختر الفصل...</option>
+          <option value="">{t('materialsUpload.selectClass')}</option>
           {classesList.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
 
@@ -175,43 +177,43 @@ export default function MaterialsUpload() {
           value={selectedSubject} 
           onChange={(e) => setSelectedSubject(e.target.value)}
         >
-          <option value="">اختر المادة...</option>
+          <option value="">{t('materialsUpload.selectSubject')}</option>
           {subjects.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
       
       {!selectedClass || !selectedSubject ? (
         <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-          يرجى اختيار الفصل والمادة لعرض وإضافة الملخصات.
+          {t('materialsUpload.promptSelect')}
         </p>
       ) : (
         <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
           
           {/* Upload Form */}
           <div style={{ flex: '1 1 300px', background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: 'var(--color-primary-dark)' }}>إضافة ملخص جديد</h3>
+            <h3 style={{ margin: '0 0 16px 0', color: 'var(--color-primary-dark)' }}>{t('materialsUpload.addNew')}</h3>
             <form onSubmit={handleUpload} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>نوع المصدر</label>
+                <label>{t('materialsUpload.sourceType')}</label>
                 <div style={{ display: 'flex', gap: '16px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                     <input type="radio" name="type" checked={uploadType === 'file'} onChange={() => setUploadType('file')} />
-                    رفع ملف
+                    {t('materialsUpload.uploadFile')}
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                     <input type="radio" name="type" checked={uploadType === 'link'} onChange={() => setUploadType('link')} />
-                    رابط خارجي
+                    {t('materialsUpload.externalLink')}
                   </label>
                 </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>عنوان الملخص</label>
+                <label>{t('materialsUpload.materialTitle')}</label>
                 <input 
                   type="text" 
                   className="input-field" 
-                  placeholder="مثال: ملخص الفصل الأول" 
+                  placeholder={t('materialsUpload.titlePlaceholder')} 
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   required
@@ -220,7 +222,7 @@ export default function MaterialsUpload() {
 
               {uploadType === 'file' ? (
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>اختر الملف (PDF, صور)</label>
+                  <label>{t('materialsUpload.chooseFile')}</label>
                   <input 
                     type="file" 
                     className="input-field" 
@@ -231,7 +233,7 @@ export default function MaterialsUpload() {
                 </div>
               ) : (
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>رابط المصدر (YouTube, Drive...)</label>
+                  <label>{t('materialsUpload.sourceLink')}</label>
                   <input 
                     type="url" 
                     className="input-field" 
@@ -251,7 +253,7 @@ export default function MaterialsUpload() {
 
               <button type="submit" className="btn btn-primary" disabled={isUploading}>
                 {uploadType === 'file' ? <UploadCloud size={18} /> : <LinkIcon size={18} />}
-                {isUploading ? 'جاري الرفع...' : 'إضافة المصدر'}
+                {isUploading ? t('materialsUpload.uploading') : t('materialsUpload.addSource')}
               </button>
             </form>
           </div>
@@ -260,7 +262,7 @@ export default function MaterialsUpload() {
           <div style={{ flex: '2 1 400px' }}>
             {materials.length === 0 ? (
               <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px', background: 'white', borderRadius: '12px' }}>
-                لا توجد ملخصات مضافة لهذه المادة في هذا الفصل.
+                {t('materialsUpload.noMaterials')}
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -275,7 +277,7 @@ export default function MaterialsUpload() {
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <a href={m.url} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ padding: '6px 12px' }}>
-                        فتح
+                        {t('materialsUpload.open')}
                       </a>
                       <button className="btn btn-danger" style={{ padding: '6px 12px' }} onClick={() => handleDelete(m.id)}>
                         <Trash2 size={16} />

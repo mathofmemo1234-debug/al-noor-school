@@ -6,12 +6,14 @@ import { auth, db } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot, doc } from 'firebase/firestore';
 import StudentSchedule from './StudentSchedule';
 import StudentExams from './StudentExams';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function StudentHome() {
+  const { t } = useLanguage();
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <h2>أهلاً بك في بوابة الطالب</h2>
-      <p>هنا ستتمكن من عرض جدولك، حل الواجبات، وتحميل الملخصات.</p>
+      <h2>{t('studentDashboard.welcomeTitle')}</h2>
+      <p>{t('studentDashboard.welcomeSubtitle')}</p>
     </div>
   );
 }
@@ -42,6 +44,7 @@ function StudentWeeklyPlan() {
 }
 
 function StudentAssignments() {
+  const { t } = useLanguage();
   const studentClass = useStudentClass();
   const [assignments, setAssignments] = useState([]);
 
@@ -57,19 +60,19 @@ function StudentAssignments() {
   }, [studentClass]);
 
   if (!studentClass) {
-    return <div className="glass-panel" style={{ padding: '24px' }}>جاري تحميل البيانات...</div>;
+    return <div className="glass-panel" style={{ padding: '24px' }}>{t('studentDashboard.loadingData')}</div>;
   }
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
-        <h2>الواجبات - فصل {studentClass}</h2>
-        <p style={{ color: 'var(--color-text-muted)' }}>تجد هنا جميع الواجبات المطلوبة من معلمي فصلك.</p>
+        <h2>{t('studentDashboard.assignmentsClass')} {studentClass}</h2>
+        <p style={{ color: 'var(--color-text-muted)' }}>{t('studentDashboard.assignmentsSubtitle')}</p>
       </div>
 
       {assignments.length === 0 ? (
         <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>
-          لا توجد واجبات مضافة لهذا الفصل حالياً.
+          {t('studentDashboard.noAssignmentsClass')}
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -77,8 +80,8 @@ function StudentAssignments() {
             <div key={a.id} style={{ background: 'white', padding: '16px', borderRadius: '8px', borderLeft: '4px solid var(--color-primary)' }}>
               <h4 style={{ margin: '0 0 8px 0' }}>{a.title}</h4>
               <div style={{ color: 'var(--color-text-muted)', fontSize: '0.9em', display: 'flex', gap: '16px' }}>
-                <span><strong>المعلم:</strong> {a.teacherEmail}</span>
-                <span><strong>آخر موعد:</strong> {a.dueDate}</span>
+                <span><strong>{t('studentDashboard.teacherLabel')}</strong> {a.teacherEmail}</span>
+                <span><strong>{t('studentDashboard.deadlineLabel')}</strong> {a.dueDate}</span>
               </div>
             </div>
           ))}
@@ -92,6 +95,7 @@ import MarkdownViewer from '../components/MarkdownViewer';
 import { Download, Link as LinkIcon } from 'lucide-react';
 
 function StudentMaterials() {
+  const { t } = useLanguage();
   const studentClass = useStudentClass();
   const [materials, setMaterials] = useState([]);
 
@@ -107,19 +111,19 @@ function StudentMaterials() {
   }, [studentClass]);
 
   if (!studentClass) {
-    return <div className="glass-panel" style={{ padding: '24px' }}>جاري تحميل البيانات...</div>;
+    return <div className="glass-panel" style={{ padding: '24px' }}>{t('studentDashboard.loadingData')}</div>;
   }
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
-        <h2>الملخصات والمصادر الإضافية - فصل {studentClass}</h2>
-        <p style={{ color: 'var(--color-text-muted)' }}>جميع المرفقات والروابط التي شاركها معلموك.</p>
+        <h2>{t('studentDashboard.materialsClass')} {studentClass}</h2>
+        <p style={{ color: 'var(--color-text-muted)' }}>{t('studentDashboard.materialsSubtitle')}</p>
       </div>
 
       {materials.length === 0 ? (
         <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>
-          لا توجد ملخصات مضافة لهذا الفصل حالياً.
+          {t('studentDashboard.noMaterialsClass')}
         </p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
@@ -131,7 +135,7 @@ function StudentMaterials() {
                 </div>
                 <div>
                   <h4 style={{ margin: '0 0 4px 0', color: 'var(--color-primary-dark)' }}>{m.title}</h4>
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>المادة: {m.subject} | المعلم: {m.teacherEmail}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{t('studentDashboard.subjectLabel')} {m.subject} | {t('studentDashboard.teacherLabel')} {m.teacherEmail}</div>
                 </div>
               </div>
               <div style={{ marginTop: 'auto' }}>
@@ -142,7 +146,7 @@ function StudentMaterials() {
                   className="btn btn-primary" 
                   style={{ width: '100%', textAlign: 'center', display: 'block' }}
                 >
-                  {m.type === 'file' ? 'تحميل / فتح الملف' : 'فتح الرابط'}
+                  {m.type === 'file' ? t('studentDashboard.downloadOpenFile') : t('studentDashboard.openLink')}
                 </a>
               </div>
             </div>
@@ -154,6 +158,7 @@ function StudentMaterials() {
 }
 
 function StudentPreparations() {
+  const { t } = useLanguage();
   const studentClass = useStudentClass();
   const [preparations, setPreparations] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState('');
@@ -170,7 +175,7 @@ function StudentPreparations() {
   }, [studentClass]);
 
   if (!studentClass) {
-    return <div className="glass-panel" style={{ padding: '24px' }}>جاري تحميل البيانات...</div>;
+    return <div className="glass-panel" style={{ padding: '24px' }}>{t('studentDashboard.loadingData')}</div>;
   }
 
   // Get unique subjects
@@ -183,8 +188,8 @@ function StudentPreparations() {
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <h2>تحضير الدروس - فصل {studentClass}</h2>
-          <p style={{ color: 'var(--color-text-muted)' }}>اطلع على المحتوى والأهداف لكل مادة.</p>
+          <h2>{t('studentDashboard.preparationsClass')} {studentClass}</h2>
+          <p style={{ color: 'var(--color-text-muted)' }}>{t('studentDashboard.preparationsSubtitle')}</p>
         </div>
         
         {subjects.length > 0 && (
@@ -194,7 +199,7 @@ function StudentPreparations() {
             value={selectedSubject} 
             onChange={(e) => setSelectedSubject(e.target.value)}
           >
-            <option value="">جميع المواد</option>
+            <option value="">{t('studentDashboard.allSubjects')}</option>
             {subjects.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         )}
@@ -202,7 +207,7 @@ function StudentPreparations() {
 
       {preparations.length === 0 ? (
         <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>
-          لا توجد تحضيرات مضافة لهذا الفصل حالياً.
+          {t('studentDashboard.noPreparationsClass')}
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -210,34 +215,34 @@ function StudentPreparations() {
             <div key={p.id} style={{ background: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
               <div style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>المادة: {p.subject}</h3>
-                  <div style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '4px' }}>المعلم: {p.teacherEmail}</div>
+                  <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{t('studentDashboard.subjectLabel')} {p.subject}</h3>
+                  <div style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '4px' }}>{t('studentDashboard.teacherLabel')} {p.teacherEmail}</div>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>{p.week || 'الأسبوع 1'}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>التاريخ: {p.date || '-'}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>الحصة: {p.period || '-'}</div>
+                  <div style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>{p.week || `${t('studentDashboard.week')} 1`}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{t('studentDashboard.date')} {p.date || '-'}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{t('studentDashboard.period')} {p.period || '-'}</div>
                 </div>
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {p.fileUrl && (
                   <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '12px 16px', borderRadius: '8px' }}>
-                    <strong>ملف مرفق:</strong> <a href={p.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', textDecoration: 'underline' }}>{p.fileName}</a>
+                    <strong>{t('studentDashboard.attachedFile')}</strong> <a href={p.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', textDecoration: 'underline' }}>{p.fileName}</a>
                   </div>
                 )}
 
                 {['goals', 'portfolio', 'warmup', 'strategy', 'content', 'resources', 'formativeEval', 'summativeEval', 'homework'].map(field => {
                   const titles = {
-                    goals: 'الأهداف السلوكية',
-                    portfolio: 'الحقبنة',
-                    warmup: 'التهيئة',
-                    strategy: 'استراتيجيات التدريس',
-                    content: 'محتوى الدرس',
-                    resources: 'الوسائل ومصادر التعلم',
-                    formativeEval: 'التقويم البنائي',
-                    summativeEval: 'التقويم النهائي',
-                    homework: 'الواجبات'
+                    goals: t('lessonPreparation.behavioralGoals'),
+                    portfolio: t('lessonPreparation.portfolio'),
+                    warmup: t('lessonPreparation.warmup'),
+                    strategy: t('lessonPreparation.teachingStrategies'),
+                    content: t('lessonPreparation.lessonContent'),
+                    resources: t('lessonPreparation.resources'),
+                    formativeEval: t('lessonPreparation.formativeEval'),
+                    summativeEval: t('lessonPreparation.summativeEval'),
+                    homework: t('lessonPreparation.homework')
                   };
                   if (!p[field]) return null;
                   return (
@@ -261,8 +266,9 @@ function StudentPreparations() {
 
 
 export default function StudentDashboard() {
+  const { t } = useLanguage();
   return (
-    <Layout role="student" title="لوحة تحكم الطالب">
+    <Layout role="student" title={t('studentDashboard.pageTitle')}>
       <Routes>
         <Route path="/" element={<StudentHome />} />
         <Route path="/weekly-plan" element={<StudentWeeklyPlan />} />

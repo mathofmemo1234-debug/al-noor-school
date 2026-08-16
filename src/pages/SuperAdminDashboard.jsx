@@ -4,11 +4,13 @@ import { collection, addDoc, onSnapshot, doc, setDoc, query, where, getDocs, del
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { Building2, UserPlus, Save, Trash2, CheckSquare } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import Layout from '../components/Layout';
 import ChangePassword from '../components/ChangePassword';
 
 export default function SuperAdminDashboard() {
   const { userData } = useAuth();
+  const { t } = useLanguage();
   
   const [schools, setSchools] = useState([]);
   const [admins, setAdmins] = useState([]);
@@ -58,10 +60,10 @@ export default function SuperAdminDashboard() {
         createdAt: new Date()
       });
       setSchoolName('');
-      alert('تمت إضافة المجمع بنجاح');
+      alert(t('superAdmin.schoolAddedSuccess'));
     } catch (error) {
       console.error(error);
-      alert('حدث خطأ أثناء إضافة المجمع');
+      alert(t('superAdmin.schoolAddError'));
     } finally {
       setIsAddingSchool(false);
     }
@@ -73,11 +75,11 @@ export default function SuperAdminDashboard() {
     setAdminError('');
 
     if (adminNationalId.length < 10) {
-      setAdminError('رقم الهوية يجب أن يكون 10 أرقام على الأقل');
+      setAdminError(t('superAdmin.nationalIdLengthError'));
       return;
     }
     if (adminPassword.length < 6) {
-      setAdminError('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+      setAdminError(t('superAdmin.passwordLengthError'));
       return;
     }
 
@@ -99,7 +101,7 @@ export default function SuperAdminDashboard() {
         createdAt: new Date()
       });
 
-      setAdminMessage('تم إنشاء حساب المدير بنجاح');
+      setAdminMessage(t('superAdmin.adminCreatedSuccess'));
       setAdminName('');
       setAdminNationalId('');
       setAdminPassword('');
@@ -107,9 +109,9 @@ export default function SuperAdminDashboard() {
     } catch (error) {
       console.error(error);
       if (error.code === 'auth/email-already-in-use') {
-        setAdminError('رقم الهوية مستخدم مسبقاً');
+        setAdminError(t('superAdmin.nationalIdInUse'));
       } else {
-        setAdminError('حدث خطأ أثناء إنشاء المدير: ' + error.message);
+        setAdminError(t('superAdmin.adminCreateError') + error.message);
       }
     } finally {
       setIsAddingAdmin(false);
@@ -117,30 +119,30 @@ export default function SuperAdminDashboard() {
   };
 
   const handleDeleteAdmin = async (id) => {
-    if (window.confirm('هل أنت متأكد من حذف حساب هذا المدير؟')) {
+    if (window.confirm(t('superAdmin.confirmDeleteAdmin'))) {
       try {
         await deleteDoc(doc(db, 'users', id));
-        alert('تم الحذف من قاعدة البيانات بنجاح (سيظل حسابه معلقاً في قائمة المصادقة Firebase Auth).');
+        alert(t('superAdmin.deleteSuccess'));
       } catch (error) {
-        alert('حدث خطأ أثناء الحذف');
+        alert(t('superAdmin.deleteError'));
       }
     }
   };
 
   return (
-    <Layout role="superadmin" title="لوحة تحكم النظام (المدير العام)">
+    <Layout role="superadmin" title={t('superAdmin.title')}>
       <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Building2 size={32} color="var(--color-primary-dark)" />
-          <h1 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>إدارة النظام الشاملة</h1>
+          <h1 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{t('superAdmin.generalSystemManagement')}</h1>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
           
           {/* المجمعات */}
           <div className="glass-panel" style={{ padding: '24px' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}><Building2 size={20}/> المجمعات التعليمية</h2>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}><Building2 size={20}/> {t('superAdmin.educationalComplexes')}</h2>
             
             <form onSubmit={handleAddSchool} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
               <input 
@@ -148,19 +150,19 @@ export default function SuperAdminDashboard() {
                 className="input-field" 
                 value={schoolName} 
                 onChange={e => setSchoolName(e.target.value)} 
-                placeholder="اسم المجمع التعليمي..." 
+                placeholder={t('superAdmin.schoolNamePlaceholder')} 
                 required 
               />
               <button type="submit" className="btn btn-primary" disabled={isAddingSchool}>
-                {isAddingSchool ? 'جاري الإضافة...' : 'إضافة مجمع'}
+                {isAddingSchool ? t('superAdmin.adding') : t('superAdmin.addSchool')}
               </button>
             </form>
 
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>اسم المجمع</th>
-                  <th>معرف المجمع (ID)</th>
+                  <th>{t('superAdmin.schoolName')}</th>
+                  <th>{t('superAdmin.schoolId')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -170,50 +172,50 @@ export default function SuperAdminDashboard() {
                     <td style={{ fontSize: '12px', color: '#64748b' }}>{s.id}</td>
                   </tr>
                 ))}
-                {schools.length === 0 && <tr><td colSpan="2" style={{ textAlign: 'center' }}>لا يوجد مجمعات بعد</td></tr>}
+                {schools.length === 0 && <tr><td colSpan="2" style={{ textAlign: 'center' }}>{t('superAdmin.noSchoolsYet')}</td></tr>}
               </tbody>
             </table>
           </div>
 
           {/* مدراء المجمعات */}
           <div className="glass-panel" style={{ padding: '24px' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}><UserPlus size={20}/> إدارة المدراء (Admins)</h2>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}><UserPlus size={20}/> {t('superAdmin.adminManagement')}</h2>
             
             {adminMessage && <div style={{ background: '#dcfce7', color: '#166534', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>{adminMessage}</div>}
             {adminError && <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>{adminError}</div>}
 
             <form onSubmit={handleAddAdmin} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '20px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>اسم المدير</label>
+                <label style={{ display: 'block', marginBottom: '5px' }}>{t('superAdmin.adminName')}</label>
                 <input type="text" className="input-field" value={adminName} onChange={e => setAdminName(e.target.value)} required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>رقم الهوية (اسم المستخدم)</label>
+                <label style={{ display: 'block', marginBottom: '5px' }}>{t('superAdmin.nationalIdLabel')}</label>
                 <input type="text" className="input-field" value={adminNationalId} onChange={e => setAdminNationalId(e.target.value)} required dir="ltr" />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>كلمة المرور</label>
+                <label style={{ display: 'block', marginBottom: '5px' }}>{t('superAdmin.passwordLabel')}</label>
                 <input type="password" className="input-field" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} required dir="ltr" />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>المجمع التعليمي</label>
+                <label style={{ display: 'block', marginBottom: '5px' }}>{t('superAdmin.schoolLabel')}</label>
                 <select className="input-field" value={selectedSchool} onChange={e => setSelectedSchool(e.target.value)} required>
-                  <option value="">اختر المجمع...</option>
+                  <option value="">{t('superAdmin.selectSchool')}</option>
                   {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
               <button type="submit" className="btn btn-primary" disabled={isAddingAdmin}>
-                {isAddingAdmin ? 'جاري الإنشاء...' : 'إنشاء حساب مدير'}
+                {isAddingAdmin ? t('superAdmin.creating') : t('superAdmin.createAdminAccount')}
               </button>
             </form>
 
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>اسم المدير</th>
-                  <th>رقم الهوية</th>
-                  <th>المجمع</th>
-                  <th>إجراءات</th>
+                  <th>{t('superAdmin.adminName')}</th>
+                  <th>{t('superAdmin.nationalId')}</th>
+                  <th>{t('superAdmin.school')}</th>
+                  <th>{t('superAdmin.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -222,7 +224,7 @@ export default function SuperAdminDashboard() {
                     <td>{a.name}</td>
                     <td>{a.nationalId}</td>
                     <td style={{ fontSize: '12px', color: '#64748b' }}>
-                      {schools.find(s => s.id === a.schoolId)?.name || 'غير معروف'}
+                      {schools.find(s => s.id === a.schoolId)?.name || t('superAdmin.unknown')}
                     </td>
                     <td>
                       <button onClick={() => handleDeleteAdmin(a.id)} className="btn-icon delete">
@@ -231,7 +233,7 @@ export default function SuperAdminDashboard() {
                     </td>
                   </tr>
                 ))}
-                {admins.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center' }}>لا يوجد مدراء بعد</td></tr>}
+                {admins.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center' }}>{t('superAdmin.noAdminsYet')}</td></tr>}
               </tbody>
             </table>
           </div>

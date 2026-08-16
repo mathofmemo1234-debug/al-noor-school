@@ -3,8 +3,10 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase';
 import MarkdownViewer from './MarkdownViewer';
 import { Image as ImageIcon, Loader } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function MarkdownInput({ label, value, onChange, placeholder, height = '200px' }) {
+  const { t } = useLanguage();
   const textareaRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -29,7 +31,7 @@ export default function MarkdownInput({ label, value, onChange, placeholder, hei
   const uploadImage = async (file) => {
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      alert('حجم الصورة يجب أن لا يتجاوز 2 ميجابايت');
+      alert(t('markdownInput.imageSizeError'));
       return;
     }
 
@@ -38,7 +40,7 @@ export default function MarkdownInput({ label, value, onChange, placeholder, hei
       const storageRef = ref(storage, `inline_images/${Date.now()}_${file.name || 'image.png'}`);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
-      insertTextAtCursor(`\n![صورة](${url})\n`);
+      insertTextAtCursor(`\n![${t('markdownInput.image')}](${url})\n`);
     } catch (error) {
       console.error('Error uploading inline image:', error);
       alert('حدث خطأ أثناء الرفع');
@@ -71,18 +73,18 @@ export default function MarkdownInput({ label, value, onChange, placeholder, hei
   return (
     <div className="form-group" style={{ marginBottom: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <label style={{ margin: 0 }}>{label} <span style={{fontSize:'12px', color:'#666'}}>(يدعم LaTeX بالدولار ساين $ و $$)</span></label>
+        <label style={{ margin: 0 }}>{label} <span style={{fontSize:'12px', color:'#666'}}>{t('markdownInput.latexSupport')}</span></label>
         <div style={{ position: 'relative' }}>
           <input 
             type="file" 
             accept="image/*" 
             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
             onChange={handleFileSelect}
-            title="إدراج صورة"
+            title={t('markdownInput.insertImage')}
           />
           <button type="button" className="btn" style={{ padding: '6px 12px', fontSize: '12px', background: '#e2e8f0', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '6px' }}>
             {isUploading ? <Loader size={14} className="spin" /> : <ImageIcon size={14} />}
-            {isUploading ? 'جاري الرفع...' : 'إدراج صورة'}
+            {isUploading ? t('markdownInput.uploading') : t('markdownInput.insertImage')}
           </button>
         </div>
       </div>
@@ -95,20 +97,20 @@ export default function MarkdownInput({ label, value, onChange, placeholder, hei
             value={value}
             onChange={e => onChange(e.target.value)}
             onPaste={handlePaste}
-            placeholder={placeholder + "\n(لإدراج صورة يمكنك لصقها مباشرة Ctrl+V)"}
+            placeholder={placeholder + "\n" + t('markdownInput.pasteImageHint')}
           />
           {isUploading && (
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10, borderRadius: '8px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--color-primary)' }}>
                 <Loader className="spin" size={24} style={{ marginBottom: '8px' }} />
-                <span style={{ fontWeight: 'bold' }}>جاري الرفع...</span>
+                <span style={{ fontWeight: 'bold' }}>{t('markdownInput.uploading')}</span>
               </div>
             </div>
           )}
         </div>
         <div style={{ flex: 1, border: '1px solid var(--color-border)', borderRadius: '8px', padding: '16px', background: '#fff', overflowY: 'auto' }}>
-          <h4 style={{ margin: '0 0 10px 0', color: 'var(--color-text-muted)' }}>معاينة مباشرة:</h4>
-          <MarkdownViewer content={value || '*(فارغ)*'} />
+          <h4 style={{ margin: '0 0 10px 0', color: 'var(--color-text-muted)' }}>{t('markdownInput.livePreview')}</h4>
+          <MarkdownViewer content={value || t('markdownInput.empty')} />
         </div>
       </div>
     </div>
