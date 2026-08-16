@@ -8,6 +8,17 @@ import { useAuth } from '../contexts/AuthContext';
 import MarkdownInput from '../components/MarkdownInput';
 import { useLanguage } from '../contexts/LanguageContext';
 
+const DEFAULT_PERIODS = [
+  'الحصة 1',
+  'الحصة 2',
+  'الحصة 3',
+  'الحصة 4',
+  'الحصة 5',
+  'الحصة 6',
+  'الحصة 7',
+  'الحصة 8'
+];
+
 export default function LessonPreparation() {
   const { t } = useLanguage();
   const { userData } = useAuth();
@@ -28,8 +39,8 @@ export default function LessonPreparation() {
   const [weeks] = useState(Array.from({length: 18}, (_, i) => `الأسبوع ${i + 1}`));
   const [selectedWeek, setSelectedWeek] = useState('الأسبوع 1');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [availablePeriods, setAvailablePeriods] = useState([]);
-  const [selectedPeriod, setSelectedPeriod] = useState('');
+  const [availablePeriods, setAvailablePeriods] = useState(DEFAULT_PERIODS);
+  const [selectedPeriod, setSelectedPeriod] = useState(DEFAULT_PERIODS[0]);
   
   // Form fields
   const [goals, setGoals] = useState('');
@@ -75,12 +86,12 @@ export default function LessonPreparation() {
     return () => unsub();
   }, [teacherDocId]);
 
-  // Fetch available classes for this teacher based on their schedule
+  // Fetch available classes for this teacher based on their schedule or classes collection
   useEffect(() => {
-    if (!teacherDocId) return;
     const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
-      const classNames = {};
-      classesSnap.docs.forEach(d => classNames[d.id] = d.data().name);
+      const allClassNames = classesSnap.docs.map(d => d.data().name).filter(Boolean);
+      const classNamesMap = {};
+      classesSnap.docs.forEach(d => classNamesMap[d.id] = d.data().name);
       
       const unsubSchedules = onSnapshot(collection(db, 'schedules'), (schedulesSnap) => {
         const myClassNames = new Set();
@@ -88,35 +99,51 @@ export default function LessonPreparation() {
         
         schedulesSnap.docs.forEach(docSnap => {
           const matrix = docSnap.data().matrix || {};
-          let isTeaching = false;
           Object.values(matrix).forEach(cell => {
-            if (cell.teacherId === teacherDocId) {
-              isTeaching = true;
+            if (!teacherDocId || cell.teacherId === teacherDocId) {
+              if (classNamesMap[docSnap.id]) myClassNames.add(classNamesMap[docSnap.id]);
               if (cell.subject) mySubjects.add(cell.subject);
             }
           });
-          if (isTeaching && classNames[docSnap.id]) {
-            myClassNames.add(classNames[docSnap.id]);
-          }
         });
-        setClassesList(Array.from(myClassNames));
-        setSubjects(Array.from(mySubjects));
+
+        // Add teacher's own subjects from profile if available
+        if (userData?.subject) {
+          userData.subject.split(/[,،]/).map(s => s.trim()).filter(Boolean).forEach(s => mySubjects.add(s));
+        }
+
+        const finalClasses = myClassNames.size > 0 ? Array.from(myClassNames) : allClassNames;
+        const finalSubjects = mySubjects.size > 0 ? Array.from(mySubjects) : (userData?.subject ? userData.subject.split(/[,،]/).map(s => s.trim()) : []);
+
+        setClassesList(finalClasses);
+        setSubjects(finalSubjects);
+
+        if (finalClasses.length > 0) {
+          setSelectedClass(prev => finalClasses.includes(prev) ? prev : finalClasses[0]);
+        }
+        if (finalSubjects.length > 0) {
+          setSelectedSubject(prev => finalSubjects.includes(prev) ? prev : finalSubjects[0]);
+        }
       });
       return () => unsubSchedules();
     });
     return () => unsubClasses();
-  }, [teacherDocId]);
+  }, [teacherDocId, userData]);
 
   // Fetch available periods based on selected class and subject
   useEffect(() => {
-    if (!teacherDocId || !selectedClass || !selectedSubject) {
-      setAvailablePeriods([]);
-      setSelectedPeriod('');
+    if (!selectedClass || !selectedSubject) {
+      setAvailablePeriods(DEFAULT_PERIODS);
+      setSelectedPeriod(prev => prev || DEFAULT_PERIODS[0]);
       return;
     }
 
     const unsubClasses = onSnapshot(query(collection(db, 'classes'), where('name', '==', selectedClass)), (classSnap) => {
-      if (classSnap.empty) return;
+      if (classSnap.empty) {
+        setAvailablePeriods(DEFAULT_PERIODS);
+        setSelectedPeriod(prev => prev || DEFAULT_PERIODS[0]);
+        return;
+      }
       const classId = classSnap.docs[0].id;
       
       const unsubSchedule = onSnapshot(doc(db, 'schedules', classId), (docSnap) => {
@@ -125,15 +152,22 @@ export default function LessonPreparation() {
           const periods = [];
           
           Object.entries(matrix).forEach(([key, cell]) => {
-            if (cell.teacherId === teacherDocId && cell.subject === selectedSubject) {
+            if ((!teacherDocId || cell.teacherId === teacherDocId) && cell.subject === selectedSubject) {
               const [day, period] = key.split('-');
-              periods.push(`${day} - ${period}`);
+              periods.push(`${day} - الحصة ${period}`);
             }
           });
           
-          setAvailablePeriods(periods);
-          if (periods.length > 0) setSelectedPeriod(periods[0]);
-          else setSelectedPeriod('');
+          if (periods.length > 0) {
+            setAvailablePeriods(periods);
+            setSelectedPeriod(prev => periods.includes(prev) ? prev : periods[0]);
+          } else {
+            setAvailablePeriods(DEFAULT_PERIODS);
+            setSelectedPeriod(prev => DEFAULT_PERIODS.includes(prev) ? prev : DEFAULT_PERIODS[0]);
+          }
+        } else {
+          setAvailablePeriods(DEFAULT_PERIODS);
+          setSelectedPeriod(prev => DEFAULT_PERIODS.includes(prev) ? prev : DEFAULT_PERIODS[0]);
         }
       });
       return () => unsubSchedule();
@@ -330,9 +364,8 @@ export default function LessonPreparation() {
                 style={{ width: '150px', marginBottom: 0 }}
                 value={selectedPeriod} 
                 onChange={(e) => setSelectedPeriod(e.target.value)}
-                disabled={!availablePeriods.length}
               >
-                <option value="">{availablePeriods.length ? t('lessonPreparation.selectPeriod') : t('lessonPreparation.noPeriods')}</option>
+                <option value="">{t('lessonPreparation.selectPeriod')}</option>
                 {availablePeriods.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
 
