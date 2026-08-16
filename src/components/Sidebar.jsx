@@ -4,10 +4,12 @@ import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star } fro
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function Sidebar({ role }) {
   const navigate = useNavigate();
   const { userData } = useAuth();
+  const { t } = useLanguage();
 
   const handleLogout = async () => {
     try {
@@ -19,43 +21,43 @@ export default function Sidebar({ role }) {
   };
 
   const adminLinks = [
-    { path: '/admin', icon: Home, label: 'الرئيسية' },
-    { path: '/admin/teachers', icon: Users, label: 'إدارة المعلمين' },
-    { path: '/admin/students', icon: Users, label: 'إدارة الطلاب' },
-    { path: '/admin/classes', icon: BookOpen, label: 'إدارة الفصول' },
-    { path: '/admin/schedule', icon: Calendar, label: 'الجدول المدرسي' },
-    { path: '/admin/preparations', icon: BookOpen, label: 'متابعة التحضير' },
-    { path: '/admin/weekly-plan', icon: BookOpen, label: 'الخطة الأسبوعية' },
-    { path: '/admin/excellence', icon: Star, label: 'ملفات التميز' },
-    { path: '/admin/settings', icon: Settings, label: 'الإعدادات' },
+    { path: '/admin', icon: Home, label: t('sidebar.overview') },
+    { path: '/admin/teachers', icon: Users, label: t('sidebar.teachers') },
+    { path: '/admin/students', icon: Users, label: t('sidebar.students') },
+    { path: '/admin/classes', icon: BookOpen, label: t('sidebar.classes') },
+    { path: '/admin/schedule', icon: Calendar, label: t('sidebar.schedule') },
+    { path: '/admin/preparations', icon: BookOpen, label: t('sidebar.preparations') },
+    { path: '/admin/weekly-plan', icon: BookOpen, label: t('sidebar.weeklyPlan') },
+    { path: '/admin/excellence', icon: Star, label: t('sidebar.files') },
+    { path: '/admin/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
   const superAdminLinks = [
-    { path: '/superadmin', icon: Home, label: 'لوحة التحكم (ماستر)' },
+    { path: '/superadmin', icon: Home, label: t('sidebar.superAdminDashboard') },
   ];
 
   const teacherLinks = [
-    { path: '/teacher', icon: Home, label: 'الرئيسية (مهام المعلم)' },
-    { path: '/teacher/preparation', icon: BookOpen, label: 'تحضير الدروس' },
-    { path: '/teacher/weekly-plan', icon: Calendar, label: 'الخطة الأسبوعية' },
-    { path: '/teacher/schedule', icon: Calendar, label: 'الجدول المدرسي' },
-    { path: '/teacher/assignments', icon: BookOpen, label: 'الواجبات' },
-    { path: '/teacher/exams', icon: FileText, label: 'الاختبارات' },
-    { path: '/teacher/materials', icon: BookOpen, label: 'المرفقات' },
-    { path: '/teacher/attendance', icon: Users, label: 'رصد الغياب' },
-    { path: '/teacher/excellence', icon: Star, label: 'ملفات التميز' },
-    { path: '/teacher/settings', icon: Settings, label: 'الإعدادات' },
+    { path: '/teacher', icon: Home, label: t('sidebar.overview') },
+    { path: '/teacher/preparation', icon: BookOpen, label: t('sidebar.preparations') },
+    { path: '/teacher/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
+    { path: '/teacher/schedule', icon: Calendar, label: t('sidebar.schedule') },
+    { path: '/teacher/assignments', icon: BookOpen, label: t('sidebar.assignments') },
+    { path: '/teacher/exams', icon: FileText, label: t('sidebar.exams') },
+    { path: '/teacher/materials', icon: BookOpen, label: t('sidebar.materials') },
+    { path: '/teacher/attendance', icon: Users, label: t('sidebar.attendance') },
+    { path: '/teacher/excellence', icon: Star, label: t('sidebar.files') },
+    { path: '/teacher/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
   const studentLinks = [
-    { path: '/student', icon: Home, label: 'الرئيسية' },
-    { path: '/student/weekly-plan', icon: Calendar, label: 'الخطة الأسبوعية' },
-    { path: '/student/schedule', icon: Calendar, label: 'الجدول الدراسي' },
-    { path: '/student/assignments', icon: BookOpen, label: 'الواجبات' },
-    { path: '/student/exams', icon: FileText, label: 'الاختبارات' },
-    { path: '/student/materials', icon: BookOpen, label: 'المقررات' },
-    { path: '/student/preparations', icon: BookOpen, label: 'عرض التحاضير' },
-    { path: '/student/settings', icon: Settings, label: 'الإعدادات' },
+    { path: '/student', icon: Home, label: t('sidebar.overview') },
+    { path: '/student/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
+    { path: '/student/schedule', icon: Calendar, label: t('sidebar.schedule') },
+    { path: '/student/assignments', icon: BookOpen, label: t('sidebar.assignments') },
+    { path: '/student/exams', icon: FileText, label: t('sidebar.exams') },
+    { path: '/student/materials', icon: BookOpen, label: t('sidebar.materials') },
+    { path: '/student/preparations', icon: BookOpen, label: t('sidebar.studentPreparations') },
+    { path: '/student/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
   const links = role === 'superadmin' ? superAdminLinks : role === 'admin' ? adminLinks : role === 'teacher' ? teacherLinks : studentLinks;
@@ -85,7 +87,7 @@ export default function Sidebar({ role }) {
       <div style={{ marginTop: 'auto', padding: '20px' }}>
         <button className="nav-item" onClick={handleLogout} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}>
           <LogOut size={20} />
-          <span>تسجيل الخروج</span>
+          <span>{t('sidebar.logout')}</span>
         </button>
       </div>
     </div>

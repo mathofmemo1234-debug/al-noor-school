@@ -4,10 +4,12 @@ import { LogIn, AlertCircle, UserPlus } from 'lucide-react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { useLanguage } from '../contexts/LanguageContext';
 import './Login.css';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   
   // Modes
   const [isSignup, setIsSignup] = useState(false);
@@ -217,8 +219,8 @@ export default function Login() {
           <div className="logo-container" style={{ width: '100px', height: '100px', background: 'transparent', boxShadow: 'none' }}>
             <img src={`${import.meta.env.BASE_URL}logo.png`} alt="شعار المدارس" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} />
           </div>
-          <h1>المدارس المتقدمة للتعلم الذكي</h1>
-          <p>{isSignup ? 'إنشاء حساب جديد' : 'بوابة الدخول الموحدة'}</p>
+          <h1>{t('login.title')}</h1>
+          <p>{isSignup ? t('login.signupSubtitle') : t('login.loginSubtitle')}</p>
         </div>
 
         <div className="role-selector">
@@ -226,18 +228,18 @@ export default function Login() {
             type="button"
             className={`role-btn ${role === 'student' ? 'active' : ''}`}
             onClick={() => { setRole('student'); setError(''); }}
-          >طالب</button>
+          >{t('login.roleStudent')}</button>
           <button 
             type="button"
             className={`role-btn ${role === 'teacher' ? 'active' : ''}`}
             onClick={() => { setRole('teacher'); setError(''); }}
-          >معلم</button>
+          >{t('login.roleTeacher')}</button>
           {!isSignup && (
             <button 
               type="button"
               className={`role-btn ${role === 'admin' ? 'active' : ''}`}
               onClick={() => { setRole('admin'); setError(''); }}
-            >إدارة</button>
+            >{t('login.roleAdmin')}</button>
           )}
         </div>
 
@@ -252,10 +254,10 @@ export default function Login() {
           {isSignup && (
             <>
               <div className="form-group">
-                <label>الاسم الرباعي</label>
+                <label>{t('login.name')}</label>
                 <input 
                   type="text" 
-                  placeholder="الاسم كاملًا" 
+                  placeholder={t('login.namePlaceholder')} 
                   required 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -264,14 +266,14 @@ export default function Login() {
 
               {role === 'student' && (
                 <div className="form-group">
-                  <label>الفصل الدراسي</label>
+                  <label>{t('login.class')}</label>
                   <select 
                     required 
                     value={studentClass}
                     onChange={(e) => setStudentClass(e.target.value)}
                     style={{ width: '100%', padding: '12px', border: '1px solid var(--color-border)', borderRadius: '8px', background: 'var(--color-surface)', fontSize: '15px' }}
                   >
-                    <option value="">اختر الفصل...</option>
+                    <option value="">{t('login.classSelect')}...</option>
                     {classesList.map(c => (
                       <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
@@ -281,10 +283,10 @@ export default function Login() {
 
               {role === 'teacher' && (
                 <div className="form-group">
-                  <label>المادة الدراسية</label>
+                  <label>{t('login.subject')}</label>
                   <input 
                     type="text" 
-                    placeholder="مثال: رياضيات، لغتي" 
+                    placeholder={t('login.subjectPlaceholder')} 
                     required 
                     value={teacherSubject}
                     onChange={(e) => setTeacherSubject(e.target.value)}
@@ -295,10 +297,10 @@ export default function Login() {
           )}
 
           <div className="form-group">
-            <label>{role === 'admin' ? 'البريد الإلكتروني للإدارة' : 'رقم الهوية الوطنية'}</label>
+            <label>{role === 'admin' ? 'البريد الإلكتروني للإدارة' : t('login.nationalId')}</label>
             <input 
               type={role === 'admin' ? 'email' : 'text'} 
-              placeholder={role === 'admin' ? 'admin@school.com' : '10xxxxxxxx'} 
+              placeholder={role === 'admin' ? 'admin@school.com' : t('login.nationalIdPlaceholder')} 
               required 
               dir="ltr"
               value={nationalId}
@@ -308,10 +310,10 @@ export default function Login() {
           
           {!isSignup && (
             <div className="form-group">
-              <label>كلمة المرور {role !== 'admin' && <span style={{fontSize:'12px', color:'#666'}}>(الافتراضية هي رقم الهوية)</span>}</label>
+              <label>{t('login.password')} {role !== 'admin' && <span style={{fontSize:'12px', color:'#666'}}>(الافتراضية هي رقم الهوية)</span>}</label>
               <input 
                 type="password" 
-                placeholder="••••••••" 
+                placeholder={t('login.passwordPlaceholder')} 
                 required 
                 dir="ltr"
                 value={password}
@@ -321,8 +323,8 @@ export default function Login() {
           )}
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ marginBottom: '15px' }}>
-            {loading ? 'جاري التحقق...' : (
-              <>{isSignup ? <UserPlus size={18} /> : <LogIn size={18} />} {isSignup ? 'إنشاء حساب' : 'تسجيل الدخول'}</>
+            {loading ? t('login.loading') : (
+              <>{isSignup ? <UserPlus size={18} /> : <LogIn size={18} />} {isSignup ? t('login.signupButton') : t('login.loginButton')}</>
             )}
           </button>
         </form>
@@ -337,7 +339,7 @@ export default function Login() {
             }}
             style={{ background: 'none', border: 'none', color: 'var(--color-primary-dark)', cursor: 'pointer', textDecoration: 'underline', fontSize: '14px' }}
           >
-            {isSignup ? 'لديك حساب بالفعل؟ قم بتسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب جديد'}
+            {isSignup ? t('login.hasAccount') : t('login.noAccount')}
           </button>
         </div>
       </div>
