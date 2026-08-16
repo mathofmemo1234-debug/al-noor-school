@@ -646,7 +646,8 @@ export const translations = {
     "-": " ",
     " ": " ",
     ",": " ",
-    "،": " "
+    "،": " ",
+    "sidebar.logout": "تسجيل الخروج"
   },
   "en": {
     "header.arabic": "عربي",
@@ -1295,6 +1296,7 @@ export const translations = {
     "-": " ",
     " ": " ",
     ",": " ",
-    "،": " "
+    "،": " ",
+    "sidebar.logout": "Logout"
   }
 };
