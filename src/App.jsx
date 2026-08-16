@@ -1,21 +1,24 @@
+import React, { Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import Login from './pages/Login';
-import AdminDashboard from './pages/AdminDashboard';
-import TeacherDashboard from './pages/TeacherDashboard';
-import StudentDashboard from './pages/StudentDashboard';
-import SuperAdminDashboard from './pages/SuperAdminDashboard';
-import Migration from './pages/Migration';
 import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
+
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const TeacherDashboard = lazy(() => import('./pages/TeacherDashboard'));
+const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
+const Migration = lazy(() => import('./pages/Migration'));
 
 function App() {
   return (
     <LanguageProvider>
       <AuthProvider>
         <Router>
-        <Routes>
+          <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}>
+            <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin/*" element={
@@ -39,8 +42,9 @@ function App() {
               <StudentDashboard />
             </ProtectedRoute>
           } />
-        </Routes>
-      </Router>
+            </Routes>
+          </Suspense>
+        </Router>
       </AuthProvider>
     </LanguageProvider>
   );

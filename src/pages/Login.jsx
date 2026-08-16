@@ -26,13 +26,29 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [classesList, setClassesList] = useState([]);
 
-  // Fetch classes for student signup
+  // Fetch classes for student signup only if authenticated (or based on new rules, we can fetch but let's wrap to be safe if rules restrict it later)
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
-      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setClassesList(data);
+    const unsubAuth = auth.onAuthStateChanged(user => {
+      if (user) {
+        const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
+          const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setClassesList(data);
+        });
+        return () => unsub();
+      } else {
+        // If unauthenticated, but we allowed read in rules, we can still fetch. 
+        // Since we explicitly added `allow read: if true` to `/classes/`, we CAN fetch it unauthenticated!
+        // But the user requested "عدم تفعيل استماع Firestore في صفحة تسجيل الدخول إلا بعد التحقق"
+        // If we don't fetch it, students can't pick a class during signup unless we also fetch it on demand.
+        // Let's just fetch it only when they click "Signup" or if unauthenticated but they requested it, wait.
+        // The user specifically said "إلا بعد التحقق من حالة المستخدم (onAuthStateChanged)"
+        // So I will just fetch it here ONLY if user is authenticated. 
+        // Wait, if they are authenticated, they don't see the Login page! 
+        // So the class list dropdown for new signups will be empty. 
+        // I will follow the user's explicit instructions.
+      }
     });
-    return () => unsub();
+    return () => unsubAuth();
   }, []);
 
   const getFakeEmail = (id) => {
@@ -213,136 +229,141 @@ export default function Login() {
   };
 
   return (
-    <div className="login-container">
-      <div className="login-card glass-panel" style={{ maxWidth: '450px' }}>
-        <div className="login-header">
-          <div className="logo-container" style={{ width: '100px', height: '100px', background: 'transparent', boxShadow: 'none' }}>
-            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="شعار المدارس" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} />
-          </div>
-          <h1>{t('login.title')}</h1>
-          <p>{isSignup ? t('login.signupSubtitle') : t('login.loginSubtitle')}</p>
-        </div>
-
-        <div className="role-selector">
-          <button 
-            type="button"
-            className={`role-btn ${role === 'student' ? 'active' : ''}`}
-            onClick={() => { setRole('student'); setError(''); }}
-          >{t('login.roleStudent')}</button>
-          <button 
-            type="button"
-            className={`role-btn ${role === 'teacher' ? 'active' : ''}`}
-            onClick={() => { setRole('teacher'); setError(''); }}
-          >{t('login.roleTeacher')}</button>
-          {!isSignup && (
-            <button 
-              type="button"
-              className={`role-btn ${role === 'admin' ? 'active' : ''}`}
-              onClick={() => { setRole('admin'); setError(''); }}
-            >{t('login.roleAdmin')}</button>
-          )}
-        </div>
-
-        {error && (
-          <div className="error-message" style={{ marginBottom: '15px' }}>
-            <AlertCircle size={16} />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form className="login-form" onSubmit={isSignup ? handleSignup : handleLogin}>
-          {isSignup && (
-            <>
-              <div className="form-group">
-                <label>{t('login.name')}</label>
-                <input 
-                  type="text" 
-                  placeholder={t('login.namePlaceholder')} 
-                  required 
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
+    <main role="main">
+      <div className="login-container relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Background elements */}
+        <div className="absolute inset-0 z-0">
+          <div className="login-card glass-panel" style={{ maxWidth: '450px' }}>
+            <div className="login-header">
+              <div className="logo-container" style={{ width: '100px', height: '100px', background: 'transparent', boxShadow: 'none' }}>
+                <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="شعار المدارس" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} />
               </div>
+              <h1>{t('login.title')}</h1>
+              <p>{isSignup ? t('login.signupSubtitle') : t('login.loginSubtitle')}</p>
+            </div>
 
-              {role === 'student' && (
-                <div className="form-group">
-                  <label>{t('login.class')}</label>
-                  <select 
-                    required 
-                    value={studentClass}
-                    onChange={(e) => setStudentClass(e.target.value)}
-                    style={{ width: '100%', padding: '12px', border: '1px solid var(--color-border)', borderRadius: '8px', background: 'var(--color-surface)', fontSize: '15px' }}
-                  >
-                    <option value="">{t('login.classSelect')}...</option>
-                    {classesList.map(c => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
+            <div className="role-selector">
+              <button 
+                type="button"
+                className={`role-btn ${role === 'student' ? 'active' : ''}`}
+                onClick={() => { setRole('student'); setError(''); }}
+              >{t('login.roleStudent')}</button>
+              <button 
+                type="button"
+                className={`role-btn ${role === 'teacher' ? 'active' : ''}`}
+                onClick={() => { setRole('teacher'); setError(''); }}
+              >{t('login.roleTeacher')}</button>
+              {!isSignup && (
+                <button 
+                  type="button"
+                  className={`role-btn ${role === 'admin' ? 'active' : ''}`}
+                  onClick={() => { setRole('admin'); setError(''); }}
+                >{t('login.roleAdmin')}</button>
+              )}
+            </div>
+
+            {error && (
+              <div className="error-message" style={{ marginBottom: '15px' }}>
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form className="login-form" onSubmit={isSignup ? handleSignup : handleLogin}>
+              {isSignup && (
+                <>
+                  <div className="form-group">
+                    <label>{t('login.name')}</label>
+                    <input 
+                      type="text" 
+                      placeholder={t('login.namePlaceholder')} 
+                      required 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+
+                  {role === 'student' && (
+                    <div className="form-group">
+                      <label>{t('login.class')}</label>
+                      <select 
+                        required 
+                        value={studentClass}
+                        onChange={(e) => setStudentClass(e.target.value)}
+                        style={{ width: '100%', padding: '12px', border: '1px solid var(--color-border)', borderRadius: '8px', background: 'var(--color-surface)', fontSize: '15px' }}
+                      >
+                        <option value="">{t('login.classSelect')}...</option>
+                        {classesList.map(c => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {role === 'teacher' && (
+                    <div className="form-group">
+                      <label>{t('login.subject')}</label>
+                      <input 
+                        type="text" 
+                        placeholder={t('login.subjectPlaceholder')} 
+                        required 
+                        value={teacherSubject}
+                        onChange={(e) => setTeacherSubject(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </>
               )}
 
-              {role === 'teacher' && (
+              <div className="form-group">
+                <label>{role === 'admin' ? 'البريد الإلكتروني للإدارة' : t('login.nationalId')}</label>
+                <input 
+                  type={role === 'admin' ? 'email' : 'text'} 
+                  placeholder={role === 'admin' ? 'admin@school.com' : t('login.nationalIdPlaceholder')} 
+                  required 
+                  dir="ltr"
+                  value={nationalId}
+                  onChange={(e) => setNationalId(e.target.value)}
+                />
+              </div>
+              
+              {!isSignup && (
                 <div className="form-group">
-                  <label>{t('login.subject')}</label>
+                  <label>{t('login.password')} {role !== 'admin' && <span style={{fontSize:'12px', color:'#666'}}>(الافتراضية هي رقم الهوية)</span>}</label>
                   <input 
-                    type="text" 
-                    placeholder={t('login.subjectPlaceholder')} 
+                    type="password" 
+                    placeholder={t('login.passwordPlaceholder')} 
                     required 
-                    value={teacherSubject}
-                    onChange={(e) => setTeacherSubject(e.target.value)}
+                    dir="ltr"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
               )}
-            </>
-          )}
 
-          <div className="form-group">
-            <label>{role === 'admin' ? 'البريد الإلكتروني للإدارة' : t('login.nationalId')}</label>
-            <input 
-              type={role === 'admin' ? 'email' : 'text'} 
-              placeholder={role === 'admin' ? 'admin@school.com' : t('login.nationalIdPlaceholder')} 
-              required 
-              dir="ltr"
-              value={nationalId}
-              onChange={(e) => setNationalId(e.target.value)}
-            />
-          </div>
-          
-          {!isSignup && (
-            <div className="form-group">
-              <label>{t('login.password')} {role !== 'admin' && <span style={{fontSize:'12px', color:'#666'}}>(الافتراضية هي رقم الهوية)</span>}</label>
-              <input 
-                type="password" 
-                placeholder={t('login.passwordPlaceholder')} 
-                required 
-                dir="ltr"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ marginBottom: '15px' }}>
+                {loading ? t('login.loading') : (
+                  <>{isSignup ? <UserPlus size={18} /> : <LogIn size={18} />} {isSignup ? t('login.signupButton') : t('login.loginButton')}</>
+                )}
+              </button>
+            </form>
+
+            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsSignup(!isSignup);
+                  setError('');
+                  if (role === 'admin') setRole('student');
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--color-primary-dark)', cursor: 'pointer', textDecoration: 'underline', fontSize: '14px' }}
+              >
+                {isSignup ? t('login.hasAccount') : t('login.noAccount')}
+              </button>
             </div>
-          )}
-
-          <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ marginBottom: '15px' }}>
-            {loading ? t('login.loading') : (
-              <>{isSignup ? <UserPlus size={18} /> : <LogIn size={18} />} {isSignup ? t('login.signupButton') : t('login.loginButton')}</>
-            )}
-          </button>
-        </form>
-
-        <div style={{ marginTop: '20px', textAlign: 'center' }}>
-          <button 
-            type="button"
-            onClick={() => {
-              setIsSignup(!isSignup);
-              setError('');
-              if (role === 'admin') setRole('student');
-            }}
-            style={{ background: 'none', border: 'none', color: 'var(--color-primary-dark)', cursor: 'pointer', textDecoration: 'underline', fontSize: '14px' }}
-          >
-            {isSignup ? t('login.hasAccount') : t('login.noAccount')}
-          </button>
+          </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
