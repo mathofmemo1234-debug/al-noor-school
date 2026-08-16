@@ -32,7 +32,13 @@ export function AuthProvider({ children }) {
             const querySnapshot = await getDocs(q);
             
             if (!querySnapshot.empty) {
-              const data = querySnapshot.docs[0].data();
+              // If multiple docs (e.g. same national ID used for both teacher & student),
+              // prioritize by role: teacher > student
+              const rolePriority = { superadmin: 4, admin: 3, teacher: 2, student: 1 };
+              const allDocs = querySnapshot.docs.map(d => d.data());
+              const data = allDocs.sort((a, b) =>
+                (rolePriority[b.role] || 0) - (rolePriority[a.role] || 0)
+              )[0];
               
               if (data.schoolId && data.schoolId !== 'ALL') {
                 const schoolDoc = await getDoc(doc(db, 'schools', data.schoolId));
@@ -45,13 +51,14 @@ export function AuthProvider({ children }) {
               setUserRole(data.role);
               setUserData(data);
             } else {
-              setUserRole('student'); // fallback
+              // No record found — don't assume student, force re-login
+              setUserRole(null);
               setUserData(null);
             }
           }
         } catch (error) {
           console.error("Error fetching role:", error);
-          setUserRole('student'); // Fallback
+          setUserRole(null); // Don't assume student on error
           setUserData(null);
         }
       } else {
