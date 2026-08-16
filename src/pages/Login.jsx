@@ -67,28 +67,80 @@ export default function Login() {
     const trimmedId = nationalId.trim();
     const trimmedPassword = password.trim();
 
-    try {
-      const loginEmail = role === 'admin' ? trimmedId : getFakeEmail(trimmedId);
-      
-      // For non-admin: verify role from Firestore BEFORE navigating
-      if (role !== 'admin') {
-        const userQuery = query(collection(db, 'users'), where('nationalId', '==', trimmedId));
-        const snap = await getDocs(userQuery);
-        
-        if (!snap.empty) {
-          const firestoreRole = snap.docs[0].data().role;
-          if (firestoreRole !== role) {
-            const roleNames = { teacher: 'معلم', student: 'طالب', admin: 'مدير' };
-            setError(`هذا الرقم مسجل في النظام كـ ${roleNames[firestoreRole] || firestoreRole}، يرجى اختيار الدور الصحيح`);
-            setLoading(false);
-            return;
+    // Helper to find record across users, teachers, students
+    const findRecord = async (nid, desiredRole) => {
+      // 1. Check users
+      try {
+        const uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
+        if (!uSnap.empty) {
+          const docs = uSnap.docs.map(d => d.data());
+          const match = docs.find(d => d.role === desiredRole);
+          if (match) return match;
+          return docs[0];
+        }
+      } catch (err) {
+        console.warn("Error querying users collection:", err);
+      }
+
+      // 2. Check teachers if requested role is teacher
+      if (desiredRole === 'teacher') {
+        try {
+          const tSnap = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
+          if (!tSnap.empty) {
+            return { ...tSnap.docs[0].data(), role: 'teacher' };
           }
+        } catch (err) {
+          console.warn("Error querying teachers collection:", err);
         }
       }
 
+      // 3. Check students if requested role is student
+      if (desiredRole === 'student') {
+        try {
+          const sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
+          if (!sSnap.empty) {
+            return { ...sSnap.docs[0].data(), role: 'student' };
+          }
+        } catch (err) {
+          console.warn("Error querying students collection:", err);
+        }
+      }
+
+      // 4. General check across other collections to detect wrong role choice
+      try {
+        const tSnapAll = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
+        if (!tSnapAll.empty) {
+          return { ...tSnapAll.docs[0].data(), role: 'teacher' };
+        }
+        const sSnapAll = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
+        if (!sSnapAll.empty) {
+          return { ...sSnapAll.docs[0].data(), role: 'student' };
+        }
+      } catch (err) {
+        console.warn("General collection check error:", err);
+      }
+
+      return null;
+    };
+
+    try {
+      const loginEmail = role === 'admin' ? trimmedId : getFakeEmail(trimmedId);
+      
+      // Step 1: Sign in with Firebase Auth
       await signInWithEmailAndPassword(auth, loginEmail, trimmedPassword);
       
-      // Set role hint for AuthContext before navigating
+      // Step 2: Now that we are authenticated, verify the user's role in Firestore
+      if (role !== 'admin') {
+        const record = await findRecord(trimmedId, role);
+        if (record && record.role !== role) {
+          await auth.signOut();
+          const roleNames = { teacher: 'معلم', student: 'طالب', admin: 'مدير' };
+          setError(`هذا الرقم مسجل في النظام كـ ${roleNames[record.role] || record.role}، يرجى اختيار الدور الصحيح`);
+          setLoading(false);
+          return;
+        }
+      }
+
       setLoginRole(role);
       
       if (loginEmail === 'super@admin.com') {
@@ -106,20 +158,36 @@ export default function Login() {
           const fakeEmail = getFakeEmail(trimmedId);
           try {
             const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, trimmedPassword);
-            const userQuery = query(collection(db, 'users'), where('nationalId', '==', trimmedId));
-            const querySnapshot = await getDocs(userQuery);
             
-            if (!querySnapshot.empty) {
-              const userData = querySnapshot.docs[0].data();
-              // Verify selected role matches Firestore role
-              if (userData.role !== role) {
+            // Search across users, teachers, and students collections
+            const record = await findRecord(trimmedId, role);
+            
+            if (record) {
+              if (record.role !== role) {
                 await deleteUser(userCredential.user);
                 const roleNames = { teacher: 'معلم', student: 'طالب', admin: 'مدير' };
-                setError(`هذا الرقم مسجل كـ ${roleNames[userData.role] || userData.role}، يرجى اختيار الدور الصحيح`);
+                setError(`هذا الرقم مسجل في النظام كـ ${roleNames[record.role] || record.role}، يرجى اختيار الدور الصحيح`);
                 return;
               }
-              if (userData.role === 'teacher') { setLoginRole('teacher'); navigate('/teacher'); }
-              if (userData.role === 'student') { setLoginRole('student'); navigate('/student'); }
+
+              // Auto sync to users collection if missing
+              try {
+                const uCheck = await getDocs(query(collection(db, 'users'), where('nationalId', '==', trimmedId)));
+                if (uCheck.empty) {
+                  await addDoc(collection(db, 'users'), {
+                    nationalId: trimmedId,
+                    email: fakeEmail,
+                    role: record.role,
+                    name: record.name || (record.role === 'teacher' ? 'معلم' : 'طالب'),
+                    schoolId: record.schoolId || 'default_school_1'
+                  });
+                }
+              } catch (syncErr) {
+                console.warn("Could not sync to users:", syncErr);
+              }
+
+              if (record.role === 'teacher') { setLoginRole('teacher'); navigate('/teacher'); }
+              if (record.role === 'student') { setLoginRole('student'); navigate('/student'); }
               return;
             } else {
               await deleteUser(userCredential.user);
