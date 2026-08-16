@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -14,53 +14,62 @@ export function AuthProvider({ children }) {
   const [userRole, setUserRole] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedRole, setSelectedRole] = useState(null);
+
+  const resolveRole = useCallback(async (user, roleHint) => {
+    try {
+      if (user.email === 'super@admin.com') {
+        setUserRole('superadmin');
+        setUserData({ name: '\u062d\u0633\u0627\u0628 \u0627\u0644\u0645\u0627\u0633\u062a\u0631', role: 'superadmin', schoolId: 'ALL' });
+        return;
+      }
+      if (user.email === 'admin@admin.com' || user.email === 'admin@school.edu.sa') {
+        setUserRole('admin');
+        setUserData({ name: '\u0645\u062f\u064a\u0631 \u0627\u0644\u0645\u062f\u0631\u0633\u0629', role: 'admin', schoolId: 'default_school_1' });
+        return;
+      }
+
+      // Fetch all user records for this email
+      const q = query(collection(db, 'users'), where('email', '==', user.email));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const allDocs = querySnapshot.docs.map(d => d.data());
+        let data;
+
+        if (allDocs.length > 1 && roleHint) {
+          // Multiple records exist — use the role hint from login page selection
+          data = allDocs.find(d => d.role === roleHint) || allDocs[0];
+        } else {
+          data = allDocs[0];
+        }
+
+        if (data.schoolId && data.schoolId !== 'ALL') {
+          const schoolDoc = await getDoc(doc(db, 'schools', data.schoolId));
+          if (schoolDoc.exists()) {
+            data.schoolName = schoolDoc.data().name;
+            data.logoUrl = schoolDoc.data().logoUrl || null;
+          }
+        }
+
+        setUserRole(data.role);
+        setUserData(data);
+      } else {
+        setUserRole(null);
+        setUserData(null);
+      }
+    } catch (error) {
+      console.error("Error fetching role:", error);
+      setUserRole(null);
+      setUserData(null);
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        try {
-          if (user.email === 'super@admin.com') {
-            setUserRole('superadmin');
-            setUserData({ name: 'حساب الماستر', role: 'superadmin', schoolId: 'ALL' });
-          } else if (user.email === 'admin@admin.com' || user.email === 'admin@school.edu.sa') {
-            setUserRole('admin');
-            setUserData({ name: 'مدير المدرسة', role: 'admin', schoolId: 'default_school_1' });
-          } else {
-            // Fetch user role from Firestore by email
-            const q = query(collection(db, 'users'), where('email', '==', user.email));
-            const querySnapshot = await getDocs(q);
-            
-            if (!querySnapshot.empty) {
-              // If multiple docs (e.g. same national ID used for both teacher & student),
-              // prioritize by role: teacher > student
-              const rolePriority = { superadmin: 4, admin: 3, teacher: 2, student: 1 };
-              const allDocs = querySnapshot.docs.map(d => d.data());
-              const data = allDocs.sort((a, b) =>
-                (rolePriority[b.role] || 0) - (rolePriority[a.role] || 0)
-              )[0];
-              
-              if (data.schoolId && data.schoolId !== 'ALL') {
-                const schoolDoc = await getDoc(doc(db, 'schools', data.schoolId));
-                if (schoolDoc.exists()) {
-                  data.schoolName = schoolDoc.data().name;
-                  data.logoUrl = schoolDoc.data().logoUrl || null;
-                }
-              }
-              
-              setUserRole(data.role);
-              setUserData(data);
-            } else {
-              // No record found — don't assume student, force re-login
-              setUserRole(null);
-              setUserData(null);
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching role:", error);
-          setUserRole(null); // Don't assume student on error
-          setUserData(null);
-        }
+        await resolveRole(user, selectedRole);
       } else {
         setUserRole(null);
         setUserData(null);
@@ -69,12 +78,18 @@ export function AuthProvider({ children }) {
     });
 
     return unsubscribe;
+  }, [resolveRole, selectedRole]);
+
+  // Called from Login.jsx before navigation to set role hint
+  const setLoginRole = useCallback((role) => {
+    setSelectedRole(role);
   }, []);
 
   const value = {
     currentUser,
     userRole,
-    userData
+    userData,
+    setLoginRole
   };
 
   return (

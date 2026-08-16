@@ -4,12 +4,14 @@ import { LogIn, AlertCircle, UserPlus } from 'lucide-react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import './Login.css';
 
 export default function Login() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { setLoginRole } = useAuth();
   
   // Modes
   const [isSignup, setIsSignup] = useState(false);
@@ -86,6 +88,9 @@ export default function Login() {
 
       await signInWithEmailAndPassword(auth, loginEmail, trimmedPassword);
       
+      // Set role hint for AuthContext before navigating
+      setLoginRole(role);
+      
       if (loginEmail === 'super@admin.com') {
         navigate('/superadmin');
       } else {
@@ -113,8 +118,8 @@ export default function Login() {
                 setError(`هذا الرقم مسجل كـ ${roleNames[userData.role] || userData.role}، يرجى اختيار الدور الصحيح`);
                 return;
               }
-              if (userData.role === 'teacher') navigate('/teacher');
-              if (userData.role === 'student') navigate('/student');
+              if (userData.role === 'teacher') { setLoginRole('teacher'); navigate('/teacher'); }
+              if (userData.role === 'student') { setLoginRole('student'); navigate('/student'); }
               return;
             } else {
               await deleteUser(userCredential.user);
@@ -194,6 +199,7 @@ export default function Login() {
             subjectArr.push(teacherSubject.trim());
             await updateDoc(docRef, { subject: subjectArr.join('، ') });
           }
+          setLoginRole('teacher');
           navigate('/teacher');
           return;
         }
@@ -233,6 +239,7 @@ export default function Login() {
           role: 'student',
           createdAt: new Date()
         });
+        setLoginRole('student');
         navigate('/student');
       } else if (role === 'teacher') {
         await addDoc(collection(db, 'teachers'), {
@@ -244,6 +251,7 @@ export default function Login() {
           role: 'teacher',
           createdAt: new Date()
         });
+        setLoginRole('teacher');
         navigate('/teacher');
       }
     } catch (err) {
