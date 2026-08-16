@@ -67,6 +67,23 @@ export default function Login() {
 
     try {
       const loginEmail = role === 'admin' ? trimmedId : getFakeEmail(trimmedId);
+      
+      // For non-admin: verify role from Firestore BEFORE navigating
+      if (role !== 'admin') {
+        const userQuery = query(collection(db, 'users'), where('nationalId', '==', trimmedId));
+        const snap = await getDocs(userQuery);
+        
+        if (!snap.empty) {
+          const firestoreRole = snap.docs[0].data().role;
+          if (firestoreRole !== role) {
+            const roleNames = { teacher: 'معلم', student: 'طالب', admin: 'مدير' };
+            setError(`هذا الرقم مسجل في النظام كـ ${roleNames[firestoreRole] || firestoreRole}، يرجى اختيار الدور الصحيح`);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       await signInWithEmailAndPassword(auth, loginEmail, trimmedPassword);
       
       if (loginEmail === 'super@admin.com') {
@@ -89,6 +106,13 @@ export default function Login() {
             
             if (!querySnapshot.empty) {
               const userData = querySnapshot.docs[0].data();
+              // Verify selected role matches Firestore role
+              if (userData.role !== role) {
+                await deleteUser(userCredential.user);
+                const roleNames = { teacher: 'معلم', student: 'طالب', admin: 'مدير' };
+                setError(`هذا الرقم مسجل كـ ${roleNames[userData.role] || userData.role}، يرجى اختيار الدور الصحيح`);
+                return;
+              }
               if (userData.role === 'teacher') navigate('/teacher');
               if (userData.role === 'student') navigate('/student');
               return;
@@ -175,13 +199,19 @@ export default function Login() {
         }
       }
 
-      // 2. Check if user already exists in Firestore (added by admin)
+      // 2. Check if national ID already exists for ANY role (strict uniqueness)
       const userQuery = query(collection(db, 'users'), where('nationalId', '==', nationalId));
       const querySnapshot = await getDocs(userQuery);
       
       if (!querySnapshot.empty) {
         if (!isExistingUser) await deleteUser(user);
-        setError('هذا الحساب مضاف مسبقاً من الإدارة، الرجاء تسجيل الدخول مباشرة');
+        const existingRole = querySnapshot.docs[0].data().role;
+        const roleNames = { teacher: 'معلم', student: 'طالب', admin: 'مدير' };
+        if (existingRole === role) {
+          setError('هذا الرقم مسجل مسبقاً. يرجى تسجيل الدخول مباشرة.');
+        } else {
+          setError(`هذا الرقم مسجل مسبقاً في النظام كـ ${roleNames[existingRole] || existingRole}. لا يمكن تسجيله مرة أخرى بدور مختلف.`);
+        }
         return;
       }
 
