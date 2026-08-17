@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck } from 'lucide-react';
+import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,6 +22,7 @@ export default function Sidebar({ role }) {
 
   const adminLinks = [
     { path: '/admin', icon: Home, label: t('sidebar.overview') },
+    { path: '/admin/staff', icon: ShieldCheck, label: 'الكادر الإداري والوكلاء' },
     { path: '/admin/supervisors', icon: UserCheck, label: 'المشرف التعليمي' },
     { path: '/admin/teachers', icon: Users, label: t('sidebar.teachers') },
     { path: '/admin/students', icon: Users, label: t('sidebar.students') },
@@ -31,6 +32,23 @@ export default function Sidebar({ role }) {
     { path: '/admin/weekly-plan', icon: BookOpen, label: t('sidebar.weeklyPlan') },
     { path: '/admin/excellence', icon: Star, label: t('sidebar.files') },
     { path: '/admin/settings', icon: Settings, label: t('sidebar.settings') },
+  ];
+
+  const userPerms = userData?.permissions || [
+    'preparations', 'weekly_plans', 'schedules', 'students', 'teachers', 'attendance', 'classes', 'excellence'
+  ];
+
+  const staffLinks = [
+    { path: '/staff', icon: Home, label: t('sidebar.overview') },
+    ...(userPerms.includes('preparations') ? [{ path: '/staff/preparations', icon: BookOpen, label: t('sidebar.preparations') }] : []),
+    ...(userPerms.includes('weekly_plans') ? [{ path: '/staff/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') }] : []),
+    ...(userPerms.includes('schedules') ? [{ path: '/staff/schedule', icon: Calendar, label: t('sidebar.schedule') }] : []),
+    ...(userPerms.includes('students') ? [{ path: '/staff/students', icon: Users, label: t('sidebar.students') }] : []),
+    ...(userPerms.includes('attendance') ? [{ path: '/staff/attendance', icon: CheckSquare, label: t('sidebar.attendance') }] : []),
+    ...(userPerms.includes('teachers') ? [{ path: '/staff/teachers', icon: Users, label: t('sidebar.teachers') }] : []),
+    ...(userPerms.includes('classes') ? [{ path: '/staff/classes', icon: BookOpen, label: t('sidebar.classes') }] : []),
+    ...(userPerms.includes('excellence') ? [{ path: '/staff/excellence', icon: Star, label: t('sidebar.files') }] : []),
+    { path: '/staff/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
   const supervisorLinks = [
@@ -73,6 +91,7 @@ export default function Sidebar({ role }) {
 
   const links = role === 'superadmin' ? superAdminLinks : 
                 role === 'admin' ? adminLinks : 
+                role === 'staff' ? staffLinks : 
                 role === 'supervisor' ? supervisorLinks : 
                 role === 'teacher' ? teacherLinks : studentLinks;
   

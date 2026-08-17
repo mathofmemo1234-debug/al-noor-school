@@ -10,11 +10,12 @@ import AdminPreparations from './AdminPreparations';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import SchoolSettings from './SchoolSettings';
 import AdminExcellence from './AdminExcellence';
+import ManageStaff from './ManageStaff';
 import { useLanguage } from '../contexts/LanguageContext';
 
 function AdminHome({ schoolId }) {
   const { t } = useLanguage();
-  const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0, supervisors: 0 });
+  const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0, supervisors: 0, staff: 0 });
 
   useEffect(() => {
     if (!schoolId) return;
@@ -22,6 +23,7 @@ function AdminHome({ schoolId }) {
     const qStudents = query(collection(db, 'students'), where('schoolId', '==', schoolId));
     const qClasses = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
     const qSupervisors = query(collection(db, 'supervisors'), where('schoolId', '==', schoolId));
+    const qStaff = query(collection(db, 'staff'), where('schoolId', '==', schoolId));
 
     const unsubTeachers = onSnapshot(qTeachers, (snap) => {
       setStats(prev => ({ ...prev, teachers: snap.size }));
@@ -35,7 +37,10 @@ function AdminHome({ schoolId }) {
     const unsubSupervisors = onSnapshot(qSupervisors, (snap) => {
       setStats(prev => ({ ...prev, supervisors: snap.size }));
     });
-    return () => { unsubTeachers(); unsubStudents(); unsubClasses(); unsubSupervisors(); };
+    const unsubStaff = onSnapshot(qStaff, (snap) => {
+      setStats(prev => ({ ...prev, staff: snap.size }));
+    });
+    return () => { unsubTeachers(); unsubStudents(); unsubClasses(); unsubSupervisors(); unsubStaff(); };
   }, [schoolId]);
 
   const handleSeedData = async () => {
@@ -185,6 +190,16 @@ function AdminHome({ schoolId }) {
           <div className="stat-info">
             <p>{t('adminDashboard.totalClasses')}</p>
             <h3>{stats.classes}</h3>
+          </div>
+        </div>
+
+        <div className="stat-card glass-panel">
+          <div className="stat-icon" style={{ color: '#0284c7', background: 'rgba(2, 132, 199, 0.1)' }}>
+            <ShieldCheck size={32} />
+          </div>
+          <div className="stat-info">
+            <p>الكادر والوكلاء</p>
+            <h3>{stats.staff}</h3>
           </div>
         </div>
 
@@ -1357,6 +1372,7 @@ export default function AdminDashboard() {
     <Layout role="admin" title={t('adminDashboard.adminDashboardTitle')}>
       <Routes>
         <Route path="/" element={<AdminHome schoolId={userData?.schoolId} />} />
+        <Route path="/staff" element={<ManageStaff schoolId={userData?.schoolId} />} />
         <Route path="/supervisors" element={<ManageSupervisors schoolId={userData?.schoolId} />} />
         <Route path="/teachers" element={<ManageTeachers schoolId={userData?.schoolId} />} />
         <Route path="/students" element={<ManageStudents schoolId={userData?.schoolId} />} />

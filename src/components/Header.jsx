@@ -17,6 +17,8 @@ export default function Header({ title, role }) {
   } else if (effectiveRole === 'teacher') {
     const teacherSubject = userData?.subject;
     if (teacherSubject) extraDetail = teacherSubject;
+  } else if (effectiveRole === 'staff') {
+    if (userData?.roleTitle) extraDetail = userData.roleTitle;
   }
 
   let supervisorSpecialty = '';
@@ -26,6 +28,7 @@ export default function Header({ title, role }) {
 
   const displayRole = effectiveRole === 'superadmin' ? t('header.master') : 
                       effectiveRole === 'admin' ? (userData?.schoolName ? `${t('header.schoolManager')} • ${userData.schoolName}` : t('header.schoolManager')) : 
+                      effectiveRole === 'staff' ? (userData?.schoolName ? `${userData?.roleTitle || 'كادر مدرسي'} • ${userData.schoolName}` : (userData?.roleTitle || 'كادر مدرسي')) :
                       effectiveRole === 'supervisor' ? (userData?.schoolName ? `مشرف تعليمي${supervisorSpecialty ? ` (${supervisorSpecialty})` : ''} • ${userData.schoolName}` : `مشرف تعليمي${supervisorSpecialty ? ` (${supervisorSpecialty})` : ''}`) :
                       effectiveRole === 'teacher' ? (extraDetail ? `${t('header.teacher')} • ${extraDetail}` : t('header.teacher')) : 
                       (extraDetail ? `${t('header.student')} • ${extraDetail}` : t('header.student'));

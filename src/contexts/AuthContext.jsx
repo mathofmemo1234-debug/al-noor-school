@@ -67,7 +67,30 @@ export function AuthProvider({ children }) {
           }
         }
 
-        // 3. Fallback: Check 'supervisors' collection
+        // 3. Fallback: Check 'staff' collection
+        if (!data && (!roleHint || roleHint === 'staff')) {
+          const staffQ = query(collection(db, 'staff'), where('nationalId', '==', nid));
+          const staffSnap = await getDocs(staffQ);
+          if (!staffSnap.empty) {
+            const staffData = staffSnap.docs[0].data();
+            data = { ...staffData, role: 'staff', email: user.email, nationalId: nid };
+            try {
+              await addDoc(collection(db, 'users'), {
+                nationalId: nid,
+                email: user.email,
+                role: 'staff',
+                name: staffData.name || 'عضو كادر',
+                roleTitle: staffData.roleTitle || '',
+                permissions: staffData.permissions || [],
+                schoolId: staffData.schoolId || 'default_school_1'
+              });
+            } catch (e) {
+              console.warn("Could not sync staff to users collection", e);
+            }
+          }
+        }
+
+        // 4. Fallback: Check 'supervisors' collection
         if (!data && (!roleHint || roleHint === 'supervisor')) {
           const supQ = query(collection(db, 'supervisors'), where('nationalId', '==', nid));
           const supSnap = await getDocs(supQ);
@@ -89,7 +112,7 @@ export function AuthProvider({ children }) {
           }
         }
 
-        // 4. Fallback: Check 'students' collection
+        // 5. Fallback: Check 'students' collection
         if (!data && (!roleHint || roleHint === 'student')) {
           const sQ = query(collection(db, 'students'), where('nationalId', '==', nid));
           const sSnap = await getDocs(sQ);
@@ -113,7 +136,7 @@ export function AuthProvider({ children }) {
       }
 
       if (data) {
-        // Enrich class for students, subject for teachers, specialty for supervisors
+        // Enrich class for students, subject for teachers, permissions/roleTitle for staff, specialty for supervisors
         if (data.role === 'student') {
           try {
             const sQ = query(collection(db, 'students'), where('nationalId', '==', nid));
@@ -137,6 +160,19 @@ export function AuthProvider({ children }) {
             }
           } catch (e) {
             console.warn("Could not enrich teacher subject", e);
+          }
+        } else if (data.role === 'staff') {
+          try {
+            const staffQ = query(collection(db, 'staff'), where('nationalId', '==', nid));
+            const staffSnap = await getDocs(staffQ);
+            if (!staffSnap.empty) {
+              const staffDoc = staffSnap.docs[0].data();
+              data.roleTitle = staffDoc.roleTitle || data.roleTitle || 'عضو كادر';
+              data.permissions = staffDoc.permissions || data.permissions || [];
+              if (staffDoc.name) data.name = staffDoc.name;
+            }
+          } catch (e) {
+            console.warn("Could not enrich staff data", e);
           }
         } else if (data.role === 'supervisor') {
           try {
