@@ -37,6 +37,7 @@ export default function SchoolMessagingHub() {
   const [selectedMessage, setSelectedMessage] = useState(null);
   
   // Directories for recipient selection
+  const [adminList, setAdminList] = useState([]);
   const [teachersList, setTeachersList] = useState([]);
   const [studentsList, setStudentsList] = useState([]);
   const [staffList, setStaffList] = useState([]);
@@ -89,6 +90,14 @@ export default function SchoolMessagingHub() {
 
   // Load Recipients Directory from Firestore (with robust fallback)
   useEffect(() => {
+    const unsubAdmins = onSnapshot(collection(db, 'users'), snap => {
+      const admins = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => (d.role === 'admin' || d.role === 'superadmin') && (!d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school'))
+        .map(d => ({ ...d, role: 'admin', roleTitle: d.roleTitle || 'مدير المدرسة', name: d.name || 'مدير المدرسة' }));
+      setAdminList(admins);
+    });
+
     const unsubTeachers = onSnapshot(collection(db, 'teachers'), snap => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'teacher' }))
         .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
@@ -123,6 +132,7 @@ export default function SchoolMessagingHub() {
     });
 
     return () => {
+      unsubAdmins();
       unsubTeachers();
       unsubStudents();
       unsubStaff();
@@ -283,7 +293,7 @@ export default function SchoolMessagingHub() {
       }];
     } else {
       if (msg.targetGroup === 'all') {
-        targetList = [...teachersList, ...studentsList, ...staffList, ...supervisorsList];
+        targetList = [...adminList, ...teachersList, ...studentsList, ...staffList, ...supervisorsList];
       } else if (msg.targetGroup === 'teachers') {
         targetList = [...teachersList];
       } else if (msg.targetGroup === 'students') {
@@ -447,7 +457,7 @@ export default function SchoolMessagingHub() {
         alert('يرجى اختيار المستلم من القائمة.');
         return;
       }
-      const allUsers = [...teachersList, ...studentsList, ...staffList, ...supervisorsList];
+      const allUsers = [...adminList, ...teachersList, ...studentsList, ...staffList, ...supervisorsList];
       const targetUser = allUsers.find(u => u.nationalId === recipientNid || u.id === recipientNid);
       if (targetUser) {
         recData = {
@@ -1019,10 +1029,15 @@ export default function SchoolMessagingHub() {
                     required
                   >
                     <option value="">-- اضغط لاختيار الشخص المستهدف --</option>
-                    <optgroup label="👑 الإدارة والكادر الإداري">
+                    <optgroup label="👑 إدارة المدرسة والوكلاء">
+                      {adminList.map(a => (
+                        <option key={a.id} value={a.nationalId || a.id}>
+                          👑 {a.name || 'مدير المدرسة'} (إدارة المدرسة) {a.nationalId ? `- هوية: ${a.nationalId}` : ''}
+                        </option>
+                      ))}
                       {staffList.map(s => (
                         <option key={s.id} value={s.nationalId || s.id}>
-                          {s.name} ({s.roleTitle || 'عضو كادر'}) - هوية: {s.nationalId}
+                          👔 {s.name} ({s.roleTitle || 'عضو كادر'}) - هوية: {s.nationalId}
                         </option>
                       ))}
                     </optgroup>
