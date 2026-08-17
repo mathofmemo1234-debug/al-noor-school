@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { FileText, Clock, Play, CheckCircle } from 'lucide-react';
+import { FileText, Clock, Play, CheckCircle, Printer } from 'lucide-react';
 import MarkdownViewer from '../components/MarkdownViewer';
 import { useLanguage } from '../contexts/LanguageContext';
+import PrintExamModal from '../components/PrintExamModal';
 
 export default function StudentExams() {
   const { t } = useLanguage();
@@ -18,6 +19,7 @@ export default function StudentExams() {
   const [answers, setAnswers] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scoreView, setScoreView] = useState(null);
+  const [printingExamResult, setPrintingExamResult] = useState(null);
 
   // Fetch student info
   useEffect(() => {
@@ -136,9 +138,35 @@ export default function StudentExams() {
         <div style={{ fontSize: '24px', margin: '20px 0', background: 'rgba(255,255,255,0.5)', padding: '20px', borderRadius: '12px', display: 'inline-block' }}>
           {t('studentExams.grade')} <strong style={{ color: scoreView.score === scoreView.total ? '#25D366' : 'var(--color-primary)' }}>{scoreView.score}</strong> / {scoreView.total}
         </div>
-        <div>
-          <button className="btn btn-primary" onClick={() => { setActiveExam(null); setScoreView(null); }}>{t('studentExams.backToList')}</button>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '10px' }}>
+          <button 
+            className="btn" 
+            style={{ background: 'linear-gradient(135deg, #0e7490, #63B2C6)', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}
+            onClick={() => setPrintingExamResult({
+              exam: activeExam,
+              results: [{
+                studentId: studentDocId,
+                score: scoreView.score,
+                totalQuestions: scoreView.total,
+                studentClass: studentClass,
+                timestamp: new Date()
+              }]
+            })}
+          >
+            <Printer size={18} /> طباعة إشعار وشهادة النتيجة (Word/PDF)
+          </button>
+          <button className="btn btn-outline" onClick={() => { setActiveExam(null); setScoreView(null); }}>{t('studentExams.backToList')}</button>
         </div>
+
+        {printingExamResult && (
+          <PrintExamModal 
+            exam={printingExamResult.exam} 
+            results={printingExamResult.results}
+            studentsCache={{ [studentDocId]: userData?.name || 'الطالب' }}
+            mode="results"
+            onClose={() => setPrintingExamResult(null)} 
+          />
+        )}
       </div>
     );
   }
@@ -221,8 +249,26 @@ export default function StudentExams() {
                 </div>
 
                 {hasTaken ? (
-                  <div style={{ background: '#dcfce7', color: '#166534', padding: '12px', borderRadius: '8px', textAlign: 'center', fontWeight: 'bold' }}>
-                    {t('studentExams.deliveredGrade')} {examResults[exam.id].score} / {examResults[exam.id].totalQuestions}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ background: '#dcfce7', color: '#166534', padding: '12px', borderRadius: '8px', textAlign: 'center', fontWeight: 'bold' }}>
+                      {t('studentExams.deliveredGrade')} {examResults[exam.id].score} / {examResults[exam.id].totalQuestions}
+                    </div>
+                    <button
+                      className="btn"
+                      style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                      onClick={() => setPrintingExamResult({
+                        exam,
+                        results: [{
+                          studentId: studentDocId,
+                          score: examResults[exam.id].score,
+                          totalQuestions: examResults[exam.id].totalQuestions,
+                          studentClass: studentClass,
+                          timestamp: examResults[exam.id].timestamp || new Date()
+                        }]
+                      })}
+                    >
+                      <Printer size={15} /> طباعة إشعار النتيجة (Word/PDF)
+                    </button>
                   </div>
                 ) : upcoming ? (
                   <div style={{ background: '#f1f5f9', color: '#64748b', padding: '12px', borderRadius: '8px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -237,6 +283,16 @@ export default function StudentExams() {
             );
           })}
         </div>
+      )}
+
+      {printingExamResult && (
+        <PrintExamModal 
+          exam={printingExamResult.exam} 
+          results={printingExamResult.results}
+          studentsCache={{ [studentDocId]: userData?.name || 'الطالب' }}
+          mode="results"
+          onClose={() => setPrintingExamResult(null)} 
+        />
       )}
     </div>
   );

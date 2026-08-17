@@ -104,7 +104,7 @@ export default function Sidebar({ role }) {
 
   return (
     <div className="sidebar">
-      <div className="sidebar-logo" style={{ flexDirection: 'column', padding: '20px 0', gap: '10px' }}>
+      <div className="sidebar-logo-wrapper">
         <img 
           src={logoSrc} 
           alt="School Logo" 
@@ -112,7 +112,7 @@ export default function Sidebar({ role }) {
             e.target.onerror = null;
             e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
           }}
-          style={{ maxWidth: '140px', maxHeight: '140px', objectFit: 'contain' }} 
+          className="sidebar-logo-img"
         />
       </div>
       
@@ -124,15 +124,15 @@ export default function Sidebar({ role }) {
             end={link.path === `/${role}`}
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
           >
-            <link.icon size={20} />
+            <link.icon size={19} />
             <span>{link.label}</span>
           </NavLink>
         ))}
       </nav>
 
-      <div style={{ marginTop: 'auto', padding: '20px' }}>
-        <button className="nav-item" onClick={handleLogout} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}>
-          <LogOut size={20} />
+      <div className="sidebar-footer">
+        <button className="nav-item" onClick={handleLogout} style={{ width: '100%', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.15)', cursor: 'pointer', color: '#dc2626', borderRadius: '10px' }}>
+          <LogOut size={19} />
           <span>{t('sidebar.logout')}</span>
         </button>
       </div>

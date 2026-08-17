@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { Edit, Trash2, Plus, Save, Clock, BookOpen, Users, FileText, CheckCircle, BarChart2 } from 'lucide-react';
+import { Edit, Trash2, Plus, Save, Clock, BookOpen, Users, FileText, CheckCircle, BarChart2, Printer, Download } from 'lucide-react';
 import MarkdownInput from '../components/MarkdownInput';
 import { useLanguage } from '../contexts/LanguageContext';
+import PrintExamModal from '../components/PrintExamModal';
 
 export default function TeacherExams() {
   const { t } = useLanguage();
@@ -32,6 +33,8 @@ export default function TeacherExams() {
   const [examResults, setExamResults] = useState([]);
   const [studentsCache, setStudentsCache] = useState({});
   const [isSaving, setIsSaving] = useState(false);
+  const [printingExamData, setPrintingExamData] = useState(null);
+  const [printingResultsData, setPrintingResultsData] = useState(null);
 
   // Get teacher ID
   useEffect(() => {
@@ -257,8 +260,16 @@ export default function TeacherExams() {
                 </div>
                 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <button className="btn btn-primary" style={{ flex: '1 1 100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '4px' }} onClick={() => handleViewResults(exam)}>
+                  <button className="btn btn-primary" style={{ flex: '1 1 100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '2px' }} onClick={() => handleViewResults(exam)}>
                     <BarChart2 size={16} /> {t('teacherExams.viewGradesResults')}
+                  </button>
+                  <button 
+                    className="btn" 
+                    style={{ flex: '1 1 100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #0e7490, #63B2C6)', color: 'white', border: 'none' }} 
+                    onClick={() => setPrintingExamData(exam)}
+                    title="طباعة وتصدير أسئلة الاختبار بصيغة Word و PDF"
+                  >
+                    <Printer size={16} /> طباعة نموذج الأسئلة (Word/PDF)
                   </button>
                   <button className="btn btn-outline" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }} onClick={() => handleEdit(exam)}>
                     <Edit size={16} /> {t('teacherExams.edit')}
@@ -271,6 +282,10 @@ export default function TeacherExams() {
             ))}
           </div>
         )}
+
+        {printingExamData && (
+          <PrintExamModal exam={printingExamData} mode="exam" onClose={() => setPrintingExamData(null)} />
+        )}
       </div>
     );
   }
@@ -278,9 +293,18 @@ export default function TeacherExams() {
   if (activeView === 'results') {
     return (
       <div className="glass-panel" style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <h2><BarChart2 style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} /> {t('teacherExams.studentGrades')} {currentExam?.title}</h2>
-          <button className="btn btn-outline" onClick={resetForm}>{t('teacherExams.backToList')}</button>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button 
+              className="btn btn-primary" 
+              style={{ background: 'linear-gradient(135deg, #0e7490, #63B2C6)', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setPrintingResultsData({ exam: currentExam, results: examResults })}
+            >
+              <Printer size={16} /> طباعة وتصدير كشف النتائج (Word/PDF)
+            </button>
+            <button className="btn btn-outline" onClick={resetForm}>{t('teacherExams.backToList')}</button>
+          </div>
         </div>
 
         {examResults.length === 0 ? (
@@ -320,6 +344,16 @@ export default function TeacherExams() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {printingResultsData && (
+          <PrintExamModal 
+            exam={printingResultsData.exam} 
+            results={printingResultsData.results} 
+            studentsCache={studentsCache} 
+            mode="results" 
+            onClose={() => setPrintingResultsData(null)} 
+          />
         )}
       </div>
     );
