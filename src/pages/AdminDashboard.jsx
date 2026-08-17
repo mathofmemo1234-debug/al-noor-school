@@ -207,17 +207,34 @@ function ManageTeachers({ schoolId }) {
   useEffect(() => {
     if (!schoolId) return;
     const q = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(q, async (snap) => {
       const raw = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const unique = [];
-      const seen = new Set();
+      const seen = new Map();
+      const duplicatesToDelete = [];
+
       for (const t of raw) {
         const nid = (t.nationalId || t.id || '').trim();
         if (!seen.has(nid)) {
-          seen.add(nid);
+          seen.set(nid, t);
           unique.push(t);
+        } else {
+          // Found a duplicate document in database for the same national ID
+          duplicatesToDelete.push(t.id);
         }
       }
+
+      // Automatically clean up duplicate documents from Firestore
+      if (duplicatesToDelete.length > 0) {
+        for (const dupId of duplicatesToDelete) {
+          try {
+            await deleteDoc(doc(db, 'teachers', dupId));
+          } catch (e) {
+            console.warn("Auto cleanup duplicate teacher error:", e);
+          }
+        }
+      }
+
       setTeachers(unique);
     });
     return () => unsub();
@@ -231,12 +248,12 @@ function ManageTeachers({ schoolId }) {
     if (!tName || !nid) return;
     setIsSaving(true);
     try {
-      // Check for duplicates
+      // Strict check: No duplicate national IDs allowed anywhere in system
       const uCheck = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
       const tCheck = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
       const sCheck = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
       if (!uCheck.empty || !tCheck.empty || !sCheck.empty) {
-        alert('رقم الهوية مسجل مسبقاً في النظام. لا يمكن إضافة نفس الرقم أكثر من مرة.');
+        alert('عذراً: رقم الهوية هذا مسجل مسبقاً في النظام. لا يمكن تسجيل نفس الرقم نهائياً!');
         setIsSaving(false);
         return;
       }
@@ -265,6 +282,9 @@ function ManageTeachers({ schoolId }) {
     
     try {
       const lines = bulkData.trim().split('\n');
+      let addedCount = 0;
+      let skippedIds = [];
+
       for (let line of lines) {
         const parts = line.split(/[\t,]/).map(s => s.trim());
         if (parts.length >= 2) {
@@ -273,34 +293,35 @@ function ManageTeachers({ schoolId }) {
           const tSubj = parts[2] || '';
           
           if (tId && tName) {
-            const fakeEmail = `${tId}@school.local`;
-            const existingT = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', tId)));
-            if (!existingT.empty) {
-              await updateDoc(doc(db, 'teachers', existingT.docs[0].id), {
-                name: tName, subject: tSubj, schoolId
-              });
-            } else {
-              await addDoc(collection(db, 'teachers'), {
-                name: tName, nationalId: tId, email: fakeEmail, subject: tSubj, role: 'teacher', schoolId, createdAt: new Date()
-              });
+            // Strict duplicate check across entire database
+            const uCheck = await getDocs(query(collection(db, 'users'), where('nationalId', '==', tId)));
+            const tCheck = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', tId)));
+            const sCheck = await getDocs(query(collection(db, 'students'), where('nationalId', '==', tId)));
+            
+            if (!uCheck.empty || !tCheck.empty || !sCheck.empty) {
+              skippedIds.push(tId);
+              continue;
             }
 
-            const existingU = await getDocs(query(collection(db, 'users'), where('nationalId', '==', tId)));
-            if (!existingU.empty) {
-              await updateDoc(doc(db, 'users', existingU.docs[0].id), {
-                name: tName, schoolId, role: 'teacher'
-              });
-            } else {
-              await addDoc(collection(db, 'users'), {
-                nationalId: tId, email: fakeEmail, role: 'teacher', name: tName, schoolId
-              });
-            }
+            const fakeEmail = `${tId}@school.local`;
+            await addDoc(collection(db, 'teachers'), {
+              name: tName, nationalId: tId, email: fakeEmail, subject: tSubj, role: 'teacher', schoolId, createdAt: new Date()
+            });
+            await addDoc(collection(db, 'users'), {
+              nationalId: tId, email: fakeEmail, role: 'teacher', name: tName, schoolId
+            });
+            addedCount++;
           }
         }
       }
       setIsBulkAdding(false);
       setBulkData('');
-      alert(t('adminDashboard.teachersAddedSuccess'));
+      
+      let msg = `تمت إضافة ${addedCount} معلم بنجاح.`;
+      if (skippedIds.length > 0) {
+        msg += `\n⚠️ تم تخطي الأرقام التالية لأنها مسجلة مسبقاً ولا يسمح بتكرارها:\n${skippedIds.join(', ')}`;
+      }
+      alert(msg);
     } catch (err) {
       console.error(err);
       alert(t('adminDashboard.bulkUploadError'));
@@ -497,20 +518,37 @@ function ManageStudents({ schoolId }) {
     const qStudents = query(collection(db, 'students'), where('schoolId', '==', schoolId));
     const qClasses = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
 
-    const unsubStudents = onSnapshot(qStudents, (snap) => {
+    const unsubStudents = onSnapshot(qStudents, async (snap) => {
       const raw = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const unique = [];
-      const seen = new Set();
+      const seen = new Map();
+      const duplicatesToDelete = [];
+
       for (const s of raw) {
         const nid = (s.nationalId || s.id || '').trim();
         if (!seen.has(nid)) {
-          seen.add(nid);
+          seen.set(nid, s);
           unique.push({
             ...s,
             class: s.class || s.className || ''
           });
+        } else {
+          // Found duplicate document in database for the same national ID
+          duplicatesToDelete.push(s.id);
         }
       }
+
+      // Automatically clean up duplicate documents from Firestore
+      if (duplicatesToDelete.length > 0) {
+        for (const dupId of duplicatesToDelete) {
+          try {
+            await deleteDoc(doc(db, 'students', dupId));
+          } catch (e) {
+            console.warn("Auto cleanup duplicate student error:", e);
+          }
+        }
+      }
+
       setStudents(unique);
     });
     const unsubClasses = onSnapshot(qClasses, (snap) => {
@@ -528,12 +566,12 @@ function ManageStudents({ schoolId }) {
     if (!sName || !nid || !sClass) return;
     setIsSaving(true);
     try {
-      // Check for duplicates
+      // Strict check: No duplicate national IDs allowed anywhere in system
       const uCheck = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
       const sCheck = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
       const tCheck = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
       if (!uCheck.empty || !sCheck.empty || !tCheck.empty) {
-        alert('رقم الهوية مسجل مسبقاً في النظام. لا يمكن إضافة نفس الرقم أكثر من مرة.');
+        alert('عذراً: رقم الهوية هذا مسجل مسبقاً في النظام. لا يمكن تسجيل نفس الرقم نهائياً!');
         setIsSaving(false);
         return;
       }
@@ -562,6 +600,9 @@ function ManageStudents({ schoolId }) {
     
     try {
       const lines = bulkData.trim().split('\n');
+      let addedCount = 0;
+      let skippedIds = [];
+
       for (let line of lines) {
         const parts = line.split(/[\t,]/).map(s => s.trim());
         if (parts.length >= 2) {
@@ -570,34 +611,35 @@ function ManageStudents({ schoolId }) {
           const sClass = parts[2] || '';
           
           if (sId && sName) {
-            const fakeEmail = `${sId}@school.local`;
-            const existingS = await getDocs(query(collection(db, 'students'), where('nationalId', '==', sId)));
-            if (!existingS.empty) {
-              await updateDoc(doc(db, 'students', existingS.docs[0].id), {
-                name: sName, class: sClass, className: sClass, schoolId
-              });
-            } else {
-              await addDoc(collection(db, 'students'), {
-                name: sName, nationalId: sId, email: fakeEmail, class: sClass, className: sClass, role: 'student', schoolId, createdAt: new Date()
-              });
+            // Strict duplicate check across entire database
+            const uCheck = await getDocs(query(collection(db, 'users'), where('nationalId', '==', sId)));
+            const sCheck = await getDocs(query(collection(db, 'students'), where('nationalId', '==', sId)));
+            const tCheck = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', sId)));
+            
+            if (!uCheck.empty || !sCheck.empty || !tCheck.empty) {
+              skippedIds.push(sId);
+              continue;
             }
 
-            const existingU = await getDocs(query(collection(db, 'users'), where('nationalId', '==', sId)));
-            if (!existingU.empty) {
-              await updateDoc(doc(db, 'users', existingU.docs[0].id), {
-                name: sName, class: sClass, className: sClass, schoolId, role: 'student'
-              });
-            } else {
-              await addDoc(collection(db, 'users'), {
-                nationalId: sId, email: fakeEmail, role: 'student', name: sName, class: sClass, className: sClass, schoolId
-              });
-            }
+            const fakeEmail = `${sId}@school.local`;
+            await addDoc(collection(db, 'students'), {
+              name: sName, nationalId: sId, email: fakeEmail, class: sClass, className: sClass, role: 'student', schoolId, createdAt: new Date()
+            });
+            await addDoc(collection(db, 'users'), {
+              nationalId: sId, email: fakeEmail, role: 'student', name: sName, class: sClass, className: sClass, schoolId
+            });
+            addedCount++;
           }
         }
       }
       setIsBulkAdding(false);
       setBulkData('');
-      alert(t('adminDashboard.studentsAddedSuccess'));
+      
+      let msg = `تمت إضافة ${addedCount} طالب بنجاح.`;
+      if (skippedIds.length > 0) {
+        msg += `\n⚠️ تم تخطي الأرقام التالية لأنها مسجلة مسبقاً ولا يسمح بتكرارها:\n${skippedIds.join(', ')}`;
+      }
+      alert(msg);
     } catch (err) {
       console.error(err);
       alert(t('adminDashboard.bulkUploadError'));
