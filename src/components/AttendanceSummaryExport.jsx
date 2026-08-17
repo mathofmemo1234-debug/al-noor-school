@@ -434,15 +434,31 @@ export default function AttendanceSummaryExport({ schoolId }) {
         {/* Printable Header (Visible only when printing) */}
         <div className="only-print" style={{ display: 'none', borderBottom: '2px solid #0e7490', paddingBottom: '16px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ margin: 0, color: '#0e7490', fontSize: '20px' }}>مجمع المدارس المتقدمة للتعلم الذكي</h2>
-              <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#475569' }}>
-                تقرير ملخص غياب وحضور الطلاب • تم الاستخراج بتاريخ: {new Date().toLocaleDateString('ar-SA')}
+            <div style={{ textAlign: 'right', fontSize: '12px', lineHeight: '1.6' }}>
+              <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#0e7490' }}>المملكة العربية السعودية - وزارة التعليم</div>
+              <div>الإدارة العامة للتعليم بمنطقة مكة المكرمة</div>
+              <div style={{ fontWeight: 'bold' }}>{userData?.schoolName || 'مجمع المدارس المتقدمة للتعلم الذكي'}</div>
+            </div>
+
+            <div style={{ textAlign: 'center' }}>
+              <img
+                src={`${import.meta.env.BASE_URL}minst.svg`}
+                alt="وزارة التعليم - Ministry of Education"
+                style={{ maxHeight: '65px', maxWidth: '140px', objectFit: 'contain', display: 'block', margin: '0 auto 4px auto' }}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                }}
+              />
+              <h2 style={{ margin: 0, color: '#0e7490', fontSize: '17px' }}>تقرير ملخص غياب وحضور الطلاب</h2>
+              <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#475569' }}>
+                تاريخ الاستخراج: {new Date().toLocaleDateString('ar-SA')}
               </p>
             </div>
+
             <div style={{ textAlign: 'left', fontSize: '12px', color: '#64748b' }}>
-              <div>المستخرج: {userData?.name || 'الإدارة المدرسية'}</div>
-              <div>الدور: {userData?.roleTitle || (userData?.role === 'admin' ? 'مدير المدرسة' : 'المعلم')}</div>
+              <div><strong>المستخرج:</strong> {userData?.name || 'الإدارة المدرسية'}</div>
+              <div><strong>الصفة:</strong> {userData?.roleTitle || (userData?.role === 'admin' ? 'مدير المدرسة' : 'المعلم')}</div>
             </div>
           </div>
 

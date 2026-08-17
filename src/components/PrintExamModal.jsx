@@ -389,9 +389,9 @@ export default function PrintExamModal({
 
               <div style={{ textAlign: 'center' }}>
                 <img
-                  src={logoUrl}
-                  alt="School Logo"
-                  style={{ maxHeight: '75px', maxWidth: '160px', objectFit: 'contain' }}
+                  src={`${import.meta.env.BASE_URL}minst.svg`}
+                  alt="وزارة التعليم - Ministry of Education"
+                  style={{ maxHeight: '80px', maxWidth: '175px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
                   onError={(e) => {
                     e.target.onerror = null;
                     e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;

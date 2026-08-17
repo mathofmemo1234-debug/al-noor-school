@@ -136,7 +136,16 @@ export default function PrintLessonPreparationModal({ prep, onClose }) {
             </div>
 
             <div style={{ textAlign: 'center' }}>
-              <h2 style={{ margin: '0 0 4px 0', color: '#0e7490', fontSize: '18px' }}>
+              <img
+                src={`${import.meta.env.BASE_URL}minst.svg`}
+                alt="وزارة التعليم - Ministry of Education"
+                style={{ maxHeight: '70px', maxWidth: '150px', objectFit: 'contain', display: 'block', margin: '0 auto 6px auto' }}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                }}
+              />
+              <h2 style={{ margin: '0 0 4px 0', color: '#0e7490', fontSize: '17px' }}>
                 بطاقة وخطة تحضير الدرس اليومي
               </h2>
               <div style={{ fontSize: '12px', color: '#64748b' }}>

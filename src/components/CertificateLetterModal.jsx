@@ -268,27 +268,23 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
               <div style={{ fontSize: '11px', color: '#64748b' }}>الرقم الوزاري المعتمد: 441029</div>
             </div>
 
-            {/* Center: Official Emblem */}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-                width: '72px',
-                height: '72px',
-                margin: '0 auto 8px auto',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, rgba(99, 178, 198, 0.2), rgba(14, 116, 144, 0.1))',
-                border: '2px solid #0e7490',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#0e7490',
-                fontWeight: 'bold',
-                fontSize: '24px'
-              }}>
-                <Building size={36} color="#0e7490" />
-              </div>
-              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0e7490', letterSpacing: '1px' }}>
-                MINISTRY OF EDUCATION
-              </div>
+            {/* Center: Official Ministry Logo */}
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <img
+                src={`${import.meta.env.BASE_URL}minst.svg`}
+                alt="وزارة التعليم - Ministry of Education"
+                style={{
+                  maxHeight: '82px',
+                  maxWidth: '175px',
+                  objectFit: 'contain',
+                  display: 'block',
+                  margin: '0 auto'
+                }}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                }}
+              />
             </div>
 
             {/* Left Side: Letter Metadata */}
