@@ -11,6 +11,7 @@ import LessonPreparation from './LessonPreparation';
 import MaterialsUpload from './MaterialsUpload';
 import TeacherExams from './TeacherExams';
 import TeacherExcellence from './TeacherExcellence';
+import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import { useLanguage } from '../contexts/LanguageContext';
 
 function TeacherTasks() {
@@ -474,7 +475,9 @@ function Assignments() {
 }
 
 function Attendance() {
+  const { userData } = useAuth();
   const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState('record'); // 'record' | 'summary'
   const [classesList, setClassesList] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [students, setStudents] = useState([]);
@@ -558,86 +561,125 @@ function Attendance() {
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2>{t('teacherDashboard.attendanceRecord')} {today}</h2>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <select 
-            className="input-field" 
-            style={{ width: '200px', marginBottom: 0 }}
-            value={selectedClass} 
-            onChange={(e) => setSelectedClass(e.target.value)}
-          >
-            <option value="">{t('teacherDashboard.selectClass')}</option>
-            {classesList.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-          <button className="btn btn-primary" onClick={handleSaveAttendance} disabled={isSaving || !selectedClass}>
-            <Save size={18} /> {isSaving ? t('teacherDashboard.saving') : t('teacherDashboard.saveRecord')}
-          </button>
-        </div>
+    <div>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <button
+          onClick={() => setActiveTab('record')}
+          className="btn"
+          style={{
+            background: activeTab === 'record' ? 'var(--color-primary-dark)' : 'white',
+            color: activeTab === 'record' ? 'white' : 'var(--color-primary-dark)',
+            border: '1px solid var(--color-border)',
+            fontWeight: 'bold',
+            borderRadius: '10px',
+            padding: '10px 20px',
+            cursor: 'pointer'
+          }}
+        >
+          📝 {t('teacherDashboard.attendanceRecord')}
+        </button>
+        <button
+          onClick={() => setActiveTab('summary')}
+          className="btn"
+          style={{
+            background: activeTab === 'summary' ? 'var(--color-primary-dark)' : 'white',
+            color: activeTab === 'summary' ? 'white' : 'var(--color-primary-dark)',
+            border: '1px solid var(--color-border)',
+            fontWeight: 'bold',
+            borderRadius: '10px',
+            padding: '10px 20px',
+            cursor: 'pointer'
+          }}
+        >
+          📊 ملخص وتصدير تقرير الغياب (Excel / PDF)
+        </button>
       </div>
-      
-      {!selectedClass ? (
-        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-          {t('teacherDashboard.pleaseSelectClassAttendance')}
-        </p>
-      ) : students.length === 0 ? (
-        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
-          {t('teacherDashboard.noStudentsClass')}
-        </p>
+
+      {activeTab === 'summary' ? (
+        <AttendanceSummaryExport schoolId={userData?.schoolId} />
       ) : (
-        <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-              <tr>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>{t('teacherDashboard.studentName')}</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>{t('teacherDashboard.present')}</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>{t('teacherDashboard.absent')}</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>{t('teacherDashboard.late')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map(student => (
-                <tr key={student.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '12px 16px', fontWeight: '500' }}>
-                    {student.name}
-                    <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--color-primary-dark)', background: 'rgba(99, 178, 198, 0.15)', padding: '2px 8px', borderRadius: '10px', marginInlineStart: '8px' }}>
-                      {student.class || student.className || selectedClass}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                    <input 
-                      type="radio" 
-                      name={`status_${student.id}`} 
-                      checked={attendanceRecords[student.id] === 'present'}
-                      onChange={() => handleStatusChange(student.id, 'present')}
-                      style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
-                    />
-                  </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                    <input 
-                      type="radio" 
-                      name={`status_${student.id}`} 
-                      checked={attendanceRecords[student.id] === 'absent'}
-                      onChange={() => handleStatusChange(student.id, 'absent')}
-                      style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
-                    />
-                  </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                    <input 
-                      type="radio" 
-                      name={`status_${student.id}`} 
-                      checked={attendanceRecords[student.id] === 'late'}
-                      onChange={() => handleStatusChange(student.id, 'late')}
-                      style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="glass-panel" style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <h2>{t('teacherDashboard.attendanceRecord')} {today}</h2>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <select 
+                className="input-field" 
+                style={{ width: '200px', marginBottom: 0 }}
+                value={selectedClass} 
+                onChange={(e) => setSelectedClass(e.target.value)}
+              >
+                <option value="">{t('teacherDashboard.selectClass')}</option>
+                {classesList.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <button className="btn btn-primary" onClick={handleSaveAttendance} disabled={isSaving || !selectedClass}>
+                <Save size={18} /> {isSaving ? t('teacherDashboard.saving') : t('teacherDashboard.saveRecord')}
+              </button>
+            </div>
+          </div>
+          
+          {!selectedClass ? (
+            <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
+              {t('teacherDashboard.pleaseSelectClassAttendance')}
+            </p>
+          ) : students.length === 0 ? (
+            <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '40px' }}>
+              {t('teacherDashboard.noStudentsClass')}
+            </p>
+          ) : (
+            <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  <tr>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>{t('teacherDashboard.studentName')}</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>{t('teacherDashboard.present')}</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>{t('teacherDashboard.absent')}</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>{t('teacherDashboard.late')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map(student => (
+                    <tr key={student.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '12px 16px', fontWeight: '500' }}>
+                        {student.name}
+                        <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--color-primary-dark)', background: 'rgba(99, 178, 198, 0.15)', padding: '2px 8px', borderRadius: '10px', marginInlineStart: '8px' }}>
+                          {student.class || student.className || selectedClass}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <input 
+                          type="radio" 
+                          name={`status_${student.id}`} 
+                          checked={attendanceRecords[student.id] === 'present'}
+                          onChange={() => handleStatusChange(student.id, 'present')}
+                          style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                        />
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <input 
+                          type="radio" 
+                          name={`status_${student.id}`} 
+                          checked={attendanceRecords[student.id] === 'absent'}
+                          onChange={() => handleStatusChange(student.id, 'absent')}
+                          style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                        />
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <input 
+                          type="radio" 
+                          name={`status_${student.id}`} 
+                          checked={attendanceRecords[student.id] === 'late'}
+                          onChange={() => handleStatusChange(student.id, 'late')}
+                          style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

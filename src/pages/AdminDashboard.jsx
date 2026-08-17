@@ -11,6 +11,7 @@ import WeeklyPlanView from '../components/WeeklyPlanView';
 import SchoolSettings from './SchoolSettings';
 import AdminExcellence from './AdminExcellence';
 import ManageStaff from './ManageStaff';
+import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import { useLanguage } from '../contexts/LanguageContext';
 
 function AdminHome({ schoolId }) {
@@ -1501,6 +1502,7 @@ export default function AdminDashboard() {
         <Route path="/students" element={<ManageStudents schoolId={userData?.schoolId} />} />
         <Route path="/classes" element={<ManageClasses schoolId={userData?.schoolId} />} />
         <Route path="/schedule" element={<ManageSchedules schoolId={userData?.schoolId} />} />
+        <Route path="/attendance" element={<AttendanceSummaryExport schoolId={userData?.schoolId} />} />
         <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />
         <Route path="/weekly-plan" element={<WeeklyPlanView schoolId={userData?.schoolId} />} />
         <Route path="/excellence" element={<AdminExcellence schoolId={userData?.schoolId} />} />

@@ -28,6 +28,7 @@ export default function Sidebar({ role }) {
     { path: '/admin/students', icon: Users, label: t('sidebar.students') },
     { path: '/admin/classes', icon: BookOpen, label: t('sidebar.classes') },
     { path: '/admin/schedule', icon: Calendar, label: t('sidebar.schedule') },
+    { path: '/admin/attendance', icon: CheckSquare, label: t('sidebar.attendance') },
     { path: '/admin/preparations', icon: BookOpen, label: t('sidebar.preparations') },
     { path: '/admin/weekly-plan', icon: BookOpen, label: t('sidebar.weeklyPlan') },
     { path: '/admin/excellence', icon: Star, label: t('sidebar.files') },
@@ -40,11 +41,11 @@ export default function Sidebar({ role }) {
 
   const staffLinks = [
     { path: '/staff', icon: Home, label: t('sidebar.overview') },
+    ...(userPerms.includes('attendance') ? [{ path: '/staff/attendance', icon: CheckSquare, label: t('sidebar.attendance') }] : []),
     ...(userPerms.includes('preparations') ? [{ path: '/staff/preparations', icon: BookOpen, label: t('sidebar.preparations') }] : []),
     ...(userPerms.includes('weekly_plans') ? [{ path: '/staff/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') }] : []),
     ...(userPerms.includes('schedules') ? [{ path: '/staff/schedule', icon: Calendar, label: t('sidebar.schedule') }] : []),
     ...(userPerms.includes('students') ? [{ path: '/staff/students', icon: Users, label: t('sidebar.students') }] : []),
-    ...(userPerms.includes('attendance') ? [{ path: '/staff/attendance', icon: CheckSquare, label: t('sidebar.attendance') }] : []),
     ...(userPerms.includes('teachers') ? [{ path: '/staff/teachers', icon: Users, label: t('sidebar.teachers') }] : []),
     ...(userPerms.includes('classes') ? [{ path: '/staff/classes', icon: BookOpen, label: t('sidebar.classes') }] : []),
     ...(userPerms.includes('excellence') ? [{ path: '/staff/excellence', icon: Star, label: t('sidebar.files') }] : []),
@@ -53,6 +54,7 @@ export default function Sidebar({ role }) {
 
   const supervisorLinks = [
     { path: '/supervisor', icon: Home, label: t('sidebar.overview') },
+    { path: '/supervisor/attendance', icon: CheckSquare, label: t('sidebar.attendance') },
     { path: '/supervisor/preparations', icon: BookOpen, label: t('sidebar.preparations') },
     { path: '/supervisor/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
     { path: '/supervisor/schedule', icon: Calendar, label: t('sidebar.schedule') },

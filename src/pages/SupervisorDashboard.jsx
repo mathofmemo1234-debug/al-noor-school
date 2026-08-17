@@ -11,6 +11,7 @@ import WeeklyPlanView from '../components/WeeklyPlanView';
 import ManageSchedules from './ManageSchedules';
 import AdminExcellence from './AdminExcellence';
 import SchoolSettings from './SchoolSettings';
+import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 
 function SupervisorHome({ schoolId }) {
   const { userData } = useAuth();
@@ -255,6 +256,7 @@ export default function SupervisorDashboard() {
     <Layout role="supervisor" title="لوحة تحكم المشرف التعليمي">
       <Routes>
         <Route path="/" element={<SupervisorHome schoolId={userData?.schoolId} />} />
+        <Route path="/attendance" element={<AttendanceSummaryExport schoolId={userData?.schoolId} />} />
         <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />
         <Route path="/weekly-plan" element={<WeeklyPlanView schoolId={userData?.schoolId} />} />
         <Route path="/schedule" element={<ManageSchedules schoolId={userData?.schoolId} />} />

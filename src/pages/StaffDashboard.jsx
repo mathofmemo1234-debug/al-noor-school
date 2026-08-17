@@ -12,6 +12,7 @@ import ManageSchedules from './ManageSchedules';
 import AdminExcellence from './AdminExcellence';
 import SchoolSettings from './SchoolSettings';
 import TeacherDashboard from './TeacherDashboard';
+import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 
 function StaffHome({ schoolId }) {
   const { userData } = useAuth();
@@ -227,10 +228,10 @@ function StaffHome({ schoolId }) {
             <div className="glass-panel" style={{ padding: '20px', borderRadius: '12px', background: 'white', border: '1px solid #e2e8f0', transition: 'all 0.2s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: '0 0 6px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckSquare size={20} color="var(--color-primary)" /> رصد ومتابعة الحضور والغياب
+                  <CheckSquare size={20} color="var(--color-primary)" /> ملخص وتصدير غياب وحضور الطلاب
                 </h3>
                 <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                  متابعة كشوفات الغياب اليومي للطلاب
+                  البحث بالاسم أو الهوية أو التاريخ وتصدير كشف الغياب (Excel / PDF)
                 </p>
               </div>
               <ArrowIcon size={20} color="var(--color-primary)" />
@@ -396,7 +397,7 @@ export default function StaffDashboard() {
           <Route path="/students" element={<StaffStudentsView schoolId={userData?.schoolId} />} />
         )}
         {userPerms.includes('attendance') && (
-          <Route path="/attendance" element={<StaffStudentsView schoolId={userData?.schoolId} />} />
+          <Route path="/attendance" element={<AttendanceSummaryExport schoolId={userData?.schoolId} />} />
         )}
         {userPerms.includes('excellence') && (
           <Route path="/excellence" element={<AdminExcellence schoolId={userData?.schoolId} />} />
