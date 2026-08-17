@@ -295,7 +295,7 @@ function StaffTeachersView({ schoolId }) {
           teachers.map(tData => (
             <div key={tData.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   {tData.name}
                   <span style={{ 
                     fontSize: '13px', 
@@ -306,6 +306,17 @@ function StaffTeachersView({ schoolId }) {
                     borderRadius: '12px' 
                   }}>
                     {tData.subject || 'غير محدد'}
+                  </span>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#0e7490',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    padding: '2px 8px',
+                    borderRadius: '10px'
+                  }}>
+                    🌐 {tData.nationality || 'سعودي'}
                   </span>
                 </h3>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>
@@ -400,7 +411,7 @@ function StaffStudentsView({ schoolId }) {
           students.map(s => (
             <div key={s.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   {s.name}
                   <span style={{ 
                     fontSize: '13px', 
@@ -411,6 +422,17 @@ function StaffStudentsView({ schoolId }) {
                     borderRadius: '12px' 
                   }}>
                     {s.class || s.className || 'غير محدد'}
+                  </span>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#0e7490',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    padding: '2px 8px',
+                    borderRadius: '10px'
+                  }}>
+                    🌐 {s.nationality || 'سعودي'}
                   </span>
                 </h3>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>

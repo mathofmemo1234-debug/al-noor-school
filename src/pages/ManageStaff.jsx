@@ -4,6 +4,7 @@ import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, que
 import { Users, UserPlus, X, Edit, Trash2, Shield, ShieldCheck, CheckSquare, Square, Phone, Award, Star, BookOpen, Calendar, CheckCircle, FileText } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import CertificateLetterModal from '../components/CertificateLetterModal';
+import NationalitySelect from '../components/NationalitySelect';
 
 export const ALL_PERMISSIONS = [
   { id: 'preparations', label: 'متابعة تحضير الدروس', icon: BookOpen, desc: 'الاطلاع على تحضير المعلمين والتقييم التربوي' },
@@ -70,6 +71,7 @@ export default function ManageStaff({ schoolId }) {
   // Form State
   const [name, setName] = useState('');
   const [nationalId, setNationalId] = useState('');
+  const [nationality, setNationality] = useState('سعودي');
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
   const [customRoleTitle, setCustomRoleTitle] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState(ROLE_PRESETS[0].defaultPermissions);
@@ -172,6 +174,7 @@ export default function ManageStaff({ schoolId }) {
       }
 
       const fakeEmail = `${nid}@school.local`;
+      const sNat = nationality.trim() || 'سعودي';
       const staffData = {
         name: sName,
         nationalId: nid,
@@ -180,6 +183,7 @@ export default function ManageStaff({ schoolId }) {
         roleCategory: preset.category,
         permissions: selectedPermissions,
         whatsapp: sWhatsapp,
+        nationality: sNat,
         role: 'staff',
         schoolId,
         createdAt: new Date()
@@ -193,6 +197,7 @@ export default function ManageStaff({ schoolId }) {
         name: sName,
         roleTitle: finalRoleTitle,
         permissions: selectedPermissions,
+        nationality: sNat,
         schoolId
       });
 
@@ -200,6 +205,7 @@ export default function ManageStaff({ schoolId }) {
       setName('');
       setNationalId('');
       setWhatsapp('');
+      setNationality('سعودي');
       setCustomRoleTitle('');
       setSelectedPresetIndex(0);
       setSelectedPermissions(ROLE_PRESETS[0].defaultPermissions);
@@ -248,11 +254,13 @@ export default function ManageStaff({ schoolId }) {
       const updatedName = editingStaffInfo.name?.trim() || '';
       const updatedRoleTitle = editingStaffInfo.roleTitle?.trim() || '';
       const updatedWhatsapp = editingStaffInfo.whatsapp?.trim() || '';
+      const updatedNat = editingStaffInfo.nationality?.trim() || 'سعودي';
 
       await updateDoc(doc(db, 'staff', editingStaffInfo.id), {
         name: updatedName,
         roleTitle: updatedRoleTitle,
-        whatsapp: updatedWhatsapp
+        whatsapp: updatedWhatsapp,
+        nationality: updatedNat
       });
 
       if (editingStaffInfo.nationalId) {
@@ -260,7 +268,8 @@ export default function ManageStaff({ schoolId }) {
         uSnap.forEach(async (d) => {
           await updateDoc(doc(db, 'users', d.id), {
             name: updatedName,
-            roleTitle: updatedRoleTitle
+            roleTitle: updatedRoleTitle,
+            nationality: updatedNat
           });
         });
       }
@@ -467,6 +476,17 @@ export default function ManageStaff({ schoolId }) {
                     }}>
                       {staff.roleTitle || 'عضو كادر'}
                     </span>
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#0e7490',
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      padding: '2px 8px',
+                      borderRadius: '10px'
+                    }}>
+                      🌐 {staff.nationality || 'سعودي'}
+                    </span>
                   </div>
 
                   <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: 'var(--color-text-muted)' }}>
@@ -584,6 +604,8 @@ export default function ManageStaff({ schoolId }) {
                 <label style={{ display: 'block', marginBottom: '6px', color: 'var(--color-text-muted)', fontWeight: 'bold' }}>رقم الهوية الوطنية</label>
                 <input type="text" className="input-field" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="10xxxxxxxx" required />
               </div>
+
+              <NationalitySelect value={nationality} onChange={setNationality} required />
 
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', color: 'var(--color-text-muted)', fontWeight: 'bold' }}>المسمى الوظيفي / الدور</label>
@@ -834,6 +856,10 @@ export default function ManageStaff({ schoolId }) {
                 <label style={{ display: 'block', marginBottom: '6px', color: 'var(--color-text-muted)' }}>الاسم</label>
                 <input type="text" className="input-field" value={editingStaffInfo.name} onChange={e => setEditingStaffInfo({ ...editingStaffInfo, name: e.target.value })} required />
               </div>
+              <NationalitySelect 
+                value={editingStaffInfo.nationality || 'سعودي'} 
+                onChange={val => setEditingStaffInfo({ ...editingStaffInfo, nationality: val })} 
+              />
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', color: 'var(--color-text-muted)' }}>المسمى الوظيفي / الدور</label>
                 <input type="text" className="input-field" value={editingStaffInfo.roleTitle} onChange={e => setEditingStaffInfo({ ...editingStaffInfo, roleTitle: e.target.value })} required />

@@ -15,6 +15,7 @@ import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import CertificateLetterModal from '../components/CertificateLetterModal';
 import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
+import NationalitySelect from '../components/NationalitySelect';
 import { useLanguage } from '../contexts/LanguageContext';
 
 function AdminHome({ schoolId }) {
@@ -233,6 +234,7 @@ function ManageTeachers({ schoolId }) {
   const [name, setName] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [subject, setSubject] = useState('');
+  const [nationality, setNationality] = useState('سعودي');
   const [isSaving, setIsSaving] = useState(false);
 
   // Bulk Add
@@ -293,14 +295,15 @@ function ManageTeachers({ schoolId }) {
       }
 
       const fakeEmail = `${nid}@school.local`;
+      const tNat = nationality.trim() || 'سعودي';
       await addDoc(collection(db, 'teachers'), {
-        name: tName, nationalId: nid, email: fakeEmail, subject: tSubj, role: 'teacher', schoolId, createdAt: new Date()
+        name: tName, nationalId: nid, email: fakeEmail, subject: tSubj, nationality: tNat, role: 'teacher', schoolId, createdAt: new Date()
       });
       await addDoc(collection(db, 'users'), {
-        nationalId: nid, email: fakeEmail, role: 'teacher', name: tName, schoolId
+        nationalId: nid, email: fakeEmail, role: 'teacher', name: tName, nationality: tNat, schoolId
       });
       setIsAdding(false);
-      setName(''); setNationalId(''); setSubject('');
+      setName(''); setNationalId(''); setSubject(''); setNationality('سعودي');
     } catch (err) {
       console.error(err);
       alert(t('adminDashboard.saveError'));
@@ -387,11 +390,13 @@ function ManageTeachers({ schoolId }) {
       const updatedName = editingTeacher.name?.trim() || '';
       const updatedSubj = editingTeacher.subject?.trim() || '';
       const updatedWhatsapp = editingTeacher.whatsapp?.trim() || '';
+      const updatedNat = editingTeacher.nationality?.trim() || 'سعودي';
 
       await updateDoc(doc(db, 'teachers', editingTeacher.id), {
         name: updatedName,
         subject: updatedSubj,
-        whatsapp: updatedWhatsapp
+        whatsapp: updatedWhatsapp,
+        nationality: updatedNat
       });
 
       if (editingTeacher.nationalId) {
@@ -401,14 +406,16 @@ function ManageTeachers({ schoolId }) {
             await updateDoc(doc(db, 'teachers', d.id), {
               name: updatedName,
               subject: updatedSubj,
-              whatsapp: updatedWhatsapp
+              whatsapp: updatedWhatsapp,
+              nationality: updatedNat
             });
           }
         });
 
         const snap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', editingTeacher.nationalId)));
         snap.forEach(async (d) => await updateDoc(doc(db, 'users', d.id), {
-          name: updatedName
+          name: updatedName,
+          nationality: updatedNat
         }));
       }
 
@@ -442,7 +449,7 @@ function ManageTeachers({ schoolId }) {
           teachers.map(tData => (
             <div key={tData.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   {tData.name}
                   <span style={{ 
                     fontSize: '13px', 
@@ -453,6 +460,17 @@ function ManageTeachers({ schoolId }) {
                     borderRadius: '12px' 
                   }}>
                     {tData.subject || 'غير محدد'}
+                  </span>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#0e7490',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    padding: '2px 8px',
+                    borderRadius: '10px'
+                  }}>
+                    🌐 {tData.nationality || 'سعودي'}
                   </span>
                 </h3>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>
@@ -490,7 +508,7 @@ function ManageTeachers({ schoolId }) {
 
       {isAdding && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '420px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.addNewTeacher')}</h3>
             <form onSubmit={handleSaveSingle} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -502,6 +520,7 @@ function ManageTeachers({ schoolId }) {
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalId')}</label>
                 <input type="text" className="input-field" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="10xxxxxxxx" required />
               </div>
+              <NationalitySelect value={nationality} onChange={setNationality} required />
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.subject')}</label>
                 <input type="text" className="input-field" value={subject} onChange={e => setSubject(e.target.value)} placeholder={t('adminDashboard.subjectPlaceholder')} required />
@@ -514,7 +533,7 @@ function ManageTeachers({ schoolId }) {
 
       {editingTeacher && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '420px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setEditingTeacher(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.editTeacherTitle')}</h3>
             <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -522,6 +541,10 @@ function ManageTeachers({ schoolId }) {
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.teacherName')}</label>
                 <input type="text" className="input-field" value={editingTeacher.name} onChange={e => setEditingTeacher({...editingTeacher, name: e.target.value})} placeholder={t('adminDashboard.fullNamePlaceholder')} required />
               </div>
+              <NationalitySelect 
+                value={editingTeacher.nationality || 'سعودي'} 
+                onChange={val => setEditingTeacher({...editingTeacher, nationality: val})} 
+              />
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.subject')}</label>
                 <input type="text" className="input-field" value={editingTeacher.subject} onChange={e => setEditingTeacher({...editingTeacher, subject: e.target.value})} placeholder={t('adminDashboard.subjectPlaceholder')} required />
@@ -581,6 +604,7 @@ function ManageSupervisors({ schoolId }) {
   const [nationalId, setNationalId] = useState('');
   const [specialty, setSpecialty] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [nationality, setNationality] = useState('سعودي');
   const [isSaving, setIsSaving] = useState(false);
 
   // Permissions State
@@ -669,6 +693,7 @@ function ManageSupervisors({ schoolId }) {
     const sName = name.trim();
     const sSpec = specialty.trim();
     const sWhatsapp = whatsapp.trim();
+    const sNat = nationality.trim() || 'سعودي';
     if (!sName || !nid) return;
     setIsSaving(true);
     try {
@@ -684,13 +709,13 @@ function ManageSupervisors({ schoolId }) {
 
       const fakeEmail = `${nid}@school.local`;
       await addDoc(collection(db, 'supervisors'), {
-        name: sName, nationalId: nid, email: fakeEmail, specialty: sSpec, whatsapp: sWhatsapp, role: 'supervisor', schoolId, createdAt: new Date()
+        name: sName, nationalId: nid, email: fakeEmail, specialty: sSpec, whatsapp: sWhatsapp, nationality: sNat, role: 'supervisor', schoolId, createdAt: new Date()
       });
       await addDoc(collection(db, 'users'), {
-        nationalId: nid, email: fakeEmail, role: 'supervisor', name: sName, specialty: sSpec, schoolId
+        nationalId: nid, email: fakeEmail, role: 'supervisor', name: sName, specialty: sSpec, nationality: sNat, schoolId
       });
       setIsAdding(false);
-      setName(''); setNationalId(''); setSpecialty(''); setWhatsapp('');
+      setName(''); setNationalId(''); setSpecialty(''); setWhatsapp(''); setNationality('سعودي');
     } catch (err) {
       console.error(err);
       alert(t('adminDashboard.saveError'));
@@ -777,11 +802,13 @@ function ManageSupervisors({ schoolId }) {
       const updatedName = editingSupervisor.name?.trim() || '';
       const updatedSpec = editingSupervisor.specialty?.trim() || '';
       const updatedWhatsapp = editingSupervisor.whatsapp?.trim() || '';
+      const updatedNat = editingSupervisor.nationality?.trim() || 'سعودي';
 
       await updateDoc(doc(db, 'supervisors', editingSupervisor.id), {
         name: updatedName,
         specialty: updatedSpec,
-        whatsapp: updatedWhatsapp
+        whatsapp: updatedWhatsapp,
+        nationality: updatedNat
       });
 
       if (editingSupervisor.nationalId) {
@@ -791,7 +818,8 @@ function ManageSupervisors({ schoolId }) {
             await updateDoc(doc(db, 'supervisors', d.id), {
               name: updatedName,
               specialty: updatedSpec,
-              whatsapp: updatedWhatsapp
+              whatsapp: updatedWhatsapp,
+              nationality: updatedNat
             });
           }
         });
@@ -799,7 +827,8 @@ function ManageSupervisors({ schoolId }) {
         const snap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', editingSupervisor.nationalId)));
         snap.forEach(async (d) => await updateDoc(doc(db, 'users', d.id), {
           name: updatedName,
-          specialty: updatedSpec
+          specialty: updatedSpec,
+          nationality: updatedNat
         }));
       }
 
@@ -833,7 +862,7 @@ function ManageSupervisors({ schoolId }) {
           supervisors.map(sup => (
             <div key={sup.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   {sup.name}
                   <span style={{ 
                     fontSize: '13px', 
@@ -844,6 +873,17 @@ function ManageSupervisors({ schoolId }) {
                     borderRadius: '12px' 
                   }}>
                     {sup.specialty || 'إشراف عام'}
+                  </span>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#0e7490',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    padding: '2px 8px',
+                    borderRadius: '10px'
+                  }}>
+                    🌐 {sup.nationality || 'سعودي'}
                   </span>
                 </h3>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>
@@ -867,6 +907,7 @@ function ManageSupervisors({ schoolId }) {
                     gap: '6px',
                     cursor: 'pointer'
                   }}
+                  title={t('adminDashboard.editPermissions')}
                 >
                   <ShieldCheck size={15} /> {t('adminDashboard.editPermissions')}
                 </button>
@@ -961,7 +1002,7 @@ function ManageSupervisors({ schoolId }) {
 
       {isAdding && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '420px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.addNewSupervisor')}</h3>
             <form onSubmit={handleSaveSingle} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -973,6 +1014,7 @@ function ManageSupervisors({ schoolId }) {
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalId')}</label>
                 <input type="text" className="input-field" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="10xxxxxxxx" required />
               </div>
+              <NationalitySelect value={nationality} onChange={setNationality} required />
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.specialty')}</label>
                 <input type="text" className="input-field" value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder={t('adminDashboard.specialtyPlaceholder')} />
@@ -989,7 +1031,7 @@ function ManageSupervisors({ schoolId }) {
 
       {editingSupervisor && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '420px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setEditingSupervisor(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.editSupervisorTitle')}</h3>
             <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -997,6 +1039,10 @@ function ManageSupervisors({ schoolId }) {
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.supervisorName')}</label>
                 <input type="text" className="input-field" value={editingSupervisor.name} onChange={e => setEditingSupervisor({...editingSupervisor, name: e.target.value})} required />
               </div>
+              <NationalitySelect 
+                value={editingSupervisor.nationality || 'سعودي'} 
+                onChange={val => setEditingSupervisor({...editingSupervisor, nationality: val})} 
+              />
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.specialty')}</label>
                 <input type="text" className="input-field" value={editingSupervisor.specialty || ''} onChange={e => setEditingSupervisor({...editingSupervisor, specialty: e.target.value})} />
@@ -1056,6 +1102,7 @@ function ManageStudents({ schoolId }) {
   const [name, setName] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [studentClass, setStudentClass] = useState('');
+  const [nationality, setNationality] = useState('سعودي');
   const [isSaving, setIsSaving] = useState(false);
 
   // Bulk Add
@@ -1111,6 +1158,7 @@ function ManageStudents({ schoolId }) {
     const nid = nationalId.trim();
     const sName = name.trim();
     const sClass = studentClass.trim();
+    const sNat = nationality.trim() || 'سعودي';
     if (!sName || !nid || !sClass) return;
     setIsSaving(true);
     try {
@@ -1126,13 +1174,13 @@ function ManageStudents({ schoolId }) {
 
       const fakeEmail = `${nid}@school.local`;
       await addDoc(collection(db, 'students'), {
-        name: sName, nationalId: nid, email: fakeEmail, class: sClass, className: sClass, role: 'student', schoolId, createdAt: new Date()
+        name: sName, nationalId: nid, email: fakeEmail, class: sClass, className: sClass, nationality: sNat, role: 'student', schoolId, createdAt: new Date()
       });
       await addDoc(collection(db, 'users'), {
-        nationalId: nid, email: fakeEmail, role: 'student', name: sName, class: sClass, className: sClass, schoolId
+        nationalId: nid, email: fakeEmail, role: 'student', name: sName, class: sClass, className: sClass, nationality: sNat, schoolId
       });
       setIsAdding(false);
-      setName(''); setNationalId(''); setStudentClass('');
+      setName(''); setNationalId(''); setStudentClass(''); setNationality('سعودي');
     } catch (err) {
       console.error(err);
       alert(t('adminDashboard.saveError'));
@@ -1218,11 +1266,13 @@ function ManageStudents({ schoolId }) {
     try {
       const updatedName = editingStudent.name?.trim() || '';
       const updatedClass = editingStudent.class?.trim() || '';
+      const updatedNat = editingStudent.nationality?.trim() || 'سعودي';
 
       await updateDoc(doc(db, 'students', editingStudent.id), {
         name: updatedName,
         class: updatedClass,
-        className: updatedClass
+        className: updatedClass,
+        nationality: updatedNat
       });
 
       if (editingStudent.nationalId) {
@@ -1232,7 +1282,8 @@ function ManageStudents({ schoolId }) {
             await updateDoc(doc(db, 'students', d.id), {
               name: updatedName,
               class: updatedClass,
-              className: updatedClass
+              className: updatedClass,
+              nationality: updatedNat
             });
           }
         });
@@ -1241,7 +1292,8 @@ function ManageStudents({ schoolId }) {
         snap.forEach(async (d) => await updateDoc(doc(db, 'users', d.id), {
           name: updatedName,
           class: updatedClass,
-          className: updatedClass
+          className: updatedClass,
+          nationality: updatedNat
         }));
       }
 
@@ -1282,7 +1334,7 @@ function ManageStudents({ schoolId }) {
           students.map(s => (
             <div key={s.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   {s.name}
                   <span style={{ 
                     fontSize: '13px', 
@@ -1293,6 +1345,17 @@ function ManageStudents({ schoolId }) {
                     borderRadius: '12px' 
                   }}>
                     {s.class || s.className || 'غير محدد'}
+                  </span>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#0e7490',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    padding: '2px 8px',
+                    borderRadius: '10px'
+                  }}>
+                    🌐 {s.nationality || 'سعودي'}
                   </span>
                 </h3>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>
@@ -1330,7 +1393,7 @@ function ManageStudents({ schoolId }) {
 
       {isAdding && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '420px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.registerNewStudentTitle')}</h3>
             <form onSubmit={handleSaveSingle} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1342,6 +1405,7 @@ function ManageStudents({ schoolId }) {
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalId')}</label>
                 <input type="text" className="input-field" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="10xxxxxxxx" required />
               </div>
+              <NationalitySelect value={nationality} onChange={setNationality} required />
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.class')}</label>
                 <select className="input-field" value={studentClass} onChange={e => setStudentClass(e.target.value)} required>
@@ -1359,7 +1423,7 @@ function ManageStudents({ schoolId }) {
 
       {editingStudent && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '420px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setEditingStudent(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
             <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.editStudentTitle')}</h3>
             <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1367,6 +1431,10 @@ function ManageStudents({ schoolId }) {
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.studentName')}</label>
                 <input type="text" className="input-field" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} placeholder={t('adminDashboard.fullNamePlaceholder')} required />
               </div>
+              <NationalitySelect 
+                value={editingStudent.nationality || 'سعودي'} 
+                onChange={val => setEditingStudent({...editingStudent, nationality: val})} 
+              />
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.class')}</label>
                 <select className="input-field" value={editingStudent.class} onChange={e => setEditingStudent({...editingStudent, class: e.target.value})} required>

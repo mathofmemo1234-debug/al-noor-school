@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Printer, X, ShieldCheck, Download, Award, Building, FileText, UserCheck, Calendar, Hash } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import NationalitySelect from './NationalitySelect';
 
 /**
  * CertificateLetterModal
@@ -19,6 +20,7 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
   const [purpose, setPurpose] = useState('تقديمها للجهات الرسمية المعنية');
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
   const [schoolYear, setSchoolYear] = useState('1447 / 1448 هـ - 2026 م');
+  const [nationality, setNationality] = useState(person.nationality || 'سعودي');
 
   if (!person) return null;
 
@@ -192,6 +194,14 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
               />
             </div>
 
+            <div style={{ minWidth: '160px' }}>
+              <NationalitySelect
+                value={nationality}
+                onChange={setNationality}
+                label="الجنسية:"
+              />
+            </div>
+
             {type !== 'student' && (
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginTop: '22px', cursor: 'pointer' }}>
@@ -351,7 +361,7 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
               <>
                 تشهد إدارة <strong>{schoolName}</strong> بأن الطالب: 
                 <span style={{ fontSize: '17px', fontWeight: 'bold', color: '#0e7490', margin: '0 6px' }}>{person.name}</span>
-                ، سعودي الجنسية / مقيم بموجب هوية وطنية / إقامة رقم (<strong>{person.nationalId}</strong>)، 
+                ، {nationality ? `${nationality} الجنسية` : 'سعودي الجنسية'}، بموجب الهوية الوطنية / الإقامة رقم (<strong>{person.nationalId}</strong>)، 
                 مقيد ومنتظم بالدراسة لدينا في <strong>{person.class || person.className || 'المرحلة المحددة'}</strong> 
                 خلال العام الدراسي <strong>{schoolYear}</strong>، وما زال مستمراً في دراسته حتى تاريخه.
               </>
@@ -359,7 +369,7 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
               <>
                 تشهد إدارة <strong>{schoolName}</strong> بأن الأستاذ / المعلم: 
                 <span style={{ fontSize: '17px', fontWeight: 'bold', color: '#0e7490', margin: '0 6px' }}>{person.name}</span>
-                ، بموجب السجل المدني رقم (<strong>{person.nationalId}</strong>)، 
+                ، {nationality ? `${nationality} الجنسية` : 'سعودي الجنسية'}، بموجب السجل المدني / الإقامة رقم (<strong>{person.nationalId}</strong>)، 
                 يعمل لدينا كمعلم لمادة <strong>{person.subject || 'التعليم العام'}</strong> 
                 وعلى رأس العمل حتى تاريخ تحرير هذا الخطاب.
                 {includeSalary && salaryAmount && (
@@ -370,7 +380,7 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
               <>
                 تشهد إدارة <strong>{schoolName}</strong> بأن الموظف / عضو الكادر: 
                 <span style={{ fontSize: '17px', fontWeight: 'bold', color: '#0e7490', margin: '0 6px' }}>{person.name}</span>
-                ، بموجب السجل المدني رقم (<strong>{person.nationalId}</strong>)، 
+                ، {nationality ? `${nationality} الجنسية` : 'سعودي الجنسية'}، بموجب السجل المدني / الإقامة رقم (<strong>{person.nationalId}</strong>)، 
                 يعمل لدينا بمسؤولية / وظيفة <strong>{person.roleTitle || person.specialty || 'كادر إداري'}</strong> 
                 وعلى رأس العمل للعام الدراسي <strong>{schoolYear}</strong>.
                 {includeSalary && salaryAmount && (

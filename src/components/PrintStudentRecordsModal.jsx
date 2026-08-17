@@ -33,11 +33,12 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
 
   const handleExportCSV = () => {
     if (filteredStudents.length === 0) return;
-    const headers = ['م', 'اسم الطالب', 'رقم الهوية', 'الصف الدراسي', 'رقم ولي الأمر / واتساب'];
+    const headers = ['م', 'اسم الطالب', 'رقم الهوية', 'الجنسية', 'الصف الدراسي', 'رقم ولي الأمر / واتساب'];
     const rows = filteredStudents.map((s, idx) => [
       idx + 1,
       `"${s.name || ''}"`,
       `"${s.nationalId || ''}"`,
+      `"${s.nationality || 'سعودي'}"`,
       `"${s.class || s.className || ''}"`,
       `"${s.parentPhone || s.whatsapp || ''}"`
     ]);
@@ -302,6 +303,7 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
                     <th style={{ padding: '10px 12px', color: '#0e7490', width: '40px' }}>#</th>
                     <th style={{ padding: '10px 12px', color: '#0e7490' }}>اسم الطالب الرباعي</th>
                     <th style={{ padding: '10px 12px', color: '#0e7490' }}>رقم الهوية الوطنية</th>
+                    <th style={{ padding: '10px 12px', color: '#0e7490' }}>الجنسية</th>
                     <th style={{ padding: '10px 12px', color: '#0e7490' }}>الصف الدراسي</th>
                     <th style={{ padding: '10px 12px', color: '#0e7490' }}>رقم ولي الأمر / واتساب</th>
                     <th style={{ padding: '10px 12px', color: '#0e7490', textAlign: 'center' }}>ملاحظات القيد</th>
@@ -310,7 +312,7 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
                 <tbody>
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
                         لا توجد سجلات مطابقة للبحث
                       </td>
                     </tr>
@@ -320,6 +322,7 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
                         <td style={{ padding: '10px 12px', fontWeight: 'bold', color: '#64748b' }}>{idx + 1}</td>
                         <td style={{ padding: '10px 12px', fontWeight: '700', color: '#0f172a' }}>{student.name}</td>
                         <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: '#334155' }}>{student.nationalId}</td>
+                        <td style={{ padding: '10px 12px', color: '#0e7490', fontWeight: '600' }}>{student.nationality || 'سعودي'}</td>
                         <td style={{ padding: '10px 12px' }}>
                           <span style={{ background: 'rgba(99, 178, 198, 0.15)', color: '#0e7490', padding: '2px 8px', borderRadius: '6px', fontWeight: '600' }}>
                             {student.class || student.className || '—'}
@@ -350,6 +353,7 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
                   </div>
                   <div style={{ fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#334155' }}>
                     <div><strong>الهوية:</strong> {student.nationalId}</div>
+                    <div><strong>الجنسية:</strong> {student.nationality || 'سعودي'}</div>
                     <div><strong>الصف:</strong> {student.class || student.className || '—'}</div>
                     <div><strong>رقم ولي الأمر:</strong> {student.parentPhone || student.whatsapp || '—'}</div>
                     <div><strong>حالة القيد:</strong> <span style={{ color: '#16a34a', fontWeight: 'bold' }}>منتظم بالدراسة</span></div>
