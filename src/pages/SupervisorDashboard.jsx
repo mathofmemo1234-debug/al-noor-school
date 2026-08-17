@@ -12,6 +12,7 @@ import ManageSchedules from './ManageSchedules';
 import AdminExcellence from './AdminExcellence';
 import SchoolSettings from './SchoolSettings';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
+import NoorIntegrationHub from '../components/NoorIntegrationHub';
 
 function SupervisorHome({ schoolId }) {
   const { userData } = useAuth();
@@ -262,6 +263,7 @@ export default function SupervisorDashboard() {
         <Route path="/schedule" element={<ManageSchedules schoolId={userData?.schoolId} />} />
         <Route path="/teachers" element={<SupervisorTeachers schoolId={userData?.schoolId} />} />
         <Route path="/excellence" element={<AdminExcellence schoolId={userData?.schoolId} />} />
+        <Route path="/noor" element={<NoorIntegrationHub schoolId={userData?.schoolId} />} />
         <Route path="/settings" element={<SchoolSettings schoolId={userData?.schoolId} />} />
         <Route path="*" element={<SupervisorHome schoolId={userData?.schoolId} />} />
       </Routes>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Users, BookOpen, UserPlus, X, Edit, Trash2, ShieldCheck, UserCheck } from 'lucide-react';
+import { Users, BookOpen, UserPlus, X, Edit, Trash2, ShieldCheck, UserCheck, Printer, FileText, Globe } from 'lucide-react';
 import ManageSchedules from './ManageSchedules';
 import { db } from '../firebase';
 import { collection, addDoc, setDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
@@ -12,6 +12,9 @@ import SchoolSettings from './SchoolSettings';
 import AdminExcellence from './AdminExcellence';
 import ManageStaff from './ManageStaff';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
+import CertificateLetterModal from '../components/CertificateLetterModal';
+import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
+import NoorIntegrationHub from '../components/NoorIntegrationHub';
 import { useLanguage } from '../contexts/LanguageContext';
 
 function AdminHome({ schoolId }) {
@@ -224,6 +227,7 @@ function ManageTeachers({ schoolId }) {
   const [isAdding, setIsAdding] = useState(false);
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState(null);
+  const [printingLetterTeacher, setPrintingLetterTeacher] = useState(null);
   
   // Single Add
   const [name, setName] = useState('');
@@ -455,9 +459,29 @@ function ManageTeachers({ schoolId }) {
                   {t('adminDashboard.nationalIdLabel')}{tData.nationalId} {tData.whatsapp ? `• ${t('adminDashboard.whatsappLabel')}${tData.whatsapp}` : ''}
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setEditingTeacher(tData)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
-                <button onClick={() => handleDelete(tData.id, tData.nationalId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4f' }}><Trash2 size={20} /></button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setPrintingLetterTeacher(tData)}
+                  className="btn"
+                  style={{
+                    background: '#f0fdf4',
+                    color: '#166534',
+                    border: '1px solid #bbf7d0',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                  title="طباعة مشهد تعريف معلم"
+                >
+                  <FileText size={15} /> مشهد تعريف
+                </button>
+                <button onClick={() => setEditingTeacher(tData)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: 'var(--color-primary)', padding: '6px', display: 'flex', alignItems: 'center' }}><Edit size={16} /></button>
+                <button onClick={() => handleDelete(tData.id, tData.nationalId)} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#ff4d4f', padding: '6px', display: 'flex', alignItems: 'center' }}><Trash2 size={16} /></button>
               </div>
             </div>
           ))
@@ -536,6 +560,10 @@ function ManageTeachers({ schoolId }) {
           </div>
         </div>
       )}
+
+      {printingLetterTeacher && (
+        <CertificateLetterModal person={printingLetterTeacher} type="teacher" onClose={() => setPrintingLetterTeacher(null)} />
+      )}
     </div>
   );
 }
@@ -546,6 +574,7 @@ function ManageSupervisors({ schoolId }) {
   const [isAdding, setIsAdding] = useState(false);
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [editingSupervisor, setEditingSupervisor] = useState(null);
+  const [printingLetterSupervisor, setPrintingLetterSupervisor] = useState(null);
   
   // Single Add
   const [name, setName] = useState('');
@@ -841,6 +870,26 @@ function ManageSupervisors({ schoolId }) {
                 >
                   <ShieldCheck size={15} /> {t('adminDashboard.editPermissions')}
                 </button>
+                <button
+                  onClick={() => setPrintingLetterSupervisor(sup)}
+                  className="btn"
+                  style={{
+                    background: '#f0fdf4',
+                    color: '#166534',
+                    border: '1px solid #bbf7d0',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                  title="طباعة خطاب تعريف مشرف"
+                >
+                  <FileText size={15} /> خطاب تعريف
+                </button>
                 <button onClick={() => setEditingSupervisor(sup)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: '#0e7490', padding: '6px', display: 'flex', alignItems: 'center' }}><Edit size={16} /></button>
                 <button onClick={() => handleDelete(sup.id, sup.nationalId)} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#dc2626', padding: '6px', display: 'flex', alignItems: 'center' }}><Trash2 size={16} /></button>
               </div>
@@ -985,6 +1034,10 @@ function ManageSupervisors({ schoolId }) {
           </div>
         </div>
       )}
+
+      {printingLetterSupervisor && (
+        <CertificateLetterModal person={printingLetterSupervisor} type="supervisor" onClose={() => setPrintingLetterSupervisor(null)} />
+      )}
     </div>
   );
 }
@@ -996,6 +1049,8 @@ function ManageStudents({ schoolId }) {
   const [isAdding, setIsAdding] = useState(false);
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [printingLetterStudent, setPrintingLetterStudent] = useState(null);
+  const [isPrintingStudentRecords, setIsPrintingStudentRecords] = useState(false);
   
   // Single Add
   const [name, setName] = useState('');
@@ -1201,9 +1256,16 @@ function ManageStudents({ schoolId }) {
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <h2>{t('adminDashboard.manageStudentsTitle')}</h2>
-        <div style={{display: 'flex', gap: '10px'}}>
+        <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+          <button 
+            className="btn" 
+            style={{background: 'linear-gradient(135deg, #0e7490, #63B2C6)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold'}} 
+            onClick={() => setIsPrintingStudentRecords(true)}
+          >
+            <Printer size={16} /> طباعة وسجل قيد الطلاب
+          </button>
           <button className="btn" style={{background: 'var(--color-surface)', color: 'var(--color-primary-dark)', border: '1px solid var(--color-border)'}} onClick={() => setIsBulkAdding(true)}>
             {t('adminDashboard.bulkUpload')}
           </button>
@@ -1237,9 +1299,29 @@ function ManageStudents({ schoolId }) {
                   {t('adminDashboard.nationalIdLabel')}{s.nationalId}
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setEditingStudent(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
-                <button onClick={() => handleDelete(s.id, s.nationalId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4f' }}><Trash2 size={20} /></button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setPrintingLetterStudent(s)}
+                  className="btn"
+                  style={{
+                    background: '#f0fdf4',
+                    color: '#166534',
+                    border: '1px solid #bbf7d0',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                  title="طباعة شهادة تعريف طالب"
+                >
+                  <FileText size={15} /> شهادة تعريف
+                </button>
+                <button onClick={() => setEditingStudent(s)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: 'var(--color-primary)', padding: '6px', display: 'flex', alignItems: 'center' }}><Edit size={16} /></button>
+                <button onClick={() => handleDelete(s.id, s.nationalId)} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#ff4d4f', padding: '6px', display: 'flex', alignItems: 'center' }}><Trash2 size={16} /></button>
               </div>
             </div>
           ))
@@ -1323,6 +1405,14 @@ function ManageStudents({ schoolId }) {
             </form>
           </div>
         </div>
+      )}
+
+      {printingLetterStudent && (
+        <CertificateLetterModal person={printingLetterStudent} type="student" onClose={() => setPrintingLetterStudent(null)} />
+      )}
+
+      {isPrintingStudentRecords && (
+        <PrintStudentRecordsModal students={students} classesList={classesList} onClose={() => setIsPrintingStudentRecords(false)} />
       )}
     </div>
   );
@@ -1506,6 +1596,7 @@ export default function AdminDashboard() {
         <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />
         <Route path="/weekly-plan" element={<WeeklyPlanView schoolId={userData?.schoolId} />} />
         <Route path="/excellence" element={<AdminExcellence schoolId={userData?.schoolId} />} />
+        <Route path="/noor" element={<NoorIntegrationHub schoolId={userData?.schoolId} />} />
         <Route path="/settings" element={<SchoolSettings schoolId={userData?.schoolId} />} />
         <Route path="*" element={<AdminHome schoolId={userData?.schoolId} />} />
       </Routes>

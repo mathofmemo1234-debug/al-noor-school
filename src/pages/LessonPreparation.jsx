@@ -3,10 +3,11 @@ import { db, auth, storage } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import MarkdownViewer from '../components/MarkdownViewer';
-import { Save, UploadCloud, Eye, Edit, Trash2, X, Image as ImageIcon, Loader } from 'lucide-react';
+import { Save, UploadCloud, Eye, Edit, Trash2, X, Image as ImageIcon, Loader, Printer } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import MarkdownInput from '../components/MarkdownInput';
 import { useLanguage } from '../contexts/LanguageContext';
+import PrintLessonPreparationModal from '../components/PrintLessonPreparationModal';
 
 const DEFAULT_PERIODS = [
   'الحصة 1',
@@ -34,6 +35,7 @@ export default function LessonPreparation() {
   const [activeTab, setActiveTab] = useState('form'); // 'form' | 'list'
   const [allPreparations, setAllPreparations] = useState([]);
   const [previewPrep, setPreviewPrep] = useState(null);
+  const [printingPrep, setPrintingPrep] = useState(null);
 
   // New States
   const [weeks] = useState(Array.from({length: 18}, (_, i) => `الأسبوع ${i + 1}`));
@@ -494,6 +496,9 @@ export default function LessonPreparation() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn" style={{ padding: '8px', background: '#0e7490', color: 'white' }} onClick={() => setPrintingPrep(p)} title="طباعة التحضير (PDF)">
+                      <Printer size={20} />
+                    </button>
                     <button className="btn" style={{ padding: '8px', background: '#e0f2fe', color: '#0284c7' }} onClick={() => setPreviewPrep(p)} title={t('lessonPreparation.preview')}>
                       <Eye size={20} />
                     </button>
@@ -525,9 +530,18 @@ export default function LessonPreparation() {
               <h2 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>
                 {t('lessonPreparation.previewPrep')} {previewPrep.subject} - {previewPrep.className}
               </h2>
-              <button className="btn" style={{ padding: '8px', background: 'transparent' }} onClick={() => setPreviewPrep(null)}>
-                <X size={24} color="#64748b" />
-              </button>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button
+                  className="btn btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '13px', background: 'linear-gradient(135deg, #0e7490, #63B2C6)' }}
+                  onClick={() => setPrintingPrep(previewPrep)}
+                >
+                  <Printer size={16} /> طباعة التحضير (PDF)
+                </button>
+                <button className="btn" style={{ padding: '8px', background: 'transparent' }} onClick={() => setPreviewPrep(null)}>
+                  <X size={24} color="#64748b" />
+                </button>
+              </div>
             </div>
             <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
@@ -568,6 +582,10 @@ export default function LessonPreparation() {
             </div>
           </div>
         </div>
+      )}
+
+      {printingPrep && (
+        <PrintLessonPreparationModal prep={printingPrep} onClose={() => setPrintingPrep(null)} />
       )}
     </div>
   );

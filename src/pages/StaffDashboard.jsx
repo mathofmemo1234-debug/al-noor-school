@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { BookOpen, Calendar, Users, Star, CheckSquare, ShieldCheck, ArrowLeft, ArrowRight, Settings } from 'lucide-react';
+import { BookOpen, Calendar, Users, Star, CheckSquare, ShieldCheck, ArrowLeft, ArrowRight, Settings, FileText, Printer, Globe } from 'lucide-react';
 import AdminPreparations from './AdminPreparations';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import ManageSchedules from './ManageSchedules';
@@ -13,6 +13,9 @@ import AdminExcellence from './AdminExcellence';
 import SchoolSettings from './SchoolSettings';
 import TeacherDashboard from './TeacherDashboard';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
+import CertificateLetterModal from '../components/CertificateLetterModal';
+import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
+import NoorIntegrationHub from '../components/NoorIntegrationHub';
 
 function StaffHome({ schoolId }) {
   const { userData } = useAuth();
@@ -261,6 +264,7 @@ function StaffHome({ schoolId }) {
 
 function StaffTeachersView({ schoolId }) {
   const [teachers, setTeachers] = useState([]);
+  const [printingLetterTeacher, setPrintingLetterTeacher] = useState(null);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -308,16 +312,45 @@ function StaffTeachersView({ schoolId }) {
                   رقم الهوية: {tData.nationalId} {tData.whatsapp ? `• واتساب: ${tData.whatsapp}` : ''}
                 </p>
               </div>
+              <div>
+                <button
+                  onClick={() => setPrintingLetterTeacher(tData)}
+                  className="btn"
+                  style={{
+                    background: '#f0fdf4',
+                    color: '#166534',
+                    border: '1px solid #bbf7d0',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                  title="طباعة مشهد تعريف معلم"
+                >
+                  <FileText size={15} /> مشهد تعريف
+                </button>
+              </div>
             </div>
           ))
         )}
       </div>
+
+      {printingLetterTeacher && (
+        <CertificateLetterModal person={printingLetterTeacher} type="teacher" onClose={() => setPrintingLetterTeacher(null)} />
+      )}
     </div>
   );
 }
 
 function StaffStudentsView({ schoolId }) {
   const [students, setStudents] = useState([]);
+  const [classesList, setClassesList] = useState([]);
+  const [printingLetterStudent, setPrintingLetterStudent] = useState(null);
+  const [isPrintingStudentRecords, setIsPrintingStudentRecords] = useState(false);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -335,12 +368,31 @@ function StaffStudentsView({ schoolId }) {
       });
       setStudents(list);
     });
-    return () => unsub();
+
+    const qCls = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+    const unsubCls = onSnapshot(qCls, (snap) => {
+      setClassesList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => {
+      unsub();
+      unsubCls();
+    };
   }, [schoolId]);
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <h2 style={{ marginBottom: '20px', color: 'var(--color-primary-dark)' }}>سجلات وقوائم الطلاب</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+        <h2 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>سجلات وقوائم الطلاب</h2>
+        <button 
+          className="btn" 
+          style={{background: 'linear-gradient(135deg, #0e7490, #63B2C6)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold'}} 
+          onClick={() => setIsPrintingStudentRecords(true)}
+        >
+          <Printer size={16} /> طباعة وسجل قيد الطلاب
+        </button>
+      </div>
+
       <div style={{ display: 'grid', gap: '12px' }}>
         {students.length === 0 ? (
           <p style={{ color: 'var(--color-text-muted)' }}>لا يوجد طلاب مسجلون حالياً</p>
@@ -365,10 +417,40 @@ function StaffStudentsView({ schoolId }) {
                   رقم الهوية: {s.nationalId}
                 </p>
               </div>
+              <div>
+                <button
+                  onClick={() => setPrintingLetterStudent(s)}
+                  className="btn"
+                  style={{
+                    background: '#f0fdf4',
+                    color: '#166534',
+                    border: '1px solid #bbf7d0',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                  title="طباعة شهادة تعريف طالب"
+                >
+                  <FileText size={15} /> شهادة تعريف
+                </button>
+              </div>
             </div>
           ))
         )}
       </div>
+
+      {printingLetterStudent && (
+        <CertificateLetterModal person={printingLetterStudent} type="student" onClose={() => setPrintingLetterStudent(null)} />
+      )}
+
+      {isPrintingStudentRecords && (
+        <PrintStudentRecordsModal students={students} classesList={classesList} onClose={() => setIsPrintingStudentRecords(false)} />
+      )}
     </div>
   );
 }
@@ -402,6 +484,7 @@ export default function StaffDashboard() {
         {userPerms.includes('excellence') && (
           <Route path="/excellence" element={<AdminExcellence schoolId={userData?.schoolId} />} />
         )}
+        <Route path="/noor" element={<NoorIntegrationHub schoolId={userData?.schoolId} />} />
         <Route path="/settings" element={<SchoolSettings schoolId={userData?.schoolId} />} />
         <Route path="*" element={<StaffHome schoolId={userData?.schoolId} />} />
       </Routes>

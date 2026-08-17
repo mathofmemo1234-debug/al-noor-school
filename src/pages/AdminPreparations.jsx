@@ -3,6 +3,8 @@ import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import MarkdownViewer from '../components/MarkdownViewer';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Printer } from 'lucide-react';
+import PrintLessonPreparationModal from '../components/PrintLessonPreparationModal';
 
 export default function AdminPreparations({ schoolId }) {
   const { t } = useLanguage();
@@ -11,6 +13,7 @@ export default function AdminPreparations({ schoolId }) {
   const [teachersList, setTeachersList] = useState({});
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState('');
+  const [printingPrep, setPrintingPrep] = useState(null);
 
   // Fetch classes with fallback
   useEffect(() => {
@@ -113,11 +116,29 @@ export default function AdminPreparations({ schoolId }) {
                     {t('adminPreparations.teacherPrefix')} {p.teacherName || teachersList[p.teacherId] || teachersList[p.teacherNationalId] || p.teacherEmail}
                   </div>
                 </div>
-                <div style={{ textAlign: 'left' }}>
+                <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                  <button
+                    onClick={() => setPrintingPrep(p)}
+                    className="btn btn-primary"
+                    style={{
+                      padding: '6px 14px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Printer size={15} /> طباعة التحضير (PDF)
+                  </button>
                   <div style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>{p.week || t('adminPreparations.week1')}</div>
                   <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{t('adminPreparations.datePrefix')} {p.date || '-'}</div>
                   <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{t('adminPreparations.periodPrefix')} {p.period || '-'}</div>
-                  <div style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '8px' }}>
+                  <div style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
                     {t('adminPreparations.updatedPrefix')} {p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('ar-EG') : '-'}
                   </div>
                 </div>
@@ -156,6 +177,10 @@ export default function AdminPreparations({ schoolId }) {
             </div>
           ))}
         </div>
+      )}
+
+      {printingPrep && (
+        <PrintLessonPreparationModal prep={printingPrep} onClose={() => setPrintingPrep(null)} />
       )}
     </div>
   );

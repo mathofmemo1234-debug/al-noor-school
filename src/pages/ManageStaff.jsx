@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
-import { Users, UserPlus, X, Edit, Trash2, Shield, ShieldCheck, CheckSquare, Square, Phone, Award, Star, BookOpen, Calendar, CheckCircle } from 'lucide-react';
+import { Users, UserPlus, X, Edit, Trash2, Shield, ShieldCheck, CheckSquare, Square, Phone, Award, Star, BookOpen, Calendar, CheckCircle, FileText } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import CertificateLetterModal from '../components/CertificateLetterModal';
 
 export const ALL_PERMISSIONS = [
   { id: 'preparations', label: 'متابعة تحضير الدروس', icon: BookOpen, desc: 'الاطلاع على تحضير المعلمين والتقييم التربوي' },
@@ -62,6 +63,7 @@ export default function ManageStaff({ schoolId }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingPermissionsStaff, setEditingPermissionsStaff] = useState(null);
   const [editingStaffInfo, setEditingStaffInfo] = useState(null);
+  const [printingLetterStaff, setPrintingLetterStaff] = useState(null);
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -502,6 +504,27 @@ export default function ManageStaff({ schoolId }) {
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <button
+                    onClick={() => setPrintingLetterStaff(staff)}
+                    className="btn"
+                    style={{
+                      background: '#f0fdf4',
+                      color: '#166534',
+                      border: '1px solid #bbf7d0',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer'
+                    }}
+                    title="طباعة خطاب تعريف موظف"
+                  >
+                    <FileText size={15} /> خطاب تعريف
+                  </button>
+
+                  <button
                     onClick={() => setEditingPermissionsStaff({ ...staff })}
                     className="btn"
                     style={{
@@ -852,6 +875,10 @@ export default function ManageStaff({ schoolId }) {
             </form>
           </div>
         </div>
+      )}
+
+      {printingLetterStaff && (
+        <CertificateLetterModal person={printingLetterStaff} type="staff" onClose={() => setPrintingLetterStaff(null)} />
       )}
     </div>
   );

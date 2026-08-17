@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare } from 'lucide-react';
+import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare, Globe } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,6 +32,7 @@ export default function Sidebar({ role }) {
     { path: '/admin/preparations', icon: BookOpen, label: t('sidebar.preparations') },
     { path: '/admin/weekly-plan', icon: BookOpen, label: t('sidebar.weeklyPlan') },
     { path: '/admin/excellence', icon: Star, label: t('sidebar.files') },
+    { path: '/admin/noor', icon: Globe, label: t('sidebar.noorSystem') },
     { path: '/admin/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
@@ -49,6 +50,7 @@ export default function Sidebar({ role }) {
     ...(userPerms.includes('teachers') ? [{ path: '/staff/teachers', icon: Users, label: t('sidebar.teachers') }] : []),
     ...(userPerms.includes('classes') ? [{ path: '/staff/classes', icon: BookOpen, label: t('sidebar.classes') }] : []),
     ...(userPerms.includes('excellence') ? [{ path: '/staff/excellence', icon: Star, label: t('sidebar.files') }] : []),
+    { path: '/staff/noor', icon: Globe, label: t('sidebar.noorSystem') },
     { path: '/staff/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
@@ -60,6 +62,7 @@ export default function Sidebar({ role }) {
     { path: '/supervisor/schedule', icon: Calendar, label: t('sidebar.schedule') },
     { path: '/supervisor/teachers', icon: Users, label: t('sidebar.teachers') },
     { path: '/supervisor/excellence', icon: Star, label: t('sidebar.files') },
+    { path: '/supervisor/noor', icon: Globe, label: t('sidebar.noorSystem') },
     { path: '/supervisor/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
