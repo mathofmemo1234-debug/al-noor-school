@@ -505,33 +505,37 @@ export default function ManageStaff({ schoolId }) {
                     onClick={() => setEditingPermissionsStaff({ ...staff })}
                     className="btn"
                     style={{
-                      background: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      color: 'var(--color-primary-dark)',
-                      padding: '6px 12px',
+                      background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+                      border: 'none',
+                      color: 'white',
+                      padding: '8px 14px',
                       fontSize: '13px',
+                      fontWeight: '700',
+                      borderRadius: '10px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px'
+                      gap: '6px',
+                      boxShadow: '0 2px 8px rgba(14, 116, 144, 0.25)',
+                      cursor: 'pointer'
                     }}
                   >
-                    <ShieldCheck size={16} /> إدارة الصلاحيات
+                    <ShieldCheck size={17} /> تعديل الصلاحيات
                   </button>
 
                   <button
                     onClick={() => setEditingStaffInfo({ ...staff })}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', padding: '6px' }}
+                    style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: '#0e7490', padding: '8px', display: 'flex', alignItems: 'center' }}
                     title="تعديل البيانات"
                   >
-                    <Edit size={18} />
+                    <Edit size={16} />
                   </button>
 
                   <button
                     onClick={() => handleDeleteStaff(staff.id, staff.nationalId, staff.name)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4f', padding: '6px' }}
+                    style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#dc2626', padding: '8px', display: 'flex', alignItems: 'center' }}
                     title="حذف"
                   >
-                    <Trash2 size={18} />
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>
@@ -543,7 +547,7 @@ export default function ManageStaff({ schoolId }) {
       {/* MODAL 1: Add New Staff Member */}
       {isAdding && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
-          <div className="glass-panel" style={{ width: '560px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '580px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', position: 'relative' }}>
             <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
             <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--color-primary-dark)' }}>إضافة عضو كادر إداري وتعيين الدور والصلاحيات</h3>
 
@@ -592,9 +596,28 @@ export default function ManageStaff({ schoolId }) {
 
               {/* Permissions Checkboxes Matrix */}
               <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'block', marginBottom: '10px', color: 'var(--color-primary-dark)', fontWeight: 'bold' }}>
-                  تحديد صلاحيات الوصول الممنوحة لهذا الحساب:
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                  <label style={{ color: 'var(--color-primary-dark)', fontWeight: 'bold' }}>
+                    تحديد صلاحيات الوصول الممنوحة لهذا الحساب:
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPermissions(ALL_PERMISSIONS.map(p => p.id))}
+                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', cursor: 'pointer' }}
+                    >
+                      توسيع (منح الكل)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPermissions([])}
+                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', cursor: 'pointer' }}
+                    >
+                      تقليص (سحب الكل)
+                    </button>
+                  </div>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
                   {ALL_PERMISSIONS.map(perm => {
                     const isChecked = selectedPermissions.includes(perm.id);
@@ -632,19 +655,99 @@ export default function ManageStaff({ schoolId }) {
         </div>
       )}
 
-      {/* MODAL 2: Edit Permissions */}
+      {/* MODAL 2: Edit Permissions (تعديل الصلاحيات - توسيع وتقليص) */}
       {editingPermissionsStaff && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
-          <div className="glass-panel" style={{ width: '560px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '600px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', position: 'relative' }}>
             <button onClick={() => setEditingPermissionsStaff(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
-            <h3 style={{ marginTop: 0, marginBottom: '6px', color: 'var(--color-primary-dark)' }}>
-              تعديل صلاحيات: {editingPermissionsStaff.name}
-            </h3>
-            <p style={{ margin: '0 0 16px 0', color: 'var(--color-text-muted)', fontSize: '13px' }}>
-              المسمى: <strong>{editingPermissionsStaff.roleTitle}</strong> • الهوية: {editingPermissionsStaff.nationalId}
-            </p>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+              <ShieldCheck size={26} color="#0e7490" />
+              <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>
+                تعديل الصلاحيات: {editingPermissionsStaff.name}
+              </h3>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                المسمى: <strong style={{ color: '#0e7490' }}>{editingPermissionsStaff.roleTitle}</strong> • الهوية: {editingPermissionsStaff.nationalId}
+              </span>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 'bold',
+                padding: '3px 10px',
+                borderRadius: '12px',
+                background: (editingPermissionsStaff.permissions || []).length > 0 ? '#dcfce7' : '#fee2e2',
+                color: (editingPermissionsStaff.permissions || []).length > 0 ? '#166534' : '#991b1b'
+              }}>
+                الصلاحيات المفعلة: {(editingPermissionsStaff.permissions || []).length} من {ALL_PERMISSIONS.length}
+              </span>
+            </div>
+
+            {/* Quick Actions: Expand & Reduce */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-muted)', marginBottom: '8px' }}>إجراءات سريعة لتوسيع أو تقليص الصلاحيات:</div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingPermissionsStaff({ ...editingPermissionsStaff, permissions: ALL_PERMISSIONS.map(p => p.id) })}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: '#f0fdf4',
+                    color: '#166534',
+                    border: '1px solid #bbf7d0',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ⚡ توسيع الصلاحيات (منح كافة الصلاحيات)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingPermissionsStaff({ ...editingPermissionsStaff, permissions: [] })}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: '#fef2f2',
+                    color: '#991b1b',
+                    border: '1px solid #fecaca',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🚫 تقليص الصلاحيات (سحب كافة الصلاحيات)
+                </button>
+              </div>
+
+              {/* Template shortcuts */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', alignSelf: 'center' }}>تطبيق نموذج:</span>
+                {ROLE_PRESETS.filter(p => p.category !== 'custom').map((p, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setEditingPermissionsStaff({ ...editingPermissionsStaff, permissions: [...p.defaultPermissions] })}
+                    style={{
+                      fontSize: '11px',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      background: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      color: 'var(--color-primary-dark)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {p.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Granular Permission Toggles */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px', marginBottom: '20px' }}>
               {ALL_PERMISSIONS.map(perm => {
                 const isChecked = (editingPermissionsStaff.permissions || []).includes(perm.id);
                 return (
@@ -657,13 +760,14 @@ export default function ManageStaff({ schoolId }) {
                       gap: '10px',
                       padding: '12px',
                       background: isChecked ? 'rgba(99, 178, 198, 0.15)' : 'white',
-                      border: isChecked ? '1px solid var(--color-primary)' : '1px solid #cbd5e1',
-                      borderRadius: '8px',
+                      border: isChecked ? '1.5px solid var(--color-primary)' : '1px solid #cbd5e1',
+                      borderRadius: '10px',
                       cursor: 'pointer',
-                      userSelect: 'none'
+                      userSelect: 'none',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    {isChecked ? <CheckSquare size={18} color="var(--color-primary)" /> : <Square size={18} color="#94a3b8" />}
+                    {isChecked ? <CheckSquare size={20} color="var(--color-primary)" /> : <Square size={20} color="#94a3b8" />}
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: isChecked ? 'bold' : 'normal', color: isChecked ? 'var(--color-primary-dark)' : 'var(--color-text)' }}>
                         {perm.label}
@@ -675,8 +779,21 @@ export default function ManageStaff({ schoolId }) {
               })}
             </div>
 
-            <button onClick={handleSavePermissions} className="btn btn-primary" disabled={isSaving} style={{ width: '100%' }}>
-              {isSaving ? 'جاري الحفظ...' : 'حفظ تعديلات الصلاحيات'}
+            <button
+              onClick={handleSavePermissions}
+              className="btn btn-primary"
+              disabled={isSaving}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+                border: 'none',
+                boxShadow: '0 4px 12px rgba(14, 116, 144, 0.3)'
+              }}
+            >
+              {isSaving ? 'جاري الحفظ والاعتماد...' : '✓ اعتماد وحفظ تعديلات الصلاحيات'}
             </button>
           </div>
         </div>

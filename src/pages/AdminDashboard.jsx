@@ -553,8 +553,51 @@ function ManageSupervisors({ schoolId }) {
   const [whatsapp, setWhatsapp] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Bulk Add
-  const [bulkData, setBulkData] = useState('');
+  // Permissions State
+  const [editingPermissionsSupervisor, setEditingPermissionsSupervisor] = useState(null);
+
+  const SUPERVISOR_ALL_PERMISSIONS = [
+    { id: 'preparations', label: 'متابعة تحضير الدروس', desc: 'الاطلاع على تحضير المعلمين والتقييم التربوي' },
+    { id: 'weekly_plans', label: 'متابعة الخطط الأسبوعية', desc: 'الاطلاع على الخطط الأسبوعية لجميع الفصول' },
+    { id: 'schedules', label: 'الجداول المدرسية', desc: 'الاطلاع على جداول الحصص والفصول والمعلمين' },
+    { id: 'teachers', label: 'دليل وكادر المعلمين', desc: 'استعراض بيانات وتخصصات المعلمين' },
+    { id: 'students', label: 'شؤون وسجلات الطلاب', desc: 'الاطلاع على بيانات وقوائم الطلاب' },
+    { id: 'attendance', label: 'متابعة الحضور والغياب', desc: 'الاطلاع على كشوفات الغياب والحضور' },
+    { id: 'excellence', label: 'ملفات التميز والتوثيق', desc: 'الاطلاع على الشواهد والملفات والتقارير' }
+  ];
+
+  const handleSaveSupervisorPermissions = async () => {
+    if (!editingPermissionsSupervisor) return;
+    setIsSaving(true);
+    try {
+      const updatedPermissions = editingPermissionsSupervisor.permissions || [];
+      await updateDoc(doc(db, 'supervisors', editingPermissionsSupervisor.id), {
+        permissions: updatedPermissions
+      });
+      if (editingPermissionsSupervisor.nationalId) {
+        const uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', editingPermissionsSupervisor.nationalId)));
+        uSnap.forEach(async (d) => {
+          await updateDoc(doc(db, 'users', d.id), {
+            permissions: updatedPermissions
+          });
+        });
+      }
+      alert('تم تحديث صلاحيات المشرف ' + editingPermissionsSupervisor.name + ' بنجاح!');
+      setEditingPermissionsSupervisor(null);
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تحديث الصلاحيات');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const toggleSupervisorPermission = (permId) => {
+    if (!editingPermissionsSupervisor) return;
+    const current = editingPermissionsSupervisor.permissions || ['preparations', 'weekly_plans', 'schedules', 'teachers', 'excellence'];
+    const updated = current.includes(permId) ? current.filter(p => p !== permId) : [...current, permId];
+    setEditingPermissionsSupervisor({ ...editingPermissionsSupervisor, permissions: updated });
+  };
   
   useEffect(() => {
     if (!schoolId) return;
@@ -777,14 +820,94 @@ function ManageSupervisors({ schoolId }) {
                   {t('adminDashboard.nationalIdLabel')}{sup.nationalId} {sup.whatsapp ? `• ${t('adminDashboard.whatsappLabel')}${sup.whatsapp}` : ''}
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setEditingSupervisor(sup)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
-                <button onClick={() => handleDelete(sup.id, sup.nationalId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4f' }}><Trash2 size={20} /></button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setEditingPermissionsSupervisor({ ...sup })}
+                  className="btn"
+                  style={{
+                    background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+                    border: 'none',
+                    color: 'white',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <ShieldCheck size={15} /> تعديل الصلاحيات
+                </button>
+                <button onClick={() => setEditingSupervisor(sup)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: '#0e7490', padding: '6px', display: 'flex', alignItems: 'center' }}><Edit size={16} /></button>
+                <button onClick={() => handleDelete(sup.id, sup.nationalId)} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#dc2626', padding: '6px', display: 'flex', alignItems: 'center' }}><Trash2 size={16} /></button>
               </div>
             </div>
           ))
         )}
       </div>
+
+      {/* Supervisor Edit Permissions Modal */}
+      {editingPermissionsSupervisor && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+          <div className="glass-panel" style={{ width: '560px', maxHeight: '90vh', overflowY: 'auto', padding: '24px', position: 'relative' }}>
+            <button onClick={() => setEditingPermissionsSupervisor(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <ShieldCheck size={24} color="#0e7490" />
+              <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>تعديل صلاحيات المشرف: {editingPermissionsSupervisor.name}</h3>
+            </div>
+            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--color-text-muted)' }}>
+              التخصص: <strong>{editingPermissionsSupervisor.specialty || 'إشراف عام'}</strong> • الهوية: {editingPermissionsSupervisor.nationalId}
+            </p>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setEditingPermissionsSupervisor({ ...editingPermissionsSupervisor, permissions: SUPERVISOR_ALL_PERMISSIONS.map(p => p.id) })}
+                style={{ padding: '6px 12px', borderRadius: '8px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                ⚡ توسيع الصلاحيات (منح الكل)
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingPermissionsSupervisor({ ...editingPermissionsSupervisor, permissions: [] })}
+                style={{ padding: '6px 12px', borderRadius: '8px', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                🚫 تقليص الصلاحيات (سحب الكل)
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+              {SUPERVISOR_ALL_PERMISSIONS.map(perm => {
+                const isChecked = (editingPermissionsSupervisor.permissions || ['preparations', 'weekly_plans', 'schedules', 'teachers', 'excellence']).includes(perm.id);
+                return (
+                  <div
+                    key={perm.id}
+                    onClick={() => toggleSupervisorPermission(perm.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px', padding: '12px',
+                      background: isChecked ? 'rgba(99, 178, 198, 0.15)' : 'white',
+                      border: isChecked ? '1.5px solid var(--color-primary)' : '1px solid #cbd5e1',
+                      borderRadius: '10px', cursor: 'pointer', userSelect: 'none'
+                    }}
+                  >
+                    <span style={{ fontSize: '16px' }}>{isChecked ? '☑' : '☐'}</span>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: isChecked ? 'bold' : 'normal', color: isChecked ? 'var(--color-primary-dark)' : 'var(--color-text)' }}>{perm.label}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{perm.desc}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button onClick={handleSaveSupervisorPermissions} className="btn btn-primary" disabled={isSaving} style={{ width: '100%', padding: '12px', fontWeight: 'bold', background: 'linear-gradient(135deg, #0e7490, #63B2C6)' }}>
+              {isSaving ? 'جاري الحفظ...' : '✓ اعتماد وحفظ تعديلات الصلاحيات'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {isAdding && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
