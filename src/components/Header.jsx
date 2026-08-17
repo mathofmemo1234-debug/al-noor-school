@@ -7,11 +7,22 @@ export default function Header({ title, role }) {
   const { currentUser, userRole, userData } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
   
-  // Format role for display
+  // Format role & extra info for display
   const effectiveRole = role || userRole;
+  
+  let extraDetail = '';
+  if (effectiveRole === 'student') {
+    const studentClass = userData?.class || userData?.className;
+    if (studentClass) extraDetail = studentClass;
+  } else if (effectiveRole === 'teacher') {
+    const teacherSubject = userData?.subject;
+    if (teacherSubject) extraDetail = teacherSubject;
+  }
+
   const displayRole = effectiveRole === 'superadmin' ? t('header.master') : 
                       effectiveRole === 'admin' ? (userData?.schoolName || t('header.schoolManager')) : 
-                      effectiveRole === 'teacher' ? t('header.teacher') : t('header.student');
+                      effectiveRole === 'teacher' ? (extraDetail ? `${t('header.teacher')} • ${extraDetail}` : t('header.teacher')) : 
+                      (extraDetail ? `${t('header.student')} • ${extraDetail}` : t('header.student'));
 
   const displayName = userData?.name || currentUser?.email?.split('@')[0] || t('header.user');
 
@@ -35,8 +46,24 @@ export default function Header({ title, role }) {
         </button>
         
         <div className="user-profile">
-          <div className="user-info" style={{ textAlign: 'left' }}>
-            <span className="user-name">{displayName}</span>
+          <div className="user-info" style={{ textAlign: 'start' }}>
+            <span className="user-name">
+              {displayName}
+              {extraDetail && (
+                <span style={{ 
+                  fontSize: '12px', 
+                  fontWeight: '600', 
+                  color: 'var(--color-primary-dark)', 
+                  background: 'rgba(99, 178, 198, 0.15)', 
+                  padding: '2px 8px', 
+                  borderRadius: '10px',
+                  marginInlineStart: '8px',
+                  display: 'inline-block'
+                }}>
+                  {extraDetail}
+                </span>
+              )}
+            </span>
             <span className="user-role">{displayRole}</span>
           </div>
           <div className="user-avatar">

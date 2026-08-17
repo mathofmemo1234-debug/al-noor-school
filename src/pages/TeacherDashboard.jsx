@@ -601,7 +601,12 @@ function Attendance() {
             <tbody>
               {students.map(student => (
                 <tr key={student.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '12px 16px', fontWeight: '500' }}>{student.name}</td>
+                  <td style={{ padding: '12px 16px', fontWeight: '500' }}>
+                    {student.name}
+                    <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--color-primary-dark)', background: 'rgba(99, 178, 198, 0.15)', padding: '2px 8px', borderRadius: '10px', marginInlineStart: '8px' }}>
+                      {student.class || student.className || selectedClass}
+                    </span>
+                  </td>
                   <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                     <input 
                       type="radio" 

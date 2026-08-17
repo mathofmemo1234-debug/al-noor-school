@@ -91,6 +91,33 @@ export function AuthProvider({ children }) {
       }
 
       if (data) {
+        // Enrich class for students and subject for teachers
+        if (data.role === 'student') {
+          try {
+            const sQ = query(collection(db, 'students'), where('nationalId', '==', nid));
+            const sSnap = await getDocs(sQ);
+            if (!sSnap.empty) {
+              const sDoc = sSnap.docs[0].data();
+              data.class = sDoc.class || sDoc.className || data.class || data.className || '';
+              if (sDoc.name) data.name = sDoc.name;
+            }
+          } catch (e) {
+            console.warn("Could not enrich student class", e);
+          }
+        } else if (data.role === 'teacher') {
+          try {
+            const tQ = query(collection(db, 'teachers'), where('nationalId', '==', nid));
+            const tSnap = await getDocs(tQ);
+            if (!tSnap.empty) {
+              const tDoc = tSnap.docs[0].data();
+              data.subject = tDoc.subject || data.subject || '';
+              if (tDoc.name) data.name = tDoc.name;
+            }
+          } catch (e) {
+            console.warn("Could not enrich teacher subject", e);
+          }
+        }
+
         if (data.schoolId && data.schoolId !== 'ALL') {
           try {
             const schoolDoc = await getDoc(doc(db, 'schools', data.schoolId));

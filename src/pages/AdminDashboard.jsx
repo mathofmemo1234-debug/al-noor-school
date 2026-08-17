@@ -408,8 +408,22 @@ function ManageTeachers({ schoolId }) {
           teachers.map(tData => (
             <div key={tData.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{tData.name}</h3>
-                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalIdLabel')}{tData.nationalId} • {tData.subject} {tData.whatsapp ? `${t('adminDashboard.whatsappLabel')}${tData.whatsapp}` : ''}</p>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {tData.name}
+                  <span style={{ 
+                    fontSize: '13px', 
+                    fontWeight: '600', 
+                    color: 'var(--color-primary-dark)', 
+                    background: 'rgba(99, 178, 198, 0.15)', 
+                    padding: '2px 10px', 
+                    borderRadius: '12px' 
+                  }}>
+                    {tData.subject || 'غير محدد'}
+                  </span>
+                </h3>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>
+                  {t('adminDashboard.nationalIdLabel')}{tData.nationalId} {tData.whatsapp ? `• ${t('adminDashboard.whatsappLabel')}${tData.whatsapp}` : ''}
+                </p>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => setEditingTeacher(tData)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
@@ -727,8 +741,22 @@ function ManageStudents({ schoolId }) {
           students.map(s => (
             <div key={s.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{s.name}</h3>
-                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalIdLabel')}{s.nationalId} • {t('adminDashboard.classLabel')} {s.class || s.className || 'غير محدد'}</p>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {s.name}
+                  <span style={{ 
+                    fontSize: '13px', 
+                    fontWeight: '600', 
+                    color: 'var(--color-primary-dark)', 
+                    background: 'rgba(99, 178, 198, 0.15)', 
+                    padding: '2px 10px', 
+                    borderRadius: '12px' 
+                  }}>
+                    {s.class || s.className || 'غير محدد'}
+                  </span>
+                </h3>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>
+                  {t('adminDashboard.nationalIdLabel')}{s.nationalId}
+                </p>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => setEditingStudent(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
