@@ -690,9 +690,9 @@ export const translations = {
   "en": {
     "header.arabic": "عربي",
     "header.english": "EN",
-    "header.master": "Master",
-    "header.schoolManager": "School Manager",
-    "header.teacher": "Teacher",
+    "header.master": "الماستر",
+    "header.schoolManager": "مدير",
+    "header.teacher": "معلم",
     "header.student": "Student",
     "header.user": "User",
     "sidebar.adminDashboard": "Admin Dashboard",

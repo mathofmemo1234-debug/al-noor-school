@@ -26,12 +26,12 @@ export default function Header({ title, role }) {
     supervisorSpecialty = userData?.specialty || userData?.subject || '';
   }
 
-  const displayRole = effectiveRole === 'superadmin' ? t('header.master') : 
-                      effectiveRole === 'admin' ? (userData?.schoolName ? `${t('header.schoolManager')} • ${userData.schoolName}` : t('header.schoolManager')) : 
+  const displayRole = effectiveRole === 'superadmin' ? 'الماستر' : 
+                      effectiveRole === 'admin' ? (userData?.schoolName ? `مدير • ${userData.schoolName}` : 'مدير') : 
                       effectiveRole === 'staff' ? (userData?.schoolName ? `${userData?.roleTitle || 'كادر مدرسي'} • ${userData.schoolName}` : (userData?.roleTitle || 'كادر مدرسي')) :
                       effectiveRole === 'supervisor' ? (userData?.schoolName ? `مشرف تعليمي${supervisorSpecialty ? ` (${supervisorSpecialty})` : ''} • ${userData.schoolName}` : `مشرف تعليمي${supervisorSpecialty ? ` (${supervisorSpecialty})` : ''}`) :
-                      effectiveRole === 'teacher' ? (extraDetail ? `${t('header.teacher')} • ${extraDetail}` : t('header.teacher')) : 
-                      (extraDetail ? `${t('header.student')} • ${extraDetail}` : t('header.student'));
+                      effectiveRole === 'teacher' ? (extraDetail ? `معلم • ${extraDetail}` : 'معلم') : 
+                      (extraDetail ? `طالب • ${extraDetail}` : 'طالب');
 
   const displayName = userData?.name || currentUser?.email?.split('@')[0] || t('header.user');
 
@@ -45,8 +45,8 @@ export default function Header({ title, role }) {
           onClick={toggleLanguage}
           style={{ background: 'transparent', padding: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}
         >
-          <Globe size={20} color="var(--color-primary-dark)" />
-          <span style={{ fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>
+          <Globe size={20} color="#0e7490" />
+          <span style={{ fontWeight: 'bold', color: '#0e7490' }}>
             {lang === 'ar' ? t('header.english') : t('header.arabic')}
           </span>
         </button>
@@ -56,13 +56,13 @@ export default function Header({ title, role }) {
         
         <div className="user-profile">
           <div className="user-info" style={{ textAlign: 'start' }}>
-            <span className="user-name">
+            <span className="user-name" style={{ color: '#0f172a', fontWeight: '700', fontSize: '15px' }}>
               {displayName}
               {extraDetail && (
                 <span style={{ 
                   fontSize: '12px', 
                   fontWeight: '600', 
-                  color: 'var(--color-primary-dark)', 
+                  color: '#0e7490', 
                   background: 'rgba(99, 178, 198, 0.15)', 
                   padding: '2px 8px', 
                   borderRadius: '10px',
@@ -73,9 +73,11 @@ export default function Header({ title, role }) {
                 </span>
               )}
             </span>
-            <span className="user-role">{displayRole}</span>
+            <span className="user-role" style={{ color: '#0e7490', fontWeight: '600', fontSize: '13px', display: 'block', marginTop: '2px' }}>
+              {displayRole}
+            </span>
           </div>
-          <div className="user-avatar">
+          <div className="user-avatar" style={{ background: 'linear-gradient(135deg, #0e7490, #63B2C6)', color: 'white', fontWeight: 'bold' }}>
             {displayName.charAt(0).toUpperCase()}
           </div>
         </div>
