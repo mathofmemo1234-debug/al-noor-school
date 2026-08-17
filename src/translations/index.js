@@ -3,7 +3,7 @@ export const translations = {
     "header.arabic": "عربي",
     "header.english": "EN",
     "header.master": "الماستر",
-    "header.schoolManager": "مدير مجمع",
+    "header.schoolManager": "مدير",
     "header.teacher": "معلم",
     "header.student": "طالب",
     "header.user": "المستخدم",
