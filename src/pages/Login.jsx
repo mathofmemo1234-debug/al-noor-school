@@ -61,7 +61,19 @@ export default function Login() {
         }
       }
 
-      // 3. Check students if requested role is student
+      // 3. Check supervisors if requested role is supervisor
+      if (desiredRole === 'supervisor') {
+        try {
+          const supSnap = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', nid)));
+          if (!supSnap.empty) {
+            return { ...supSnap.docs[0].data(), role: 'supervisor' };
+          }
+        } catch (err) {
+          console.warn("Error querying supervisors collection:", err);
+        }
+      }
+
+      // 4. Check students if requested role is student
       if (desiredRole === 'student') {
         try {
           const sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
@@ -73,11 +85,15 @@ export default function Login() {
         }
       }
 
-      // 4. General check across other collections to detect wrong role choice
+      // 5. General check across other collections to detect wrong role choice
       try {
         const tSnapAll = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
         if (!tSnapAll.empty) {
           return { ...tSnapAll.docs[0].data(), role: 'teacher' };
+        }
+        const supSnapAll = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', nid)));
+        if (!supSnapAll.empty) {
+          return { ...supSnapAll.docs[0].data(), role: 'supervisor' };
         }
         const sSnapAll = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
         if (!sSnapAll.empty) {
@@ -101,7 +117,7 @@ export default function Login() {
         const record = await findRecord(trimmedId, role);
         if (record && record.role !== role) {
           await auth.signOut();
-          const roleNames = { teacher: 'معلم', student: 'طالب', admin: 'مدير' };
+          const roleNames = { teacher: 'معلم', student: 'طالب', supervisor: 'مشرف تعليمي', admin: 'مدير' };
           setError(`هذا الرقم مسجل في النظام كـ ${roleNames[record.role] || record.role}، يرجى اختيار الدور الصحيح`);
           setLoading(false);
           return;
@@ -114,6 +130,7 @@ export default function Login() {
         navigate('/superadmin');
       } else {
         if (role === 'admin') navigate('/admin');
+        if (role === 'supervisor') navigate('/supervisor');
         if (role === 'teacher') navigate('/teacher');
         if (role === 'student') navigate('/student');
       }
@@ -126,13 +143,13 @@ export default function Login() {
           try {
             const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, trimmedPassword);
             
-            // Search across users, teachers, and students collections
+            // Search across users, supervisors, teachers, and students collections
             const record = await findRecord(trimmedId, role);
             
             if (record) {
               if (record.role !== role) {
                 await deleteUser(userCredential.user);
-                const roleNames = { teacher: 'معلم', student: 'طالب', admin: 'مدير' };
+                const roleNames = { teacher: 'معلم', student: 'طالب', supervisor: 'مشرف تعليمي', admin: 'مدير' };
                 setError(`هذا الرقم مسجل في النظام كـ ${roleNames[record.role] || record.role}، يرجى اختيار الدور الصحيح`);
                 return;
               }
@@ -145,7 +162,8 @@ export default function Login() {
                     nationalId: trimmedId,
                     email: fakeEmail,
                     role: record.role,
-                    name: record.name || (record.role === 'teacher' ? 'معلم' : 'طالب'),
+                    name: record.name || (record.role === 'supervisor' ? 'مشرف تعليمي' : record.role === 'teacher' ? 'معلم' : 'طالب'),
+                    specialty: record.specialty || '',
                     schoolId: record.schoolId || 'default_school_1'
                   });
                 }
@@ -153,8 +171,10 @@ export default function Login() {
                 console.warn("Could not sync to users:", syncErr);
               }
 
-              if (record.role === 'teacher') { setLoginRole('teacher'); navigate('/teacher'); }
-              if (record.role === 'student') { setLoginRole('student'); navigate('/student'); }
+              setLoginRole(record.role);
+              if (record.role === 'supervisor') { navigate('/supervisor'); }
+              if (record.role === 'teacher') { navigate('/teacher'); }
+              if (record.role === 'student') { navigate('/student'); }
               return;
             } else {
               await deleteUser(userCredential.user);
@@ -199,7 +219,7 @@ export default function Login() {
               <p>{t('login.loginSubtitle')}</p>
             </div>
 
-            <div className="role-selector">
+            <div className="role-selector" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
               <button 
                 type="button"
                 className={`role-btn ${role === 'student' ? 'active' : ''}`}
@@ -210,6 +230,11 @@ export default function Login() {
                 className={`role-btn ${role === 'teacher' ? 'active' : ''}`}
                 onClick={() => { setRole('teacher'); setError(''); }}
               >{t('login.roleTeacher')}</button>
+              <button 
+                type="button"
+                className={`role-btn ${role === 'supervisor' ? 'active' : ''}`}
+                onClick={() => { setRole('supervisor'); setError(''); }}
+              >مشرف تعليمي</button>
               <button 
                 type="button"
                 className={`role-btn ${role === 'admin' ? 'active' : ''}`}

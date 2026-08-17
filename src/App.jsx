@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
 
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const SupervisorDashboard = lazy(() => import('./pages/SupervisorDashboard'));
 const TeacherDashboard = lazy(() => import('./pages/TeacherDashboard'));
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
@@ -24,6 +25,11 @@ function App() {
           <Route path="/admin/*" element={
             <ProtectedRoute allowedRole="admin">
               <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/supervisor/*" element={
+            <ProtectedRoute allowedRole="supervisor">
+              <SupervisorDashboard />
             </ProtectedRoute>
           } />
           <Route path="/superadmin/*" element={

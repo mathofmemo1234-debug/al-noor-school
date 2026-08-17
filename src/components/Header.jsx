@@ -19,8 +19,14 @@ export default function Header({ title, role }) {
     if (teacherSubject) extraDetail = teacherSubject;
   }
 
+  let supervisorSpecialty = '';
+  if (effectiveRole === 'supervisor') {
+    supervisorSpecialty = userData?.specialty || userData?.subject || '';
+  }
+
   const displayRole = effectiveRole === 'superadmin' ? t('header.master') : 
-                      effectiveRole === 'admin' ? (userData?.schoolName || t('header.schoolManager')) : 
+                      effectiveRole === 'admin' ? (userData?.schoolName ? `${t('header.schoolManager')} • ${userData.schoolName}` : t('header.schoolManager')) : 
+                      effectiveRole === 'supervisor' ? (userData?.schoolName ? `مشرف تعليمي${supervisorSpecialty ? ` (${supervisorSpecialty})` : ''} • ${userData.schoolName}` : `مشرف تعليمي${supervisorSpecialty ? ` (${supervisorSpecialty})` : ''}`) :
                       effectiveRole === 'teacher' ? (extraDetail ? `${t('header.teacher')} • ${extraDetail}` : t('header.teacher')) : 
                       (extraDetail ? `${t('header.student')} • ${extraDetail}` : t('header.student'));
 

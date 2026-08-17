@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Users, BookOpen, UserPlus, X, Edit, Trash2 } from 'lucide-react';
+import { Users, BookOpen, UserPlus, X, Edit, Trash2, ShieldCheck, UserCheck } from 'lucide-react';
 import ManageSchedules from './ManageSchedules';
 import { db } from '../firebase';
 import { collection, addDoc, setDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
@@ -14,13 +14,14 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 function AdminHome({ schoolId }) {
   const { t } = useLanguage();
-  const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0 });
+  const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0, supervisors: 0 });
 
   useEffect(() => {
     if (!schoolId) return;
     const qTeachers = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
     const qStudents = query(collection(db, 'students'), where('schoolId', '==', schoolId));
     const qClasses = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+    const qSupervisors = query(collection(db, 'supervisors'), where('schoolId', '==', schoolId));
 
     const unsubTeachers = onSnapshot(qTeachers, (snap) => {
       setStats(prev => ({ ...prev, teachers: snap.size }));
@@ -31,7 +32,10 @@ function AdminHome({ schoolId }) {
     const unsubClasses = onSnapshot(qClasses, (snap) => {
       setStats(prev => ({ ...prev, classes: snap.size }));
     });
-    return () => { unsubTeachers(); unsubStudents(); unsubClasses(); };
+    const unsubSupervisors = onSnapshot(qSupervisors, (snap) => {
+      setStats(prev => ({ ...prev, supervisors: snap.size }));
+    });
+    return () => { unsubTeachers(); unsubStudents(); unsubClasses(); unsubSupervisors(); };
   }, [schoolId]);
 
   const handleSeedData = async () => {
@@ -181,6 +185,16 @@ function AdminHome({ schoolId }) {
           <div className="stat-info">
             <p>{t('adminDashboard.totalClasses')}</p>
             <h3>{stats.classes}</h3>
+          </div>
+        </div>
+
+        <div className="stat-card glass-panel">
+          <div className="stat-icon" style={{ color: '#8b5cf6', background: 'rgba(139, 92, 246, 0.1)' }}>
+            <UserCheck size={32} />
+          </div>
+          <div className="stat-info">
+            <p>المشرفون التعليميون</p>
+            <h3>{stats.supervisors}</h3>
           </div>
         </div>
       </div>
@@ -498,6 +512,332 @@ function ManageTeachers({ schoolId }) {
                 value={bulkData} 
                 onChange={e => setBulkData(e.target.value)} 
                 placeholder="1010101010, أحمد محمد, رياضيات&#10;1020202020, خالد عبدالله, علوم" 
+                required 
+                style={{resize: 'none'}}
+              />
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.uploading') : t('adminDashboard.uploadData')}</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ManageSupervisors({ schoolId }) {
+  const { t } = useLanguage();
+  const [supervisors, setSupervisors] = useState([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [isBulkAdding, setIsBulkAdding] = useState(false);
+  const [editingSupervisor, setEditingSupervisor] = useState(null);
+  
+  // Single Add
+  const [name, setName] = useState('');
+  const [nationalId, setNationalId] = useState('');
+  const [specialty, setSpecialty] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Bulk Add
+  const [bulkData, setBulkData] = useState('');
+  
+  useEffect(() => {
+    if (!schoolId) return;
+    const q = query(collection(db, 'supervisors'), where('schoolId', '==', schoolId));
+    const unsub = onSnapshot(q, async (snap) => {
+      const raw = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const unique = [];
+      const seen = new Map();
+      const duplicatesToDelete = [];
+
+      for (const s of raw) {
+        const nid = (s.nationalId || s.id || '').trim();
+        if (!seen.has(nid)) {
+          seen.set(nid, s);
+          unique.push(s);
+        } else {
+          duplicatesToDelete.push(s.id);
+        }
+      }
+
+      if (duplicatesToDelete.length > 0) {
+        for (const dupId of duplicatesToDelete) {
+          try {
+            await deleteDoc(doc(db, 'supervisors', dupId));
+          } catch (e) {
+            console.warn("Auto cleanup duplicate supervisor error:", e);
+          }
+        }
+      }
+
+      setSupervisors(unique);
+    });
+    return () => unsub();
+  }, [schoolId]);
+
+  const handleSaveSingle = async (e) => {
+    e.preventDefault();
+    const nid = nationalId.trim();
+    const sName = name.trim();
+    const sSpec = specialty.trim();
+    const sWhatsapp = whatsapp.trim();
+    if (!sName || !nid) return;
+    setIsSaving(true);
+    try {
+      const uCheck = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
+      const supCheck = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', nid)));
+      const tCheck = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
+      const sCheck = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
+      if (!uCheck.empty || !supCheck.empty || !tCheck.empty || !sCheck.empty) {
+        alert('عذراً: رقم الهوية هذا مسجل مسبقاً في النظام. لا يمكن تسجيل نفس الرقم نهائياً!');
+        setIsSaving(false);
+        return;
+      }
+
+      const fakeEmail = `${nid}@school.local`;
+      await addDoc(collection(db, 'supervisors'), {
+        name: sName, nationalId: nid, email: fakeEmail, specialty: sSpec, whatsapp: sWhatsapp, role: 'supervisor', schoolId, createdAt: new Date()
+      });
+      await addDoc(collection(db, 'users'), {
+        nationalId: nid, email: fakeEmail, role: 'supervisor', name: sName, specialty: sSpec, schoolId
+      });
+      setIsAdding(false);
+      setName(''); setNationalId(''); setSpecialty(''); setWhatsapp('');
+    } catch (err) {
+      console.error(err);
+      alert(t('adminDashboard.saveError'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveBulk = async (e) => {
+    e.preventDefault();
+    if (!bulkData.trim()) return;
+    setIsSaving(true);
+    
+    try {
+      const lines = bulkData.trim().split('\n');
+      let addedCount = 0;
+      let skippedIds = [];
+
+      for (let line of lines) {
+        const parts = line.split(/[\t,]/).map(s => s.trim());
+        if (parts.length >= 2) {
+          const sId = parts[0];
+          const sName = parts[1];
+          const sSpec = parts[2] || '';
+          
+          if (sId && sName) {
+            const uCheck = await getDocs(query(collection(db, 'users'), where('nationalId', '==', sId)));
+            const supCheck = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', sId)));
+            const tCheck = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', sId)));
+            const sCheck = await getDocs(query(collection(db, 'students'), where('nationalId', '==', sId)));
+            
+            if (!uCheck.empty || !supCheck.empty || !tCheck.empty || !sCheck.empty) {
+              skippedIds.push(sId);
+              continue;
+            }
+
+            const fakeEmail = `${sId}@school.local`;
+            await addDoc(collection(db, 'supervisors'), {
+              name: sName, nationalId: sId, email: fakeEmail, specialty: sSpec, role: 'supervisor', schoolId, createdAt: new Date()
+            });
+            await addDoc(collection(db, 'users'), {
+              nationalId: sId, email: fakeEmail, role: 'supervisor', name: sName, specialty: sSpec, schoolId
+            });
+            addedCount++;
+          }
+        }
+      }
+      setIsBulkAdding(false);
+      setBulkData('');
+      
+      let msg = `تمت إضافة ${addedCount} مشرف تعليمي بنجاح.`;
+      if (skippedIds.length > 0) {
+        msg += `\n⚠️ تم تخطي الأرقام التالية لأنها مسجلة مسبقاً ولا يسمح بتكرارها:\n${skippedIds.join(', ')}`;
+      }
+      alert(msg);
+    } catch (err) {
+      console.error(err);
+      alert(t('adminDashboard.bulkUploadError'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (id, nationalId) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا المشرف التعليمي؟')) return;
+    try {
+      await deleteDoc(doc(db, 'supervisors', id));
+      if (nationalId) {
+        const supSnap = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', nationalId)));
+        supSnap.forEach(async (d) => await deleteDoc(doc(db, 'supervisors', d.id)));
+        const snap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nationalId)));
+        snap.forEach(async (d) => await deleteDoc(doc(db, 'users', d.id)));
+      }
+    } catch (err) {
+      console.error(err);
+      alert(t('adminDashboard.deleteError'));
+    }
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const updatedName = editingSupervisor.name?.trim() || '';
+      const updatedSpec = editingSupervisor.specialty?.trim() || '';
+      const updatedWhatsapp = editingSupervisor.whatsapp?.trim() || '';
+
+      await updateDoc(doc(db, 'supervisors', editingSupervisor.id), {
+        name: updatedName,
+        specialty: updatedSpec,
+        whatsapp: updatedWhatsapp
+      });
+
+      if (editingSupervisor.nationalId) {
+        const supSnap = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', editingSupervisor.nationalId)));
+        supSnap.forEach(async (d) => {
+          if (d.id !== editingSupervisor.id) {
+            await updateDoc(doc(db, 'supervisors', d.id), {
+              name: updatedName,
+              specialty: updatedSpec,
+              whatsapp: updatedWhatsapp
+            });
+          }
+        });
+
+        const snap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', editingSupervisor.nationalId)));
+        snap.forEach(async (d) => await updateDoc(doc(db, 'users', d.id), {
+          name: updatedName,
+          specialty: updatedSpec
+        }));
+      }
+
+      setEditingSupervisor(null);
+    } catch (err) {
+      console.error(err);
+      alert(t('adminDashboard.updateError'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel" style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>إدارة المشرفين التعليميين</h2>
+        <div style={{display: 'flex', gap: '10px'}}>
+          <button className="btn" style={{background: 'var(--color-surface)', color: 'var(--color-primary-dark)', border: '1px solid var(--color-border)'}} onClick={() => setIsBulkAdding(true)}>
+            {t('adminDashboard.bulkUpload')}
+          </button>
+          <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
+            إضافة مشرف تعليمي
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gap: '12px' }}>
+        {supervisors.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)' }}>لم تتم إضافة أي مشرفين تعليميين بعد</p>
+        ) : (
+          supervisors.map(sup => (
+            <div key={sup.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {sup.name}
+                  <span style={{ 
+                    fontSize: '13px', 
+                    fontWeight: '600', 
+                    color: 'var(--color-primary-dark)', 
+                    background: 'rgba(99, 178, 198, 0.15)', 
+                    padding: '2px 10px', 
+                    borderRadius: '12px' 
+                  }}>
+                    {sup.specialty || 'إشراف عام'}
+                  </span>
+                </h3>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>
+                  {t('adminDashboard.nationalIdLabel')}{sup.nationalId} {sup.whatsapp ? `• ${t('adminDashboard.whatsappLabel')}${sup.whatsapp}` : ''}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setEditingSupervisor(sup)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>
+                <button onClick={() => handleDelete(sup.id, sup.nationalId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4f' }}><Trash2 size={20} /></button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {isAdding && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+            <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>إضافة مشرف تعليمي جديد</h3>
+            <form onSubmit={handleSaveSingle} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم المشرف</label>
+                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="الاسم الثلاثي أو الرباعي" required />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalId')}</label>
+                <input type="text" className="input-field" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="10xxxxxxxx" required />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>التخصص / المجال الإشرافي</label>
+                <input type="text" className="input-field" value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder="مثال: إشراف رياضيات، إشراف عام..." />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.whatsappOptional')}</label>
+                <input type="text" className="input-field" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="05xxxxxxxx" />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.saving') : 'حفظ المشرف'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingSupervisor && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+            <button onClick={() => setEditingSupervisor(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>تعديل بيانات المشرف التعليمي</h3>
+            <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم المشرف</label>
+                <input type="text" className="input-field" value={editingSupervisor.name} onChange={e => setEditingSupervisor({...editingSupervisor, name: e.target.value})} required />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>التخصص / المجال الإشرافي</label>
+                <input type="text" className="input-field" value={editingSupervisor.specialty || ''} onChange={e => setEditingSupervisor({...editingSupervisor, specialty: e.target.value})} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.whatsappOptional')}</label>
+                <input type="text" className="input-field" value={editingSupervisor.whatsapp || ''} onChange={e => setEditingSupervisor({...editingSupervisor, whatsapp: e.target.value})} />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.saving') : t('adminDashboard.saveChanges')}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isBulkAdding && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="glass-panel" style={{ width: '500px', padding: '24px', position: 'relative' }}>
+            <button onClick={() => setIsBulkAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
+            <h3 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--color-primary-dark)' }}>رفع قائمة المشرفين التعليميين</h3>
+            <p style={{fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '15px'}}>
+              الترتيب المطلوب: <strong>رقم الهوية، اسم المشرف، التخصص</strong> مفصولة بفاصلة
+            </p>
+            <form onSubmit={handleSaveBulk} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <textarea 
+                className="input-field" 
+                rows="10" 
+                value={bulkData} 
+                onChange={e => setBulkData(e.target.value)} 
+                placeholder="1010101010, د. فهد العتيبي, إشراف رياضيات&#10;1020202020, أ. عبدالله الغامدي, إشراف عام" 
                 required 
                 style={{resize: 'none'}}
               />
@@ -1017,6 +1357,7 @@ export default function AdminDashboard() {
     <Layout role="admin" title={t('adminDashboard.adminDashboardTitle')}>
       <Routes>
         <Route path="/" element={<AdminHome schoolId={userData?.schoolId} />} />
+        <Route path="/supervisors" element={<ManageSupervisors schoolId={userData?.schoolId} />} />
         <Route path="/teachers" element={<ManageTeachers schoolId={userData?.schoolId} />} />
         <Route path="/students" element={<ManageStudents schoolId={userData?.schoolId} />} />
         <Route path="/classes" element={<ManageClasses schoolId={userData?.schoolId} />} />

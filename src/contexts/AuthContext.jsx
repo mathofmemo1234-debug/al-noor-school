@@ -67,7 +67,29 @@ export function AuthProvider({ children }) {
           }
         }
 
-        // 3. Fallback: Check 'students' collection
+        // 3. Fallback: Check 'supervisors' collection
+        if (!data && (!roleHint || roleHint === 'supervisor')) {
+          const supQ = query(collection(db, 'supervisors'), where('nationalId', '==', nid));
+          const supSnap = await getDocs(supQ);
+          if (!supSnap.empty) {
+            const supData = supSnap.docs[0].data();
+            data = { ...supData, role: 'supervisor', email: user.email, nationalId: nid };
+            try {
+              await addDoc(collection(db, 'users'), {
+                nationalId: nid,
+                email: user.email,
+                role: 'supervisor',
+                name: supData.name || 'مشرف تعليمي',
+                specialty: supData.specialty || '',
+                schoolId: supData.schoolId || 'default_school_1'
+              });
+            } catch (e) {
+              console.warn("Could not sync supervisor to users collection", e);
+            }
+          }
+        }
+
+        // 4. Fallback: Check 'students' collection
         if (!data && (!roleHint || roleHint === 'student')) {
           const sQ = query(collection(db, 'students'), where('nationalId', '==', nid));
           const sSnap = await getDocs(sQ);
@@ -91,7 +113,7 @@ export function AuthProvider({ children }) {
       }
 
       if (data) {
-        // Enrich class for students and subject for teachers
+        // Enrich class for students, subject for teachers, specialty for supervisors
         if (data.role === 'student') {
           try {
             const sQ = query(collection(db, 'students'), where('nationalId', '==', nid));
@@ -115,6 +137,18 @@ export function AuthProvider({ children }) {
             }
           } catch (e) {
             console.warn("Could not enrich teacher subject", e);
+          }
+        } else if (data.role === 'supervisor') {
+          try {
+            const supQ = query(collection(db, 'supervisors'), where('nationalId', '==', nid));
+            const supSnap = await getDocs(supQ);
+            if (!supSnap.empty) {
+              const supDoc = supSnap.docs[0].data();
+              data.specialty = supDoc.specialty || data.specialty || '';
+              if (supDoc.name) data.name = supDoc.name;
+            }
+          } catch (e) {
+            console.warn("Could not enrich supervisor specialty", e);
           }
         }
 

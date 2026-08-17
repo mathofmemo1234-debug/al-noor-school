@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star } from 'lucide-react';
+import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,6 +22,7 @@ export default function Sidebar({ role }) {
 
   const adminLinks = [
     { path: '/admin', icon: Home, label: t('sidebar.overview') },
+    { path: '/admin/supervisors', icon: UserCheck, label: 'المشرف التعليمي' },
     { path: '/admin/teachers', icon: Users, label: t('sidebar.teachers') },
     { path: '/admin/students', icon: Users, label: t('sidebar.students') },
     { path: '/admin/classes', icon: BookOpen, label: t('sidebar.classes') },
@@ -30,6 +31,16 @@ export default function Sidebar({ role }) {
     { path: '/admin/weekly-plan', icon: BookOpen, label: t('sidebar.weeklyPlan') },
     { path: '/admin/excellence', icon: Star, label: t('sidebar.files') },
     { path: '/admin/settings', icon: Settings, label: t('sidebar.settings') },
+  ];
+
+  const supervisorLinks = [
+    { path: '/supervisor', icon: Home, label: t('sidebar.overview') },
+    { path: '/supervisor/preparations', icon: BookOpen, label: t('sidebar.preparations') },
+    { path: '/supervisor/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
+    { path: '/supervisor/schedule', icon: Calendar, label: t('sidebar.schedule') },
+    { path: '/supervisor/teachers', icon: Users, label: t('sidebar.teachers') },
+    { path: '/supervisor/excellence', icon: Star, label: t('sidebar.files') },
+    { path: '/supervisor/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
   const superAdminLinks = [
@@ -60,7 +71,10 @@ export default function Sidebar({ role }) {
     { path: '/student/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
-  const links = role === 'superadmin' ? superAdminLinks : role === 'admin' ? adminLinks : role === 'teacher' ? teacherLinks : studentLinks;
+  const links = role === 'superadmin' ? superAdminLinks : 
+                role === 'admin' ? adminLinks : 
+                role === 'supervisor' ? supervisorLinks : 
+                role === 'teacher' ? teacherLinks : studentLinks;
   
   const logoSrc = userData?.logoUrl || `${import.meta.env.BASE_URL}logo.webp`;
 
