@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
 import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar } from 'lucide-react';
@@ -23,31 +23,49 @@ export default function StudentSchedule() {
   const [semester, setSemester] = useState('');
   const [teachers, setTeachers] = useState({});
   const [studentClass, setStudentClass] = useState(null);
-
   const [classId, setClassId] = useState(null);
 
   useEffect(() => {
-    if (userData?.nationalId) {
-      const unsub = onSnapshot(
-        query(collection(db, 'students'), where('nationalId', '==', userData.nationalId)),
-        (snap) => {
-          if (!snap.empty) {
-            setStudentClass(snap.docs[0].data().class);
-          } else {
-            setStudentClass(null);
-          }
+    const nid = (userData?.nationalId || auth.currentUser?.email?.replace('@school.local', '') || '').trim();
+    if (!nid && !auth.currentUser?.email) return;
+
+    const q = nid 
+      ? query(collection(db, 'students'), where('nationalId', '==', nid))
+      : query(collection(db, 'students'), where('email', '==', auth.currentUser.email));
+
+    const unsub = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        const docs = snap.docs.map(d => d.data());
+        const validDoc = docs.find(d => (d.class || d.className)?.trim()) || docs[0];
+        const cls = (validDoc?.class || validDoc?.className || '')?.trim();
+        setStudentClass(cls || null);
+      } else {
+        if (nid) {
+          const uq = query(collection(db, 'users'), where('nationalId', '==', nid));
+          const unsubUsers = onSnapshot(uq, (uSnap) => {
+            if (!uSnap.empty) {
+              const uData = uSnap.docs[0].data();
+              setStudentClass((uData.class || uData.className || '')?.trim() || null);
+            } else {
+              setStudentClass(null);
+            }
+          });
+          return () => unsubUsers();
+        } else {
+          setStudentClass(null);
         }
-      );
-      return () => unsub();
-    }
+      }
+    });
+    return () => unsub();
   }, [userData]);
 
   useEffect(() => {
     if (studentClass) {
+      const trimmed = studentClass.trim();
       const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
         let foundId = null;
         classesSnap.docs.forEach(doc => {
-          if (doc.data().name === studentClass) {
+          if (doc.data().name?.trim() === trimmed) {
             foundId = doc.id;
           }
         });
@@ -65,18 +83,29 @@ export default function StudentSchedule() {
       const tMap = {};
       snap.docs.forEach(doc => {
         tMap[doc.id] = { name: doc.data().name, whatsapp: doc.data().whatsapp };
+        if (doc.data().nationalId) {
+          tMap[doc.data().nationalId] = { name: doc.data().name, whatsapp: doc.data().whatsapp };
+        }
       });
       setTeachers(tMap);
     });
 
-    if (classId) {
-      // Load class schedule using the actual classId
-      const unsubSchedule = onSnapshot(doc(db, 'schedules', classId), (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setScheduleData(data.matrix || {});
-          setAcademicYear(data.academicYear || '');
-          setSemester(data.semester || '');
+    if (classId || studentClass) {
+      const unsubSchedule = onSnapshot(collection(db, 'schedules'), (snap) => {
+        let foundSchedule = null;
+        if (classId) {
+          const matchById = snap.docs.find(d => d.id === classId || d.data().classId === classId);
+          if (matchById) foundSchedule = matchById.data();
+        }
+        if (!foundSchedule && studentClass) {
+          const matchByName = snap.docs.find(d => d.data().className?.trim() === studentClass?.trim());
+          if (matchByName) foundSchedule = matchByName.data();
+        }
+
+        if (foundSchedule) {
+          setScheduleData(foundSchedule.matrix || {});
+          setAcademicYear(foundSchedule.academicYear || '');
+          setSemester(foundSchedule.semester || '');
         } else {
           setScheduleData({});
         }
@@ -85,7 +114,7 @@ export default function StudentSchedule() {
     }
     
     return () => unsubTeachers();
-  }, [classId]);
+  }, [classId, studentClass]);
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>

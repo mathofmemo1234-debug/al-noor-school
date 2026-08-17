@@ -49,13 +49,33 @@ function AdminHome({ schoolId }) {
       for (let i = 0; i < 5; i++) {
         const nid = `100000000${i+1}`;
         const email = `${nid}@school.local`;
-        const docRef = await addDoc(collection(db, 'teachers'), {
-          name: teachers[i].name, nationalId: nid, email, subject: teachers[i].subject, role: 'teacher', schoolId, createdAt: new Date()
-        });
-        teacherIds.push(docRef.id);
-        await addDoc(collection(db, 'users'), {
-          nationalId: nid, email, role: 'teacher', name: teachers[i].name, schoolId
-        });
+        
+        // Check if teacher already exists to avoid duplicates
+        const existingTSnap = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
+        let docId;
+        if (!existingTSnap.empty) {
+          docId = existingTSnap.docs[0].id;
+          await updateDoc(doc(db, 'teachers', docId), {
+            name: teachers[i].name, subject: teachers[i].subject, schoolId
+          });
+        } else {
+          const docRef = await addDoc(collection(db, 'teachers'), {
+            name: teachers[i].name, nationalId: nid, email, subject: teachers[i].subject, role: 'teacher', schoolId, createdAt: new Date()
+          });
+          docId = docRef.id;
+        }
+        teacherIds.push(docId);
+
+        const existingUSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
+        if (!existingUSnap.empty) {
+          await updateDoc(doc(db, 'users', existingUSnap.docs[0].id), {
+            name: teachers[i].name, schoolId, role: 'teacher'
+          });
+        } else {
+          await addDoc(collection(db, 'users'), {
+            nationalId: nid, email, role: 'teacher', name: teachers[i].name, schoolId
+          });
+        }
       }
 
       const classNames = ["أول متوسط", "ثاني متوسط", "ثالث متوسط", "أول ثانوي", "ثاني ثانوي", "ثالث ثانوي"];
@@ -64,20 +84,41 @@ function AdminHome({ schoolId }) {
         const nid = `200000000${i+1}`;
         const email = `${nid}@school.local`;
         const assignedClass = classNames[i % classNames.length];
-        await addDoc(collection(db, 'students'), {
-          name: studentNames[i], nationalId: nid, email, className: assignedClass, role: 'student', schoolId, createdAt: new Date()
-        });
-        await addDoc(collection(db, 'users'), {
-          nationalId: nid, email, role: 'student', name: studentNames[i], schoolId
-        });
+        
+        const existingSSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
+        if (!existingSSnap.empty) {
+          await updateDoc(doc(db, 'students', existingSSnap.docs[0].id), {
+            name: studentNames[i], class: assignedClass, className: assignedClass, schoolId
+          });
+        } else {
+          await addDoc(collection(db, 'students'), {
+            name: studentNames[i], nationalId: nid, email, class: assignedClass, className: assignedClass, role: 'student', schoolId, createdAt: new Date()
+          });
+        }
+
+        const existingUSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
+        if (!existingUSnap.empty) {
+          await updateDoc(doc(db, 'users', existingUSnap.docs[0].id), {
+            name: studentNames[i], class: assignedClass, className: assignedClass, schoolId, role: 'student'
+          });
+        } else {
+          await addDoc(collection(db, 'users'), {
+            nationalId: nid, email, role: 'student', name: studentNames[i], class: assignedClass, className: assignedClass, schoolId
+          });
+        }
       }
 
       const classDocs = [];
       for (let cName of classNames) {
-        const docRef = await addDoc(collection(db, 'classes'), {
-          name: cName, level: 'test', schoolId, createdAt: new Date()
-        });
-        classDocs.push({ id: docRef.id, name: cName });
+        const existingCSnap = await getDocs(query(collection(db, 'classes'), where('name', '==', cName), where('schoolId', '==', schoolId)));
+        if (!existingCSnap.empty) {
+          classDocs.push({ id: existingCSnap.docs[0].id, name: cName });
+        } else {
+          const docRef = await addDoc(collection(db, 'classes'), {
+            name: cName, level: 'test', schoolId, createdAt: new Date()
+          });
+          classDocs.push({ id: docRef.id, name: cName });
+        }
       }
 
       // Assign schedule for the first 3 classes to show teachers teaching multiple classes
@@ -92,6 +133,7 @@ function AdminHome({ schoolId }) {
         
         await setDoc(doc(db, 'schedules', targetClass.id), {
           className: targetClass.name,
+          classId: targetClass.id,
           schoolId,
           matrix
         });
@@ -166,23 +208,45 @@ function ManageTeachers({ schoolId }) {
     if (!schoolId) return;
     const q = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTeachers(data);
+      const raw = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const unique = [];
+      const seen = new Set();
+      for (const t of raw) {
+        const nid = (t.nationalId || t.id || '').trim();
+        if (!seen.has(nid)) {
+          seen.add(nid);
+          unique.push(t);
+        }
+      }
+      setTeachers(unique);
     });
     return () => unsub();
   }, [schoolId]);
 
   const handleSaveSingle = async (e) => {
     e.preventDefault();
-    if (!name || !nationalId) return;
+    const nid = nationalId.trim();
+    const tName = name.trim();
+    const tSubj = subject.trim();
+    if (!tName || !nid) return;
     setIsSaving(true);
     try {
-      const fakeEmail = `${nationalId}@school.local`;
+      // Check for duplicates
+      const uCheck = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
+      const tCheck = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
+      const sCheck = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
+      if (!uCheck.empty || !tCheck.empty || !sCheck.empty) {
+        alert('رقم الهوية مسجل مسبقاً في النظام. لا يمكن إضافة نفس الرقم أكثر من مرة.');
+        setIsSaving(false);
+        return;
+      }
+
+      const fakeEmail = `${nid}@school.local`;
       await addDoc(collection(db, 'teachers'), {
-        name, nationalId, email: fakeEmail, subject, role: 'teacher', schoolId, createdAt: new Date()
+        name: tName, nationalId: nid, email: fakeEmail, subject: tSubj, role: 'teacher', schoolId, createdAt: new Date()
       });
       await addDoc(collection(db, 'users'), {
-        nationalId, email: fakeEmail, role: 'teacher', name, schoolId
+        nationalId: nid, email: fakeEmail, role: 'teacher', name: tName, schoolId
       });
       setIsAdding(false);
       setName(''); setNationalId(''); setSubject('');
@@ -202,7 +266,6 @@ function ManageTeachers({ schoolId }) {
     try {
       const lines = bulkData.trim().split('\n');
       for (let line of lines) {
-        // Split by comma or tab
         const parts = line.split(/[\t,]/).map(s => s.trim());
         if (parts.length >= 2) {
           const tId = parts[0];
@@ -211,12 +274,27 @@ function ManageTeachers({ schoolId }) {
           
           if (tId && tName) {
             const fakeEmail = `${tId}@school.local`;
-            await addDoc(collection(db, 'teachers'), {
-              name: tName, nationalId: tId, email: fakeEmail, subject: tSubj, role: 'teacher', schoolId, createdAt: new Date()
-            });
-            await addDoc(collection(db, 'users'), {
-              nationalId: tId, email: fakeEmail, role: 'teacher', name: tName, schoolId
-            });
+            const existingT = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', tId)));
+            if (!existingT.empty) {
+              await updateDoc(doc(db, 'teachers', existingT.docs[0].id), {
+                name: tName, subject: tSubj, schoolId
+              });
+            } else {
+              await addDoc(collection(db, 'teachers'), {
+                name: tName, nationalId: tId, email: fakeEmail, subject: tSubj, role: 'teacher', schoolId, createdAt: new Date()
+              });
+            }
+
+            const existingU = await getDocs(query(collection(db, 'users'), where('nationalId', '==', tId)));
+            if (!existingU.empty) {
+              await updateDoc(doc(db, 'users', existingU.docs[0].id), {
+                name: tName, schoolId, role: 'teacher'
+              });
+            } else {
+              await addDoc(collection(db, 'users'), {
+                nationalId: tId, email: fakeEmail, role: 'teacher', name: tName, schoolId
+              });
+            }
           }
         }
       }
@@ -235,9 +313,12 @@ function ManageTeachers({ schoolId }) {
     if (!window.confirm(t('adminDashboard.confirmDeleteTeacher'))) return;
     try {
       await deleteDoc(doc(db, 'teachers', id));
-      const uq = query(collection(db, 'users'), where('nationalId', '==', nationalId));
-      const snap = await getDocs(uq);
-      snap.forEach(async (d) => await deleteDoc(doc(db, 'users', d.id)));
+      if (nationalId) {
+        const tSnap = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nationalId)));
+        tSnap.forEach(async (d) => await deleteDoc(doc(db, 'teachers', d.id)));
+        const snap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nationalId)));
+        snap.forEach(async (d) => await deleteDoc(doc(db, 'users', d.id)));
+      }
     } catch (err) {
       console.error(err);
       alert(t('adminDashboard.deleteError'));
@@ -248,16 +329,34 @@ function ManageTeachers({ schoolId }) {
     e.preventDefault();
     setIsSaving(true);
     try {
+      const updatedName = editingTeacher.name?.trim() || '';
+      const updatedSubj = editingTeacher.subject?.trim() || '';
+      const updatedWhatsapp = editingTeacher.whatsapp?.trim() || '';
+
       await updateDoc(doc(db, 'teachers', editingTeacher.id), {
-        name: editingTeacher.name,
-        subject: editingTeacher.subject,
-        whatsapp: editingTeacher.whatsapp || ''
+        name: updatedName,
+        subject: updatedSubj,
+        whatsapp: updatedWhatsapp
       });
-      const uq = query(collection(db, 'users'), where('nationalId', '==', editingTeacher.nationalId));
-      const snap = await getDocs(uq);
-      snap.forEach(async (d) => await updateDoc(doc(db, 'users', d.id), {
-        name: editingTeacher.name
-      }));
+
+      if (editingTeacher.nationalId) {
+        const tSnap = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', editingTeacher.nationalId)));
+        tSnap.forEach(async (d) => {
+          if (d.id !== editingTeacher.id) {
+            await updateDoc(doc(db, 'teachers', d.id), {
+              name: updatedName,
+              subject: updatedSubj,
+              whatsapp: updatedWhatsapp
+            });
+          }
+        });
+
+        const snap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', editingTeacher.nationalId)));
+        snap.forEach(async (d) => await updateDoc(doc(db, 'users', d.id), {
+          name: updatedName
+        }));
+      }
+
       setEditingTeacher(null);
     } catch (err) {
       console.error(err);
@@ -399,8 +498,20 @@ function ManageStudents({ schoolId }) {
     const qClasses = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
 
     const unsubStudents = onSnapshot(qStudents, (snap) => {
-      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setStudents(data);
+      const raw = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const unique = [];
+      const seen = new Set();
+      for (const s of raw) {
+        const nid = (s.nationalId || s.id || '').trim();
+        if (!seen.has(nid)) {
+          seen.add(nid);
+          unique.push({
+            ...s,
+            class: s.class || s.className || ''
+          });
+        }
+      }
+      setStudents(unique);
     });
     const unsubClasses = onSnapshot(qClasses, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -411,15 +522,28 @@ function ManageStudents({ schoolId }) {
 
   const handleSaveSingle = async (e) => {
     e.preventDefault();
-    if (!name || !nationalId || !studentClass) return;
+    const nid = nationalId.trim();
+    const sName = name.trim();
+    const sClass = studentClass.trim();
+    if (!sName || !nid || !sClass) return;
     setIsSaving(true);
     try {
-      const fakeEmail = `${nationalId}@school.local`;
+      // Check for duplicates
+      const uCheck = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
+      const sCheck = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
+      const tCheck = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
+      if (!uCheck.empty || !sCheck.empty || !tCheck.empty) {
+        alert('رقم الهوية مسجل مسبقاً في النظام. لا يمكن إضافة نفس الرقم أكثر من مرة.');
+        setIsSaving(false);
+        return;
+      }
+
+      const fakeEmail = `${nid}@school.local`;
       await addDoc(collection(db, 'students'), {
-        name, nationalId, email: fakeEmail, class: studentClass, role: 'student', schoolId, createdAt: new Date()
+        name: sName, nationalId: nid, email: fakeEmail, class: sClass, className: sClass, role: 'student', schoolId, createdAt: new Date()
       });
       await addDoc(collection(db, 'users'), {
-        nationalId, email: fakeEmail, role: 'student', name, schoolId
+        nationalId: nid, email: fakeEmail, role: 'student', name: sName, class: sClass, className: sClass, schoolId
       });
       setIsAdding(false);
       setName(''); setNationalId(''); setStudentClass('');
@@ -447,12 +571,27 @@ function ManageStudents({ schoolId }) {
           
           if (sId && sName) {
             const fakeEmail = `${sId}@school.local`;
-            await addDoc(collection(db, 'students'), {
-              name: sName, nationalId: sId, email: fakeEmail, class: sClass, role: 'student', schoolId, createdAt: new Date()
-            });
-            await addDoc(collection(db, 'users'), {
-              nationalId: sId, email: fakeEmail, role: 'student', name: sName, schoolId
-            });
+            const existingS = await getDocs(query(collection(db, 'students'), where('nationalId', '==', sId)));
+            if (!existingS.empty) {
+              await updateDoc(doc(db, 'students', existingS.docs[0].id), {
+                name: sName, class: sClass, className: sClass, schoolId
+              });
+            } else {
+              await addDoc(collection(db, 'students'), {
+                name: sName, nationalId: sId, email: fakeEmail, class: sClass, className: sClass, role: 'student', schoolId, createdAt: new Date()
+              });
+            }
+
+            const existingU = await getDocs(query(collection(db, 'users'), where('nationalId', '==', sId)));
+            if (!existingU.empty) {
+              await updateDoc(doc(db, 'users', existingU.docs[0].id), {
+                name: sName, class: sClass, className: sClass, schoolId, role: 'student'
+              });
+            } else {
+              await addDoc(collection(db, 'users'), {
+                nationalId: sId, email: fakeEmail, role: 'student', name: sName, class: sClass, className: sClass, schoolId
+              });
+            }
           }
         }
       }
@@ -471,9 +610,12 @@ function ManageStudents({ schoolId }) {
     if (!window.confirm(t('adminDashboard.confirmDeleteStudent'))) return;
     try {
       await deleteDoc(doc(db, 'students', id));
-      const uq = query(collection(db, 'users'), where('nationalId', '==', nationalId));
-      const snap = await getDocs(uq);
-      snap.forEach(async (d) => await deleteDoc(doc(db, 'users', d.id)));
+      if (nationalId) {
+        const sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nationalId)));
+        sSnap.forEach(async (d) => await deleteDoc(doc(db, 'students', d.id)));
+        const snap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nationalId)));
+        snap.forEach(async (d) => await deleteDoc(doc(db, 'users', d.id)));
+      }
     } catch (err) {
       console.error(err);
       alert(t('adminDashboard.deleteError'));
@@ -484,15 +626,35 @@ function ManageStudents({ schoolId }) {
     e.preventDefault();
     setIsSaving(true);
     try {
+      const updatedName = editingStudent.name?.trim() || '';
+      const updatedClass = editingStudent.class?.trim() || '';
+
       await updateDoc(doc(db, 'students', editingStudent.id), {
-        name: editingStudent.name,
-        class: editingStudent.class
+        name: updatedName,
+        class: updatedClass,
+        className: updatedClass
       });
-      const uq = query(collection(db, 'users'), where('nationalId', '==', editingStudent.nationalId));
-      const snap = await getDocs(uq);
-      snap.forEach(async (d) => await updateDoc(doc(db, 'users', d.id), {
-        name: editingStudent.name
-      }));
+
+      if (editingStudent.nationalId) {
+        const sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', editingStudent.nationalId)));
+        sSnap.forEach(async (d) => {
+          if (d.id !== editingStudent.id) {
+            await updateDoc(doc(db, 'students', d.id), {
+              name: updatedName,
+              class: updatedClass,
+              className: updatedClass
+            });
+          }
+        });
+
+        const snap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', editingStudent.nationalId)));
+        snap.forEach(async (d) => await updateDoc(doc(db, 'users', d.id), {
+          name: updatedName,
+          class: updatedClass,
+          className: updatedClass
+        }));
+      }
+
       setEditingStudent(null);
     } catch (err) {
       console.error(err);
@@ -524,7 +686,7 @@ function ManageStudents({ schoolId }) {
             <div key={s.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: '0 0 8px 0', color: 'var(--color-primary-dark)' }}>{s.name}</h3>
-                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalIdLabel')}{s.nationalId}{t('adminDashboard.classLabel')}{s.class}</p>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalIdLabel')}{s.nationalId} • {t('adminDashboard.classLabel')} {s.class || s.className || 'غير محدد'}</p>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => setEditingStudent(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}><Edit size={20} /></button>

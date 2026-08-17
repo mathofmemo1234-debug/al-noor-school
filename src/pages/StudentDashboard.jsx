@@ -7,6 +7,7 @@ import { collection, query, where, getDocs, onSnapshot, doc } from 'firebase/fir
 import StudentSchedule from './StudentSchedule';
 import StudentExams from './StudentExams';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 
 function StudentHome() {
   const { t } = useLanguage();
@@ -19,19 +20,44 @@ function StudentHome() {
 }
 
 function useStudentClass() {
+  const { userData } = useAuth();
   const [studentClass, setStudentClass] = useState(null);
   
   useEffect(() => {
-    const fetchClass = async () => {
-      if (!auth.currentUser) return;
-      const q = query(collection(db, 'students'), where('email', '==', auth.currentUser.email));
-      const snap = await getDocs(q);
+    const nid = (userData?.nationalId || auth.currentUser?.email?.replace('@school.local', '') || '').trim();
+    if (!nid && !auth.currentUser?.email) return;
+
+    const q = nid 
+      ? query(collection(db, 'students'), where('nationalId', '==', nid))
+      : query(collection(db, 'students'), where('email', '==', auth.currentUser.email));
+
+    const unsub = onSnapshot(q, (snap) => {
       if (!snap.empty) {
-        setStudentClass(snap.docs[0].data().class);
+        const docs = snap.docs.map(d => d.data());
+        const validDoc = docs.find(d => (d.class || d.className)?.trim()) || docs[0];
+        const cls = (validDoc?.class || validDoc?.className || '')?.trim();
+        setStudentClass(cls || null);
+      } else {
+        // Fallback: check users collection
+        if (nid) {
+          const uq = query(collection(db, 'users'), where('nationalId', '==', nid));
+          const unsubUsers = onSnapshot(uq, (uSnap) => {
+            if (!uSnap.empty) {
+              const uData = uSnap.docs[0].data();
+              setStudentClass((uData.class || uData.className || '')?.trim() || null);
+            } else {
+              setStudentClass(null);
+            }
+          });
+          return () => unsubUsers();
+        } else {
+          setStudentClass(null);
+        }
       }
-    };
-    fetchClass();
-  }, []);
+    });
+
+    return () => unsub();
+  }, [userData]);
 
   return studentClass;
 }

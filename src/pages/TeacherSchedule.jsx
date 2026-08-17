@@ -64,21 +64,26 @@ export default function TeacherSchedule() {
 
   // Filter schedule for this teacher
   const getTeacherCell = (day, period) => {
-    if (!teacherDocId) return null;
+    const tid = teacherDocId;
+    const nid = userData?.nationalId;
+    if (!tid && !nid) return null;
     const key = `${day}-${period}`;
     let result = null;
     
     // Loop through all classes schedules to see if the teacher has a class in this period
     for (const schedule of schedules) {
-      if (schedule.matrix && schedule.matrix[key] && schedule.matrix[key].teacherId === teacherDocId) {
-        result = {
-          scheduleId: schedule.id, // doc id
-          key: key,
-          subject: schedule.matrix[key].subject,
-          className: classes[schedule.id] || t('teacherSchedule.unknownClass'),
-          virtualLink: schedule.matrix[key].virtualLink || ''
-        };
-        break; // A teacher can only be in one class per period
+      if (schedule.matrix && schedule.matrix[key]) {
+        const cellTeacherId = schedule.matrix[key].teacherId;
+        if (cellTeacherId && (cellTeacherId === tid || cellTeacherId === nid)) {
+          result = {
+            scheduleId: schedule.id, // doc id
+            key: key,
+            subject: schedule.matrix[key].subject,
+            className: classes[schedule.id] || schedule.className || t('teacherSchedule.unknownClass'),
+            virtualLink: schedule.matrix[key].virtualLink || ''
+          };
+          break; // A teacher can only be in one class per period
+        }
       }
     }
     return result;
