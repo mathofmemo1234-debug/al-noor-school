@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar } from 'lucide-react';
+import { Calendar, Printer } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import PrintScheduleModal from '../components/PrintScheduleModal';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 const dayMap = {
@@ -22,8 +23,12 @@ export default function StudentSchedule() {
   const [academicYear, setAcademicYear] = useState('');
   const [semester, setSemester] = useState('');
   const [teachers, setTeachers] = useState({});
+  const [teachersList, setTeachersList] = useState([]);
+  const [classesList, setClassesList] = useState([]);
+  const [allSchedules, setAllSchedules] = useState([]);
   const [studentClass, setStudentClass] = useState(null);
   const [classId, setClassId] = useState(null);
+  const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
 
   useEffect(() => {
     const nid = (userData?.nationalId || auth.currentUser?.email?.replace('@school.local', '') || '').trim();
@@ -60,67 +65,94 @@ export default function StudentSchedule() {
   }, [userData]);
 
   useEffect(() => {
-    if (studentClass) {
-      const trimmed = studentClass.trim();
-      const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
-        let foundId = null;
-        classesSnap.docs.forEach(doc => {
-          if (doc.data().name?.trim() === trimmed) {
-            foundId = doc.id;
-          }
-        });
-        setClassId(foundId);
+    const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
+      const list = [];
+      let foundId = null;
+      classesSnap.docs.forEach(doc => {
+        const d = { id: doc.id, ...doc.data() };
+        list.push(d);
+        if (studentClass && doc.data().name?.trim() === studentClass.trim()) {
+          foundId = doc.id;
+        }
       });
-      return () => unsubClasses();
-    } else {
-      setClassId(null);
-    }
+      setClassesList(list);
+      setClassId(foundId);
+    });
+    return () => unsubClasses();
   }, [studentClass]);
 
   useEffect(() => {
     // Load all teachers for name mapping
     const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
       const tMap = {};
+      const tList = [];
       snap.docs.forEach(doc => {
+        const d = { id: doc.id, ...doc.data() };
+        tList.push(d);
         tMap[doc.id] = { name: doc.data().name, whatsapp: doc.data().whatsapp };
         if (doc.data().nationalId) {
           tMap[doc.data().nationalId] = { name: doc.data().name, whatsapp: doc.data().whatsapp };
         }
       });
       setTeachers(tMap);
+      setTeachersList(tList);
     });
 
-    if (classId || studentClass) {
-      const unsubSchedule = onSnapshot(collection(db, 'schedules'), (snap) => {
-        let foundSchedule = null;
-        if (classId) {
-          const matchById = snap.docs.find(d => d.id === classId || d.data().classId === classId);
-          if (matchById) foundSchedule = matchById.data();
-        }
-        if (!foundSchedule && studentClass) {
-          const matchByName = snap.docs.find(d => d.data().className?.trim() === studentClass?.trim());
-          if (matchByName) foundSchedule = matchByName.data();
-        }
+    const unsubSchedule = onSnapshot(collection(db, 'schedules'), (snap) => {
+      const schedList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setAllSchedules(schedList);
 
-        if (foundSchedule) {
-          setScheduleData(foundSchedule.matrix || {});
-          setAcademicYear(foundSchedule.academicYear || '');
-          setSemester(foundSchedule.semester || '');
-        } else {
-          setScheduleData({});
-        }
-      });
-      return () => { unsubTeachers(); unsubSchedule(); };
-    }
-    
-    return () => unsubTeachers();
+      let foundSchedule = null;
+      if (classId) {
+        const matchById = schedList.find(d => d.id === classId || d.classId === classId);
+        if (matchById) foundSchedule = matchById;
+      }
+      if (!foundSchedule && studentClass) {
+        const matchByName = schedList.find(d => d.className?.trim() === studentClass?.trim());
+        if (matchByName) foundSchedule = matchByName;
+      }
+
+      if (foundSchedule) {
+        setScheduleData(foundSchedule.matrix || {});
+        setAcademicYear(foundSchedule.academicYear || '');
+        setSemester(foundSchedule.semester || '');
+      } else {
+        setScheduleData({});
+      }
+    });
+
+    return () => { unsubTeachers(); unsubSchedule(); };
   }, [classId, studentClass]);
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--color-primary-dark)' }}>
-        <Calendar size={24} /> {t('studentSchedule.mySchedule')}
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '12px' }}>
+        <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--color-primary-dark)' }}>
+          <Calendar size={24} /> {t('studentSchedule.mySchedule')} {studentClass ? `(${studentClass})` : ''}
+        </h2>
+        {studentClass && (
+          <button
+            type="button"
+            onClick={() => setIsPrintingSchedule(true)}
+            className="btn"
+            style={{
+              background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+              color: 'white',
+              border: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: 'bold',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(14, 116, 144, 0.25)',
+              cursor: 'pointer'
+            }}
+          >
+            <Printer size={18} /> طباعة جدول الفصل
+          </button>
+        )}
+      </div>
       {(academicYear || semester) && (
         <div style={{ marginBottom: '24px', color: 'var(--color-text-muted)' }}>
           {academicYear} | {semester}
@@ -184,6 +216,19 @@ export default function StudentSchedule() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {isPrintingSchedule && (
+        <PrintScheduleModal
+          classes={classesList}
+          teachers={teachersList}
+          schedules={allSchedules}
+          defaultLevel="class"
+          initialClassId={classId || classesList[0]?.id}
+          academicYear={academicYear || '1447-1448'}
+          semester={semester || 'الفصل الدراسي الأول'}
+          onClose={() => setIsPrintingSchedule(false)}
+        />
       )}
     </div>
   );

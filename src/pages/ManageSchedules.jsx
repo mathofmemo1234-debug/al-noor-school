@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, writeBatch, query, where } from 'firebase/firestore';
-import { Calendar, BookOpen, Plus, Trash2, Save } from 'lucide-react';
+import { Calendar, BookOpen, Plus, Trash2, Save, Printer } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import PrintScheduleModal from '../components/PrintScheduleModal';
 
 export default function ManageSchedules({ schoolId }) {
   const { t } = useLanguage();
@@ -24,6 +25,8 @@ export default function ManageSchedules({ schoolId }) {
   
   // Array of flat schedule entries
   const [entries, setEntries] = useState([]);
+  const [schedulesList, setSchedulesList] = useState([]);
+  const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
   // For managing subjects
@@ -63,6 +66,7 @@ export default function ManageSchedules({ schoolId }) {
     // Load existing schedules and flatten them
     const qSchedules = query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
     const unsubSchedules = onSnapshot(qSchedules, (snap) => {
+      setSchedulesList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       let flatEntries = [];
       snap.docs.forEach(docSnap => {
         const data = docSnap.data();
@@ -259,7 +263,27 @@ export default function ManageSchedules({ schoolId }) {
               <option value={t('manageSchedules.secondSemester')}>{t('manageSchedules.secondSemester')}</option>
             </select>
           </div>
-          <div style={{ flex: 1, textAlign: 'left', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <div style={{ flex: 1, textAlign: 'left', display: 'flex', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setIsPrintingSchedule(true)}
+              className="btn"
+              style={{
+                background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+                color: 'white',
+                border: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontWeight: 'bold',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(14, 116, 144, 0.25)',
+                cursor: 'pointer'
+              }}
+            >
+              <Printer size={18} /> طباعة وتصدير الجداول (فصل / معلم / عام)
+            </button>
             <button onClick={handleAddRow} className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
               <Plus size={18} /> {t('manageSchedules.addNewPeriod')}
             </button>
@@ -329,6 +353,17 @@ export default function ManageSchedules({ schoolId }) {
           </table>
         </div>
       </div>
+
+      {isPrintingSchedule && (
+        <PrintScheduleModal
+          classes={classes}
+          teachers={teachers}
+          schedules={schedulesList}
+          academicYear={academicYear}
+          semester={semester}
+          onClose={() => setIsPrintingSchedule(false)}
+        />
+      )}
 
     </div>
   );

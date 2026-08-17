@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, where, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, Link as LinkIcon, Edit2, X, Check } from 'lucide-react';
+import { Calendar, Link as LinkIcon, Edit2, X, Check, Printer } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import PrintScheduleModal from '../components/PrintScheduleModal';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 const dayMap = {
@@ -20,7 +21,10 @@ export default function TeacherSchedule() {
   const { userData } = useAuth();
   const [schedules, setSchedules] = useState([]);
   const [classes, setClasses] = useState({});
+  const [classesList, setClassesList] = useState([]);
+  const [teachersList, setTeachersList] = useState([]);
   const [teacherDocId, setTeacherDocId] = useState(null);
+  const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
 
   // Link Editing State
   const [editingCell, setEditingCell] = useState(null); // { scheduleId, key, currentLink }
@@ -48,10 +52,18 @@ export default function TeacherSchedule() {
     // Load all classes for name mapping
     const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
       const clsMap = {};
+      const list = [];
       snap.docs.forEach(doc => {
         clsMap[doc.id] = doc.data().name;
+        list.push({ id: doc.id, ...doc.data() });
       });
       setClasses(clsMap);
+      setClassesList(list);
+    });
+
+    // Load all teachers
+    const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
+      setTeachersList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
     // Load all schedules
@@ -59,7 +71,7 @@ export default function TeacherSchedule() {
       setSchedules(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => { unsubClasses(); unsubSchedules(); };
+    return () => { unsubClasses(); unsubTeachers(); unsubSchedules(); };
   }, []);
 
   // Filter schedule for this teacher
@@ -110,9 +122,31 @@ export default function TeacherSchedule() {
 
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px', color: 'var(--color-primary-dark)' }}>
-        <Calendar size={24} /> {t('teacherSchedule.mySchedule')}
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--color-primary-dark)' }}>
+          <Calendar size={24} /> {t('teacherSchedule.mySchedule')}
+        </h2>
+        <button
+          type="button"
+          onClick={() => setIsPrintingSchedule(true)}
+          className="btn"
+          style={{
+            background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+            color: 'white',
+            border: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: 'bold',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(14, 116, 144, 0.25)',
+            cursor: 'pointer'
+          }}
+        >
+          <Printer size={18} /> طباعة جدولي الدراسي
+        </button>
+      </div>
       
       <div style={{ overflowX: 'auto' }}>
         <table className="data-table">
@@ -185,6 +219,17 @@ export default function TeacherSchedule() {
           </tbody>
         </table>
       </div>
+
+      {isPrintingSchedule && (
+        <PrintScheduleModal
+          classes={classesList}
+          teachers={teachersList.length > 0 ? teachersList : [{ id: teacherDocId || userData?.nationalId || 'teacher', name: userData?.name || 'المعلم', subject: userData?.subject || 'تعليم عام' }]}
+          schedules={schedules}
+          defaultLevel="teacher"
+          initialTeacherId={teacherDocId || userData?.nationalId || teachersList[0]?.id}
+          onClose={() => setIsPrintingSchedule(false)}
+        />
+      )}
     </div>
   );
 }
