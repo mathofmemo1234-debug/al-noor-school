@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
   Mail, Send, Inbox, Paperclip, FileText, Image as ImageIcon, Download,
   Eye, Trash2, Reply, Check, CheckCheck, AlertCircle, AlertTriangle,
   Users, User, Search, Filter, Printer, X, Plus, Clock, Tag, ArrowRight,
-  ShieldCheck, UserCheck, BookOpen, Sparkles, RefreshCw, CheckCircle2
+  ShieldCheck, UserCheck, BookOpen, Sparkles, RefreshCw, CheckCircle2,
+  ListOrdered, UserX, BarChart2, EyeOff
 } from 'lucide-react';
 
 const ROLE_BADGES = {
@@ -57,7 +58,10 @@ export default function SchoolMessagingHub() {
   const [attachment, setAttachment] = useState(null); // { name, type: 'image' | 'pdf', size, dataUrl }
   const [isSending, setIsSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
-  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+  // Read Audit Tab in Reader
+  const [auditTab, setAuditTab] = useState('read'); // 'read' | 'pending'
+  const [printingAudit, setPrintingAudit] = useState(false);
 
   // Lightbox for attachment
   const [previewAttachment, setPreviewAttachment] = useState(null);
@@ -132,13 +136,18 @@ export default function SchoolMessagingHub() {
     const unsub = onSnapshot(collection(db, 'school_messages'), snap => {
       const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
-      // Sort newest first
       msgs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       setMessages(msgs);
+
+      // Keep selected message in sync
+      if (selectedMessage) {
+        const updated = msgs.find(m => m.id === selectedMessage.id);
+        if (updated) setSelectedMessage(updated);
+      }
     });
 
     return () => unsub();
-  }, [schoolId]);
+  }, [schoolId, selectedMessage?.id]);
 
   // Determine if a message is received by the current user
   const isMessageForMe = (msg) => {
@@ -205,7 +214,6 @@ export default function SchoolMessagingHub() {
 
   const displayedMessages = useMemo(() => {
     return currentTabList.filter(m => {
-      // Search query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchSubj = m.subject?.toLowerCase().includes(q);
@@ -215,7 +223,6 @@ export default function SchoolMessagingHub() {
         if (!matchSubj && !matchBody && !matchSender && !matchReceiver) return false;
       }
 
-      // Filter category
       if (filterType === 'unread') {
         if (m.readBy && m.readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()))) return false;
       } else if (filterType === 'individual') {
@@ -230,14 +237,25 @@ export default function SchoolMessagingHub() {
     });
   }, [currentTabList, searchQuery, filterType, myIdentities]);
 
-  // Handle Mark as Read when opening message
+  // Handle Mark as Read when opening message + Record detailed Reader object
   const handleSelectMessage = async (msg) => {
     setSelectedMessage(msg);
-    const hasRead = msg.readBy && msg.readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()));
+    const hasRead = msg.readBy && Array.isArray(msg.readBy) && msg.readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()));
+    
     if (activeTab === 'inbox' && !hasRead) {
       try {
+        const readerEntry = {
+          userId: currentUser?.uid || myNid,
+          nationalId: myNid,
+          name: myName,
+          role: myRole,
+          roleTitle: myRoleTitle,
+          readAt: new Date().toISOString()
+        };
+
         await updateDoc(doc(db, 'school_messages', msg.id), {
-          readBy: arrayUnion(myNid, currentUser?.uid || myNid)
+          readBy: arrayUnion(myNid, currentUser?.uid || myNid),
+          readers: arrayUnion(readerEntry)
         });
       } catch (err) {
         console.error('Error marking as read:', err);
@@ -245,12 +263,104 @@ export default function SchoolMessagingHub() {
     }
   };
 
+  // Compute Detailed Audience & Read Audit for Selected Message
+  const auditData = useMemo(() => {
+    if (!selectedMessage) return { targetAudience: [], readList: [], pendingList: [], readPercentage: 0 };
+
+    const msg = selectedMessage;
+    const recordedReaders = msg.readers || [];
+    const readBySet = new Set((msg.readBy || []).map(x => String(x).trim().toLowerCase()));
+
+    // 1. Determine Target Audience List
+    let targetList = [];
+    if (msg.messageType === 'individual') {
+      targetList = [{
+        id: msg.receiverId || msg.receiverNationalId,
+        nationalId: msg.receiverNationalId || '',
+        name: msg.receiverName || 'المستلم',
+        role: msg.receiverRole || 'user',
+        roleTitle: msg.receiverRoleTitle || 'مستلم'
+      }];
+    } else {
+      if (msg.targetGroup === 'all') {
+        targetList = [...teachersList, ...studentsList, ...staffList, ...supervisorsList];
+      } else if (msg.targetGroup === 'teachers') {
+        targetList = [...teachersList];
+      } else if (msg.targetGroup === 'students') {
+        targetList = [...studentsList];
+      } else if (msg.targetGroup === 'class') {
+        targetList = studentsList.filter(s => s.class === msg.targetClassName || s.className === msg.targetClassName);
+      } else if (msg.targetGroup === 'staff') {
+        targetList = [...staffList];
+      } else if (msg.targetGroup === 'supervisors') {
+        targetList = [...supervisorsList];
+      }
+    }
+
+    // 2. Classify into Read vs Pending
+    const readList = [];
+    const pendingList = [];
+
+    // Map recorded readers first
+    const processedNids = new Set();
+    recordedReaders.forEach(r => {
+      const rNid = String(r.nationalId || r.userId || '').trim().toLowerCase();
+      processedNids.add(rNid);
+      readList.push({
+        id: r.userId || r.nationalId,
+        nationalId: r.nationalId,
+        name: r.name,
+        role: r.role,
+        roleTitle: r.roleTitle || ROLE_BADGES[r.role]?.label || r.role,
+        readAt: r.readAt
+      });
+    });
+
+    // Check target audience
+    targetList.forEach(member => {
+      const mNid = String(member.nationalId || member.id || '').trim().toLowerCase();
+      const mId = String(member.id || '').trim().toLowerCase();
+
+      if (processedNids.has(mNid) || processedNids.has(mId)) {
+        return; // already in readList
+      }
+
+      if (readBySet.has(mNid) || readBySet.has(mId)) {
+        readList.push({
+          id: member.id,
+          nationalId: member.nationalId,
+          name: member.name,
+          role: member.role,
+          roleTitle: member.roleTitle || member.subject || member.class || member.specialty || ROLE_BADGES[member.role]?.label || member.role,
+          readAt: msg.createdAt // fallback timestamp
+        });
+      } else {
+        pendingList.push({
+          id: member.id,
+          nationalId: member.nationalId,
+          name: member.name,
+          role: member.role,
+          roleTitle: member.roleTitle || member.subject || member.class || member.specialty || ROLE_BADGES[member.role]?.label || member.role
+        });
+      }
+    });
+
+    const total = targetList.length || readList.length + pendingList.length || 1;
+    const pct = Math.min(100, Math.round((readList.length / total) * 100));
+
+    return {
+      targetAudience: targetList,
+      readList,
+      pendingList,
+      readPercentage: isNaN(pct) ? 0 : pct
+    };
+  }, [selectedMessage, teachersList, studentsList, staffList, supervisorsList]);
+
   // Handle File Attachment Upload (Images & PDFs)
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size limit: 3MB
     if (file.size > 3 * 1024 * 1024) {
       alert('حجم الملف المرفق يجب ألا يتجاوز 3 ميجابايت لضمان سرعة الإرسال والتصفح.');
       return;
@@ -288,27 +398,35 @@ export default function SchoolMessagingHub() {
     setSelectedMessage(null);
   };
 
-  // Quick Test Message Generator (Sends a real test circular to verify immediate effectiveness)
+  // Quick Test Message Generator
   const handleSendTestMessage = async () => {
     try {
       await addDoc(collection(db, 'school_messages'), {
         schoolId,
-        senderId: 'system_admin',
-        senderNationalId: '1000000001',
-        senderName: 'إدارة المدارس المتقدمة',
-        senderRole: 'admin',
-        senderRoleTitle: 'مدير المدرسة',
+        senderId: currentUser?.uid || myNid,
+        senderNationalId: myNid,
+        senderName: myName,
+        senderRole: myRole,
+        senderRoleTitle: myRoleTitle,
         messageType: 'group',
         targetGroup: 'all',
-        subject: '✨ مرحباً بكم في نظام المراسلات والتعاميم المدرسية المحدث',
-        body: `السلام عليكم ورحمة الله وبركاته،\n\nنرحب بكافة الزملاء المعلمين وأبنائنا الطلاب والكادر الإداري والمشرفين التربويين في منصة التواصل والمراسلات الرسمية.\n\nيمكنكم من خلال هذه المنصة:\n1. إرسال واستقبال الرسائل الفردية المباشرة.\n2. إرسال التعاميم الرسمية والتوجيهات الجماعية.\n3. إرفاق الصور ومستندات الـ PDF بكل سهولة.\n4. متابعة التنبيهات الفورية وقراءة الرسائل فور ورودها.\n\nمع تمنياتنا للجميع بعام دراسي حافل بالتميز والنجاح.\nإدارة المدرسة`,
+        subject: '✨ تعميم تجريبي: تفعيل نظام المتابعة وقراءة الرسائل',
+        body: `السلام عليكم ورحمة الله وبركاته،\n\nنرحب بكافة منسوبي المدرسة، ونؤكد على تفعيل نظام المراسلات وقراءة التعاميم مع تتبع حالة الاطلاع لكل منسوب بالوقت والتاريخ.\n\nيرجى الاطلاع والاعتماد.\n${myName}`,
         priority: 'important',
         attachment: null,
-        readBy: [],
+        readBy: [myNid, currentUser?.uid || myNid],
+        readers: [{
+          userId: currentUser?.uid || myNid,
+          nationalId: myNid,
+          name: myName,
+          role: myRole,
+          roleTitle: myRoleTitle,
+          readAt: new Date().toISOString()
+        }],
         createdAt: new Date().toISOString(),
         replyToId: null
       });
-      alert('✓ تم إرسال رسالة تجريبية ترحيبية بنجاح إلى كافة منسوبي المدرسة!');
+      alert('✓ تم إرسال تعميم تجريبي بنجاح!');
       setActiveTab('inbox');
     } catch (err) {
       console.error('Error sending test message:', err);
@@ -352,6 +470,15 @@ export default function SchoolMessagingHub() {
 
     setIsSending(true);
     try {
+      const senderReaderObj = {
+        userId: currentUser?.uid || myNid,
+        nationalId: myNid,
+        name: myName,
+        role: myRole,
+        roleTitle: myRoleTitle,
+        readAt: new Date().toISOString()
+      };
+
       const payload = {
         schoolId,
         senderId: currentUser?.uid || myNid,
@@ -365,6 +492,7 @@ export default function SchoolMessagingHub() {
         priority,
         attachment: attachment || null,
         readBy: [myNid, currentUser?.uid || myNid],
+        readers: [senderReaderObj],
         createdAt: new Date().toISOString(),
         replyToId: replyingTo ? replyingTo.id : null
       };
@@ -383,8 +511,6 @@ export default function SchoolMessagingHub() {
       setAttachment(null);
       setRecipientNid('');
       setReplyingTo(null);
-      setFeedbackSuccess(true);
-      setTimeout(() => setFeedbackSuccess(false), 3000);
       setActiveTab('sent');
       alert('✓ تم إرسال الرسالة / التعميم بنجاح.');
     } catch (err) {
@@ -451,11 +577,11 @@ export default function SchoolMessagingHub() {
                 alignItems: 'center',
                 gap: '4px'
               }}>
-                <CheckCircle2 size={13} /> اتصال فوري نشط
+                <CheckCheck size={14} color="#059669" /> متابعة حالة القراءة مفعلة
               </span>
             </div>
             <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: 'var(--color-text-muted)' }}>
-              تواصل داخلي فوري وفردي وجماعي بين الإدارة، المعلمين، الطلاب، الكادر، والمشرفين
+              تواصل داخلي فوري وفردي وجماعي مع رصد دقيق لمن اطلع وقرأ الرسائل والتعاميم بالوقت والتاريخ
             </p>
           </div>
         </div>
@@ -514,7 +640,7 @@ export default function SchoolMessagingHub() {
       </div>
 
       {/* Main Grid Container */}
-      <div style={{ display: 'grid', gridTemplateColumns: selectedMessage ? '1fr 1.2fr' : '1fr', gap: '20px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: selectedMessage ? '1fr 1.35fr' : '1fr', gap: '20px', alignItems: 'start' }}>
         
         {/* Left Column: Tabs & Messages List (or Compose Form) */}
         <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -682,6 +808,15 @@ export default function SchoolMessagingHub() {
                     const isSelected = selectedMessage?.id === msg.id;
                     const senderRoleBadge = ROLE_BADGES[msg.senderRole] || ROLE_BADGES.student;
 
+                    // Read status check for Sent Tab
+                    const isDirectReadByRecipient = msg.messageType === 'individual' && msg.readBy && (
+                      msg.readBy.includes(msg.receiverNationalId) || 
+                      msg.readBy.includes(msg.receiverId) ||
+                      (msg.readers && msg.readers.some(r => String(r.nationalId || r.userId).toLowerCase() === String(msg.receiverNationalId || msg.receiverId).toLowerCase()))
+                    );
+
+                    const readersCount = (msg.readers?.length) || (msg.readBy?.length ? Math.max(0, msg.readBy.length - 1) : 0);
+
                     return (
                       <div
                         key={msg.id}
@@ -761,8 +896,8 @@ export default function SchoolMessagingHub() {
                           </div>
                         </div>
 
-                        {/* Footer details: Group label / Attachment */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px dashed #f1f5f9' }}>
+                        {/* Footer details: Read Receipts & Group label / Attachment */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px dashed #f1f5f9', flexWrap: 'wrap', gap: '6px' }}>
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                             {msg.messageType === 'group' ? (
                               <span style={{ fontSize: '11px', color: '#0369a1', background: '#e0f2fe', padding: '2px 6px', borderRadius: '6px', fontWeight: 'bold' }}>
@@ -772,6 +907,25 @@ export default function SchoolMessagingHub() {
                               <span style={{ fontSize: '11px', color: '#475569' }}>
                                 👤 رسالة خاصة
                               </span>
+                            )}
+
+                            {/* Read Status for Sent tab */}
+                            {activeTab === 'sent' && (
+                              msg.messageType === 'individual' ? (
+                                isDirectReadByRecipient ? (
+                                  <span style={{ fontSize: '11px', color: '#0284c7', background: '#e0f2fe', padding: '1px 6px', borderRadius: '6px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <CheckCheck size={13} color="#0284c7" /> تم الاطلاع
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <Check size={13} color="#94a3b8" /> بانتظار الاطلاع
+                                  </span>
+                                )
+                              ) : (
+                                <span style={{ fontSize: '11px', color: '#0f766e', background: '#ccfbf1', padding: '1px 6px', borderRadius: '6px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <Eye size={12} /> اطّلع عليه: {readersCount}
+                                </span>
+                              )
                             )}
                           </div>
 
@@ -1177,7 +1331,7 @@ export default function SchoolMessagingHub() {
               lineHeight: '1.8',
               color: '#1e293b',
               whiteSpace: 'pre-wrap',
-              minHeight: '140px'
+              minHeight: '120px'
             }}>
               {selectedMessage.body}
             </div>
@@ -1264,6 +1418,160 @@ export default function SchoolMessagingHub() {
               </div>
             )}
 
+            {/* ========================================================================= */}
+            {/* 📊 READ AUDIT & RECEIPTS SECTION (حالة الاطلاع والقراءة لجميع المستهدفين)  */}
+            {/* ========================================================================= */}
+            <div style={{
+              padding: '16px',
+              borderRadius: '12px',
+              border: '1.5px solid #0e7490',
+              background: '#f0fdfa',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <BarChart2 size={20} color="#0e7490" />
+                  <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#0f766e' }}>
+                    حالة الاطلاع والقراءة لجميع المستهدفين:
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0e7490' }}>
+                    نسبة القراءة: {auditData.readPercentage}% ({auditData.readList.length} من {auditData.targetAudience.length || auditData.readList.length})
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div style={{ width: '100%', height: '8px', background: '#ccfbf1', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{
+                  width: `${auditData.readPercentage}%`,
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #0e7490, #10b981)',
+                  transition: 'width 0.4s ease-in-out'
+                }} />
+              </div>
+
+              {/* Toggle Tabs: Read vs Pending */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAuditTab('read')}
+                  style={{
+                    flex: 1,
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: auditTab === 'read' ? '#0f766e' : 'white',
+                    color: auditTab === 'read' ? 'white' : '#0f766e',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <CheckCircle2 size={14} /> تم الاطلاع ({auditData.readList.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAuditTab('pending')}
+                  style={{
+                    flex: 1,
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: auditTab === 'pending' ? '#d97706' : 'white',
+                    color: auditTab === 'pending' ? 'white' : '#d97706',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <Clock size={14} /> بانتظار الاطلاع ({auditData.pendingList.length})
+                </button>
+              </div>
+
+              {/* Readers List Table / Badges */}
+              <div style={{ maxHeight: '180px', overflowY: 'auto', background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '8px' }}>
+                {auditTab === 'read' ? (
+                  auditData.readList.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '16px', color: '#94a3b8', fontSize: '12px' }}>
+                      لم يقم أي شخص بالاطلاع على الرسالة بعد
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {auditData.readList.map((reader, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          fontSize: '12px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CheckCheck size={14} color="#10b981" />
+                            <strong>{reader.name}</strong>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>({reader.roleTitle || reader.role})</span>
+                          </div>
+
+                          <div style={{ fontSize: '11px', color: '#0f766e', fontWeight: '600' }}>
+                            {reader.readAt ? new Date(reader.readAt).toLocaleString('ar-SA') : 'تم الاطلاع'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  auditData.pendingList.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '16px', color: '#10b981', fontSize: '12px', fontWeight: 'bold' }}>
+                      ✓ رائع! تم الاطلاع على الرسالة من قِبل جميع المستهدفين (100%)
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {auditData.pendingList.map((member, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          background: '#fffbeb',
+                          border: '1px solid #fde68a',
+                          fontSize: '12px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Clock size={14} color="#d97706" />
+                            <strong>{member.name}</strong>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>({member.roleTitle || member.role})</span>
+                          </div>
+
+                          <span style={{ fontSize: '11px', color: '#d97706', fontWeight: 'bold' }}>
+                            لم يُفتح بعد
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+
             {/* Quick Actions at bottom */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -1299,7 +1607,7 @@ export default function SchoolMessagingHub() {
                     cursor: 'pointer'
                   }}
                 >
-                  <Printer size={15} /> طباعة
+                  <Printer size={15} /> طباعة الرسالة وكشف الاطلاع
                 </button>
               </div>
 
