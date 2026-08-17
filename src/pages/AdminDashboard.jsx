@@ -16,6 +16,7 @@ import CertificateLetterModal from '../components/CertificateLetterModal';
 import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
 import NationalitySelect from '../components/NationalitySelect';
+import SchoolMessagingHub from './SchoolMessagingHub';
 import { useLanguage } from '../contexts/LanguageContext';
 
 function AdminHome({ schoolId }) {
@@ -1654,6 +1655,7 @@ export default function AdminDashboard() {
     <Layout role="admin" title={t('adminDashboard.adminDashboardTitle')}>
       <Routes>
         <Route path="/" element={<AdminHome schoolId={userData?.schoolId} />} />
+        <Route path="/messages" element={<SchoolMessagingHub />} />
         <Route path="/staff" element={<ManageStaff schoolId={userData?.schoolId} />} />
         <Route path="/supervisors" element={<ManageSupervisors schoolId={userData?.schoolId} />} />
         <Route path="/teachers" element={<ManageTeachers schoolId={userData?.schoolId} />} />

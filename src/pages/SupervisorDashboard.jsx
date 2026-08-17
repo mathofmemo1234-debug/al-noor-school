@@ -13,6 +13,7 @@ import AdminExcellence from './AdminExcellence';
 import SchoolSettings from './SchoolSettings';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
+import SchoolMessagingHub from './SchoolMessagingHub';
 
 function SupervisorHome({ schoolId }) {
   const { userData } = useAuth();
@@ -257,6 +258,7 @@ export default function SupervisorDashboard() {
     <Layout role="supervisor" title="لوحة تحكم المشرف التعليمي">
       <Routes>
         <Route path="/" element={<SupervisorHome schoolId={userData?.schoolId} />} />
+        <Route path="/messages" element={<SchoolMessagingHub />} />
         <Route path="/attendance" element={<AttendanceSummaryExport schoolId={userData?.schoolId} />} />
         <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />
         <Route path="/weekly-plan" element={<WeeklyPlanView schoolId={userData?.schoolId} />} />

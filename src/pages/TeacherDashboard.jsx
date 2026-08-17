@@ -12,6 +12,7 @@ import MaterialsUpload from './MaterialsUpload';
 import TeacherExams from './TeacherExams';
 import TeacherExcellence from './TeacherExcellence';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
+import SchoolMessagingHub from './SchoolMessagingHub';
 import { useLanguage } from '../contexts/LanguageContext';
 
 function TeacherTasks() {
@@ -694,6 +695,7 @@ export default function TeacherDashboard() {
     <Layout role="teacher" title={t('teacherDashboard.pageTitle')}>
       <Routes>
         <Route path="/" element={<TeacherTasks />} />
+        <Route path="/messages" element={<SchoolMessagingHub />} />
         <Route path="/schedule" element={<TeacherSchedule />} />
         <Route path="/weekly-plan" element={<WeeklyPlan />} />
         <Route path="/preparation" element={<LessonPreparation />} />

@@ -6,6 +6,7 @@ import { auth, db } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot, doc } from 'firebase/firestore';
 import StudentSchedule from './StudentSchedule';
 import StudentExams from './StudentExams';
+import SchoolMessagingHub from './SchoolMessagingHub';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -297,6 +298,7 @@ export default function StudentDashboard() {
     <Layout role="student" title={t('studentDashboard.pageTitle')}>
       <Routes>
         <Route path="/" element={<StudentHome />} />
+        <Route path="/messages" element={<SchoolMessagingHub />} />
         <Route path="/weekly-plan" element={<StudentWeeklyPlan />} />
         <Route path="/assignments" element={<StudentAssignments />} />
         <Route path="/schedule" element={<StudentSchedule />} />
