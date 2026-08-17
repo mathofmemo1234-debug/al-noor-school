@@ -37,26 +37,54 @@ export default function Header({ title, role }) {
 
   // Listen to unread messages
   useEffect(() => {
-    if (!schoolId || !myNid) return;
+    const myIdentities = new Set([
+      myNid,
+      userData?.nationalId,
+      userData?.id,
+      currentUser?.uid,
+      currentUser?.email,
+      currentUser?.email?.split('@')[0],
+      userData?.name
+    ].filter(Boolean).map(s => String(s).trim().toLowerCase()));
 
-    const q = query(collection(db, 'school_messages'), where('schoolId', '==', schoolId));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(collection(db, 'school_messages'), (snap) => {
       let count = 0;
       snap.docs.forEach(docSnap => {
         const msg = docSnap.data();
+        if (schoolId && schoolId !== 'main_school' && msg.schoolId && msg.schoolId !== schoolId) return;
+
         const readBy = msg.readBy || [];
-        if (readBy.includes(myNid)) return; // already read
+        const hasRead = Array.isArray(readBy) && readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()));
+        if (hasRead) return; // already read
+
+        // Check if current user is the sender of a direct message
+        const senderNid = String(msg.senderNationalId || '').trim().toLowerCase();
+        const senderId = String(msg.senderId || '').trim().toLowerCase();
+        if (msg.messageType === 'individual' && (myIdentities.has(senderNid) || myIdentities.has(senderId))) {
+          return;
+        }
 
         // Check if message belongs to this user
         if (msg.messageType === 'individual') {
-          if (msg.receiverNationalId === myNid || msg.receiverId === currentUser?.uid) {
+          const recNid = String(msg.receiverNationalId || '').trim().toLowerCase();
+          const recId = String(msg.receiverId || '').trim().toLowerCase();
+          const recEmail = String(msg.receiverEmail || '').trim().toLowerCase();
+          const recName = String(msg.receiverName || '').trim().toLowerCase();
+
+          if (myIdentities.has(recNid) || myIdentities.has(recId) || myIdentities.has(recEmail) || (recName && myIdentities.has(recName))) {
             count++;
           }
         } else if (msg.messageType === 'group') {
-          if (msg.targetGroup === 'all') count++;
-          else if (msg.targetGroup === 'teachers' && effectiveRole === 'teacher') count++;
-          else if (msg.targetGroup === 'students' && effectiveRole === 'student') count++;
-          else if (msg.targetGroup === 'class' && effectiveRole === 'student' && myClass && msg.targetClassName?.trim() === myClass) count++;
+          if (!msg.targetGroup || msg.targetGroup === 'all') count++;
+          else if (msg.targetGroup === 'teachers' && (effectiveRole === 'teacher' || userData?.role === 'teacher' || !!userData?.subject)) count++;
+          else if (msg.targetGroup === 'students' && (effectiveRole === 'student' || userData?.role === 'student')) count++;
+          else if (msg.targetGroup === 'class' && (effectiveRole === 'student' || userData?.role === 'student')) {
+            const targetCls = String(msg.targetClassName || '').trim().toLowerCase();
+            const userCls = String(myClass || userData?.class || userData?.className || '').trim().toLowerCase();
+            if (targetCls && userCls && (targetCls === userCls || userCls.includes(targetCls) || targetCls.includes(userCls))) {
+              count++;
+            }
+          }
           else if (msg.targetGroup === 'staff' && (effectiveRole === 'staff' || effectiveRole === 'admin')) count++;
           else if (msg.targetGroup === 'supervisors' && effectiveRole === 'supervisor') count++;
         }
@@ -65,7 +93,7 @@ export default function Header({ title, role }) {
     });
 
     return () => unsub();
-  }, [schoolId, myNid, effectiveRole, myClass, currentUser]);
+  }, [schoolId, myNid, effectiveRole, myClass, currentUser, userData]);
 
   const displayRole = effectiveRole === 'superadmin' ? 'الماستر' : 
                       effectiveRole === 'admin' ? (userData?.schoolName ? `مدير • ${userData.schoolName}` : 'مدير') : 

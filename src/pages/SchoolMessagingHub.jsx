@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, arrayUnion, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
   Mail, Send, Inbox, Paperclip, FileText, Image as ImageIcon, Download,
   Eye, Trash2, Reply, Check, CheckCheck, AlertCircle, AlertTriangle,
   Users, User, Search, Filter, Printer, X, Plus, Clock, Tag, ArrowRight,
-  ShieldCheck, UserCheck, BookOpen, ChevronRight, ExternalLink
+  ShieldCheck, UserCheck, BookOpen, Sparkles, RefreshCw, CheckCircle2
 } from 'lucide-react';
 
 const ROLE_BADGES = {
@@ -23,7 +23,7 @@ const TARGET_GROUPS = [
   { id: 'teachers', label: '👨‍🏫 كافة المعلمين والمعلمات', desc: 'يصل لجميع معلمي المدرسة' },
   { id: 'students', label: '🎓 كافة الطلاب والطالبات', desc: 'يصل لجميع طلاب المدرسة' },
   { id: 'class', label: '🏫 طلاب فصل دراسي محدد', desc: 'تحديد فصل معين لإرسال التوجيهات أو الواجبات' },
-  { id: 'staff', label: '👔 كافة أعضاء الكادر الإداري والوكلاء', desc: 'يصل للوكلاء والإداريين والمشرفين الإداريين' },
+  { id: 'staff', label: '👔 كافة أعضاء الكادر الإداري والوكلاء', desc: 'يصل للوكلاء والإداريين' },
   { id: 'supervisors', label: '🌟 كافة المشرفين التربويين', desc: 'يصل للمشرفين التعليميين' }
 ];
 
@@ -57,42 +57,64 @@ export default function SchoolMessagingHub() {
   const [attachment, setAttachment] = useState(null); // { name, type: 'image' | 'pdf', size, dataUrl }
   const [isSending, setIsSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
   // Lightbox for attachment
   const [previewAttachment, setPreviewAttachment] = useState(null);
 
   const schoolId = userData?.schoolId || 'main_school';
   const myNid = (userData?.nationalId || currentUser?.email?.replace('@school.local', '') || currentUser?.uid || '').trim();
-  const myName = userData?.name || 'مستخدم النظام';
+  const myName = userData?.name || (userRole === 'teacher' ? 'المعلم' : userRole === 'admin' ? 'مدير المدرسة' : 'مستخدم النظام');
   const myRole = userRole || userData?.role || 'student';
-  const myRoleTitle = userData?.roleTitle || ROLE_BADGES[myRole]?.label || myRole;
+  const myRoleTitle = userData?.roleTitle || (myRole === 'teacher' ? `معلم • ${userData?.subject || ''}` : ROLE_BADGES[myRole]?.label || myRole);
   const myClass = (userData?.class || userData?.className || '')?.trim();
 
-  // Load Recipients Directory
+  // All my possible identifiers for matching messages
+  const myIdentities = useMemo(() => {
+    const ids = new Set([
+      myNid,
+      userData?.nationalId,
+      userData?.id,
+      currentUser?.uid,
+      currentUser?.email,
+      currentUser?.email?.split('@')[0],
+      myName
+    ].filter(Boolean).map(s => String(s).trim().toLowerCase()));
+    return ids;
+  }, [myNid, userData, currentUser, myName]);
+
+  // Load Recipients Directory from Firestore (with robust fallback)
   useEffect(() => {
-    if (!schoolId) return;
-
-    const unsubTeachers = onSnapshot(query(collection(db, 'teachers'), where('schoolId', '==', schoolId)), snap => {
-      setTeachersList(snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'teacher' })));
+    const unsubTeachers = onSnapshot(collection(db, 'teachers'), snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'teacher' }))
+        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
+      setTeachersList(list);
     });
 
-    const unsubStudents = onSnapshot(query(collection(db, 'students'), where('schoolId', '==', schoolId)), snap => {
-      setStudentsList(snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'student' })));
+    const unsubStudents = onSnapshot(collection(db, 'students'), snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'student' }))
+        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
+      setStudentsList(list);
     });
 
-    const unsubStaff = onSnapshot(query(collection(db, 'staff'), where('schoolId', '==', schoolId)), snap => {
-      setStaffList(snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'staff' })));
+    const unsubStaff = onSnapshot(collection(db, 'staff'), snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'staff' }))
+        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
+      setStaffList(list);
     });
 
-    const unsubSupervisors = onSnapshot(query(collection(db, 'supervisors'), where('schoolId', '==', schoolId)), snap => {
-      setSupervisorsList(snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'supervisor' })));
+    const unsubSupervisors = onSnapshot(collection(db, 'supervisors'), snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'supervisor' }))
+        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
+      setSupervisorsList(list);
     });
 
-    const unsubClasses = onSnapshot(query(collection(db, 'classes'), where('schoolId', '==', schoolId)), snap => {
-      const cls = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setClassesList(cls);
-      if (cls.length > 0 && !targetClassName) {
-        setTargetClassName(cls[0].name);
+    const unsubClasses = onSnapshot(collection(db, 'classes'), snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
+      setClassesList(list);
+      if (list.length > 0 && !targetClassName) {
+        setTargetClassName(list[0].name);
       }
     });
 
@@ -105,13 +127,11 @@ export default function SchoolMessagingHub() {
     };
   }, [schoolId]);
 
-  // Load All Messages
+  // Realtime subscriber to school_messages
   useEffect(() => {
-    if (!schoolId) return;
-
-    const q = query(collection(db, 'school_messages'), where('schoolId', '==', schoolId));
-    const unsub = onSnapshot(q, snap => {
-      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const unsub = onSnapshot(collection(db, 'school_messages'), snap => {
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
       // Sort newest first
       msgs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       setMessages(msgs);
@@ -120,39 +140,65 @@ export default function SchoolMessagingHub() {
     return () => unsub();
   }, [schoolId]);
 
-  // Determine if a message is received by current user
+  // Determine if a message is received by the current user
   const isMessageForMe = (msg) => {
-    if (msg.senderNationalId === myNid && msg.messageType === 'individual') {
-      return false; // I am the sender of this private message
+    if (!msg) return false;
+
+    // Check if current user is the sender in a direct private message (not for inbox)
+    const senderNid = String(msg.senderNationalId || '').trim().toLowerCase();
+    const senderId = String(msg.senderId || '').trim().toLowerCase();
+    if (msg.messageType === 'individual' && (myIdentities.has(senderNid) || myIdentities.has(senderId))) {
+      return false;
     }
+
+    // Direct / Individual Message
     if (msg.messageType === 'individual') {
-      return msg.receiverNationalId === myNid || msg.receiverId === currentUser?.uid;
+      const recNid = String(msg.receiverNationalId || '').trim().toLowerCase();
+      const recId = String(msg.receiverId || '').trim().toLowerCase();
+      const recEmail = String(msg.receiverEmail || '').trim().toLowerCase();
+      const recName = String(msg.receiverName || '').trim().toLowerCase();
+
+      return myIdentities.has(recNid) || myIdentities.has(recId) || myIdentities.has(recEmail) || (recName && myIdentities.has(recName));
     }
+
+    // Group / Broadcast Message
     if (msg.messageType === 'group') {
-      if (msg.targetGroup === 'all') return true;
-      if (msg.targetGroup === 'teachers' && myRole === 'teacher') return true;
-      if (msg.targetGroup === 'students' && myRole === 'student') return true;
-      if (msg.targetGroup === 'class' && myRole === 'student' && myClass && msg.targetClassName?.trim() === myClass) return true;
+      if (!msg.targetGroup || msg.targetGroup === 'all') return true;
+      if (msg.targetGroup === 'teachers' && (myRole === 'teacher' || userData?.role === 'teacher' || !!userData?.subject)) return true;
+      if (msg.targetGroup === 'students' && (myRole === 'student' || userData?.role === 'student')) return true;
+      if (msg.targetGroup === 'class') {
+        const targetCls = String(msg.targetClassName || '').trim().toLowerCase();
+        const userCls = String(myClass || userData?.class || userData?.className || '').trim().toLowerCase();
+        if (targetCls && userCls && (targetCls === userCls || userCls.includes(targetCls) || targetCls.includes(userCls))) return true;
+      }
       if (msg.targetGroup === 'staff' && (myRole === 'staff' || myRole === 'admin')) return true;
       if (msg.targetGroup === 'supervisors' && myRole === 'supervisor') return true;
     }
+
     return false;
   };
 
   // Inbox Messages
   const inboxMessages = useMemo(() => {
     return messages.filter(m => isMessageForMe(m));
-  }, [messages, myNid, myRole, myClass, currentUser]);
+  }, [messages, myIdentities, myRole, myClass, userData]);
 
   // Sent Messages
   const sentMessages = useMemo(() => {
-    return messages.filter(m => m.senderNationalId === myNid || m.senderId === currentUser?.uid);
-  }, [messages, myNid, currentUser]);
+    return messages.filter(m => {
+      const sNid = String(m.senderNationalId || '').trim().toLowerCase();
+      const sId = String(m.senderId || '').trim().toLowerCase();
+      return myIdentities.has(sNid) || myIdentities.has(sId);
+    });
+  }, [messages, myIdentities]);
 
   // Unread Count
   const unreadCount = useMemo(() => {
-    return inboxMessages.filter(m => !m.readBy || !m.readBy.includes(myNid)).length;
-  }, [inboxMessages, myNid]);
+    return inboxMessages.filter(m => {
+      if (!m.readBy || !Array.isArray(m.readBy)) return true;
+      return !m.readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()));
+    }).length;
+  }, [inboxMessages, myIdentities]);
 
   // Filtered List based on Search & Filter
   const currentTabList = activeTab === 'inbox' ? inboxMessages : sentMessages;
@@ -171,7 +217,7 @@ export default function SchoolMessagingHub() {
 
       // Filter category
       if (filterType === 'unread') {
-        if (m.readBy && m.readBy.includes(myNid)) return false;
+        if (m.readBy && m.readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()))) return false;
       } else if (filterType === 'individual') {
         if (m.messageType !== 'individual') return false;
       } else if (filterType === 'group') {
@@ -182,15 +228,16 @@ export default function SchoolMessagingHub() {
 
       return true;
     });
-  }, [currentTabList, searchQuery, filterType, myNid]);
+  }, [currentTabList, searchQuery, filterType, myIdentities]);
 
   // Handle Mark as Read when opening message
   const handleSelectMessage = async (msg) => {
     setSelectedMessage(msg);
-    if (activeTab === 'inbox' && (!msg.readBy || !msg.readBy.includes(myNid))) {
+    const hasRead = msg.readBy && msg.readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()));
+    if (activeTab === 'inbox' && !hasRead) {
       try {
         await updateDoc(doc(db, 'school_messages', msg.id), {
-          readBy: arrayUnion(myNid)
+          readBy: arrayUnion(myNid, currentUser?.uid || myNid)
         });
       } catch (err) {
         console.error('Error marking as read:', err);
@@ -198,7 +245,7 @@ export default function SchoolMessagingHub() {
     }
   };
 
-  // Handle File Attachment Upload
+  // Handle File Attachment Upload (Images & PDFs)
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -210,7 +257,7 @@ export default function SchoolMessagingHub() {
     }
 
     const isImage = file.type.startsWith('image/');
-    const isPdf = file.type === 'application/pdf';
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
     if (!isImage && !isPdf) {
       alert('عذراً، يرجى اختيار ملف صورة (JPG / PNG / WEBP) أو مستند PDF فقط.');
@@ -222,7 +269,7 @@ export default function SchoolMessagingHub() {
       setAttachment({
         name: file.name,
         type: isImage ? 'image' : 'pdf',
-        mimeType: file.type,
+        mimeType: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
         size: file.size,
         dataUrl: uploadEvent.target.result
       });
@@ -234,11 +281,38 @@ export default function SchoolMessagingHub() {
   const handleStartReply = (msg) => {
     setReplyingTo(msg);
     setMessageType('individual');
-    setRecipientNid(msg.senderNationalId);
+    setRecipientNid(msg.senderNationalId || msg.senderId);
     setSubject(`رد على: ${msg.subject || 'الرسالة'}`);
-    setBody(`\n\n--- رداً على رسالة الأستاذ/الطالب: ${msg.senderName} ---\n> ${msg.body?.slice(0, 100)}...`);
+    setBody(`\n\n--- رداً على رسالة: ${msg.senderName} (${msg.senderRoleTitle || ''}) ---\n> ${msg.body?.slice(0, 120)}...`);
     setActiveTab('compose');
     setSelectedMessage(null);
+  };
+
+  // Quick Test Message Generator (Sends a real test circular to verify immediate effectiveness)
+  const handleSendTestMessage = async () => {
+    try {
+      await addDoc(collection(db, 'school_messages'), {
+        schoolId,
+        senderId: 'system_admin',
+        senderNationalId: '1000000001',
+        senderName: 'إدارة المدارس المتقدمة',
+        senderRole: 'admin',
+        senderRoleTitle: 'مدير المدرسة',
+        messageType: 'group',
+        targetGroup: 'all',
+        subject: '✨ مرحباً بكم في نظام المراسلات والتعاميم المدرسية المحدث',
+        body: `السلام عليكم ورحمة الله وبركاته،\n\nنرحب بكافة الزملاء المعلمين وأبنائنا الطلاب والكادر الإداري والمشرفين التربويين في منصة التواصل والمراسلات الرسمية.\n\nيمكنكم من خلال هذه المنصة:\n1. إرسال واستقبال الرسائل الفردية المباشرة.\n2. إرسال التعاميم الرسمية والتوجيهات الجماعية.\n3. إرفاق الصور ومستندات الـ PDF بكل سهولة.\n4. متابعة التنبيهات الفورية وقراءة الرسائل فور ورودها.\n\nمع تمنياتنا للجميع بعام دراسي حافل بالتميز والنجاح.\nإدارة المدرسة`,
+        priority: 'important',
+        attachment: null,
+        readBy: [],
+        createdAt: new Date().toISOString(),
+        replyToId: null
+      });
+      alert('✓ تم إرسال رسالة تجريبية ترحيبية بنجاح إلى كافة منسوبي المدرسة!');
+      setActiveTab('inbox');
+    } catch (err) {
+      console.error('Error sending test message:', err);
+    }
   };
 
   // Send Message Handler
@@ -255,7 +329,6 @@ export default function SchoolMessagingHub() {
         alert('يرجى اختيار المستلم من القائمة.');
         return;
       }
-      // Find recipient in lists
       const allUsers = [...teachersList, ...studentsList, ...staffList, ...supervisorsList];
       const targetUser = allUsers.find(u => u.nationalId === recipientNid || u.id === recipientNid);
       if (targetUser) {
@@ -264,7 +337,7 @@ export default function SchoolMessagingHub() {
           receiverNationalId: targetUser.nationalId || targetUser.id,
           receiverName: targetUser.name,
           receiverRole: targetUser.role || 'user',
-          receiverRoleTitle: targetUser.roleTitle || ROLE_BADGES[targetUser.role]?.label || targetUser.role
+          receiverRoleTitle: targetUser.roleTitle || targetUser.subject || targetUser.class || ROLE_BADGES[targetUser.role]?.label || targetUser.role
         };
       } else {
         recData = {
@@ -286,12 +359,12 @@ export default function SchoolMessagingHub() {
         senderName: myName,
         senderRole: myRole,
         senderRoleTitle: myRoleTitle,
-        messageType, // 'individual' | 'group'
+        messageType,
         subject: subject.trim(),
         body: body.trim(),
-        priority, // 'normal' | 'important' | 'urgent'
+        priority,
         attachment: attachment || null,
-        readBy: [myNid], // Sender has read it
+        readBy: [myNid, currentUser?.uid || myNid],
         createdAt: new Date().toISOString(),
         replyToId: replyingTo ? replyingTo.id : null
       };
@@ -305,12 +378,13 @@ export default function SchoolMessagingHub() {
 
       await addDoc(collection(db, 'school_messages'), payload);
 
-      // Reset form
       setSubject('');
       setBody('');
       setAttachment(null);
       setRecipientNid('');
       setReplyingTo(null);
+      setFeedbackSuccess(true);
+      setTimeout(() => setFeedbackSuccess(false), 3000);
       setActiveTab('sent');
       alert('✓ تم إرسال الرسالة / التعميم بنجاح.');
     } catch (err) {
@@ -346,56 +420,97 @@ export default function SchoolMessagingHub() {
         flexWrap: 'wrap',
         gap: '16px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{
-            width: '48px',
-            height: '48px',
+            width: '50px',
+            height: '50px',
             borderRadius: '14px',
             background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            boxShadow: '0 4px 12px rgba(14, 116, 144, 0.25)'
+            boxShadow: '0 4px 14px rgba(14, 116, 144, 0.25)'
           }}>
-            <Mail size={26} />
+            <Mail size={28} />
           </div>
           <div>
-            <h2 style={{ margin: '0 0 4px 0', color: 'var(--color-primary-dark)', fontSize: '20px' }}>
-              نظام المراسلات والتعاميم المدرسية
-            </h2>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-text-muted)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ margin: 0, color: 'var(--color-primary-dark)', fontSize: '20px' }}>
+                نظام المراسلات والتعاميم المدرسية
+              </h2>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 'bold',
+                color: '#059669',
+                background: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                padding: '2px 8px',
+                borderRadius: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <CheckCircle2 size={13} /> اتصال فوري نشط
+              </span>
+            </div>
+            <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: 'var(--color-text-muted)' }}>
               تواصل داخلي فوري وفردي وجماعي بين الإدارة، المعلمين، الطلاب، الكادر، والمشرفين
             </p>
           </div>
         </div>
 
-        {/* Action / Compose Button */}
-        <button
-          onClick={() => {
-            setReplyingTo(null);
-            setSubject('');
-            setBody('');
-            setAttachment(null);
-            setRecipientNid('');
-            setActiveTab('compose');
-            setSelectedMessage(null);
-          }}
-          className="btn btn-primary"
-          style={{
-            background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 20px',
-            fontWeight: 'bold',
-            fontSize: '14px',
-            borderRadius: '10px',
-            boxShadow: '0 4px 14px rgba(14, 116, 144, 0.3)'
-          }}
-        >
-          <Plus size={18} /> إنشاء رسالة / تعميم جديد
-        </button>
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {messages.length === 0 && (
+            <button
+              onClick={handleSendTestMessage}
+              className="btn"
+              style={{
+                background: '#f8fafc',
+                color: '#0e7490',
+                border: '1px dashed #0e7490',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer'
+              }}
+              title="إرسال تعميم تجريبي للاختبار والتأكد من الفاعلية"
+            >
+              <Sparkles size={16} /> تجربة إرسال تعميم ترحيبي
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              setReplyingTo(null);
+              setSubject('');
+              setBody('');
+              setAttachment(null);
+              setRecipientNid('');
+              setActiveTab('compose');
+              setSelectedMessage(null);
+            }}
+            className="btn btn-primary"
+            style={{
+              background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              borderRadius: '10px',
+              boxShadow: '0 4px 14px rgba(14, 116, 144, 0.3)'
+            }}
+          >
+            <Plus size={18} /> إنشاء رسالة / تعميم جديد
+          </button>
+        </div>
       </div>
 
       {/* Main Grid Container */}
@@ -423,7 +538,7 @@ export default function SchoolMessagingHub() {
                 transition: 'all 0.2s'
               }}
             >
-              <Inbox size={16} /> البريد الوارد
+              <Inbox size={16} /> البريد الوارد ({inboxMessages.length})
               {unreadCount > 0 && (
                 <span style={{
                   background: '#ef4444',
@@ -433,7 +548,7 @@ export default function SchoolMessagingHub() {
                   borderRadius: '10px',
                   fontWeight: '900'
                 }}>
-                  {unreadCount}
+                  {unreadCount} جديد
                 </span>
               )}
             </button>
@@ -529,15 +644,41 @@ export default function SchoolMessagingHub() {
               </div>
 
               {/* Messages Feed */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '600px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '620px', overflowY: 'auto' }}>
                 {displayedMessages.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
-                    <Mail size={40} style={{ opacity: 0.3, marginBottom: '8px' }} />
-                    <p style={{ margin: 0, fontSize: '14px' }}>لا توجد رسائل مطابقة لعرضها حالياً</p>
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                    <Mail size={48} style={{ opacity: 0.3, marginBottom: '10px', color: '#0e7490' }} />
+                    <h4 style={{ margin: '0 0 6px 0', color: '#475569', fontSize: '16px' }}>
+                      {activeTab === 'inbox' ? 'صندوق الوارد فارغ حالياً' : 'لم تقم بإرسال أي رسائل بعد'}
+                    </h4>
+                    <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#94a3b8' }}>
+                      {activeTab === 'inbox' 
+                        ? 'ستظهر هنا كافة الرسائل الفردية والتعاميم المدرسية الموجهة إليك فور إرسالها.' 
+                        : 'يمكنك إنشاء رسالة خاصة أو تعميم جماعي من زر "إنشاء رسالة / تعميم جديد".'}
+                    </p>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                      <button
+                        onClick={() => setActiveTab('compose')}
+                        className="btn btn-primary"
+                        style={{ fontSize: '13px', padding: '8px 16px', background: 'linear-gradient(135deg, #0e7490, #63B2C6)' }}
+                      >
+                        <Plus size={15} /> إرسال رسالة الآن
+                      </button>
+                      {activeTab === 'inbox' && (
+                        <button
+                          onClick={handleSendTestMessage}
+                          className="btn"
+                          style={{ fontSize: '13px', padding: '8px 16px', background: 'white', border: '1px solid #cbd5e1', color: '#0e7490' }}
+                        >
+                          <Sparkles size={15} /> إرسال رسالة تجريبية
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   displayedMessages.map(msg => {
-                    const isUnread = activeTab === 'inbox' && (!msg.readBy || !msg.readBy.includes(myNid));
+                    const hasRead = msg.readBy && Array.isArray(msg.readBy) && msg.readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()));
+                    const isUnread = activeTab === 'inbox' && !hasRead;
                     const isSelected = selectedMessage?.id === msg.id;
                     const senderRoleBadge = ROLE_BADGES[msg.senderRole] || ROLE_BADGES.student;
 
@@ -548,11 +689,11 @@ export default function SchoolMessagingHub() {
                         style={{
                           padding: '14px 16px',
                           borderRadius: '12px',
-                          border: isSelected ? '2px solid #0e7490' : isUnread ? '1.5px solid #38bdf8' : '1px solid #e2e8f0',
-                          background: isSelected ? '#f0fdf4' : isUnread ? '#f8fafc' : 'white',
+                          border: isSelected ? '2px solid #0e7490' : isUnread ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+                          background: isSelected ? '#f0fdf4' : isUnread ? '#f0f9ff' : 'white',
                           cursor: 'pointer',
                           transition: 'all 0.15s',
-                          boxShadow: isUnread ? '0 2px 6px rgba(56, 189, 248, 0.15)' : 'none',
+                          boxShadow: isUnread ? '0 3px 8px rgba(2, 132, 199, 0.12)' : 'none',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '8px'
@@ -621,7 +762,7 @@ export default function SchoolMessagingHub() {
                         </div>
 
                         {/* Footer details: Group label / Attachment */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px dashed #f1f5f9' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px dashed #f1f5f9' }}>
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                             {msg.messageType === 'group' ? (
                               <span style={{ fontSize: '11px', color: '#0369a1', background: '#e0f2fe', padding: '2px 6px', borderRadius: '6px', fontWeight: 'bold' }}>
@@ -1162,7 +1303,7 @@ export default function SchoolMessagingHub() {
                 </button>
               </div>
 
-              {(selectedMessage.senderNationalId === myNid || myRole === 'admin') && (
+              {(myIdentities.has(String(selectedMessage.senderNationalId || '').toLowerCase()) || myRole === 'admin') && (
                 <button
                   onClick={() => handleDeleteMessage(selectedMessage.id)}
                   style={{
