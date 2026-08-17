@@ -135,16 +135,28 @@ export default function PrintLessonPreparationModal({ prep, onClose }) {
               <div style={{ fontWeight: 'bold' }}>{schoolName}</div>
             </div>
 
-            <div style={{ textAlign: 'center' }}>
-              <img
-                src={`${import.meta.env.BASE_URL}minst.svg`}
-                alt="وزارة التعليم - Ministry of Education"
-                style={{ maxHeight: '70px', maxWidth: '150px', objectFit: 'contain', display: 'block', margin: '0 auto 6px auto' }}
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
-                }}
-              />
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', marginBottom: '6px' }}>
+                <img
+                  src={`${import.meta.env.BASE_URL}minst.svg`}
+                  alt="وزارة التعليم"
+                  style={{ height: '65px', width: 'auto', maxWidth: '110px', objectFit: 'contain', display: 'block' }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                  }}
+                />
+                <div style={{ width: '1.5px', height: '38px', background: '#cbd5e1' }}></div>
+                <img
+                  src={userData?.logoUrl || `${import.meta.env.BASE_URL}logo.webp`}
+                  alt="شعار المدرسة"
+                  style={{ height: '58px', width: 'auto', maxWidth: '90px', objectFit: 'contain', display: 'block' }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                  }}
+                />
+              </div>
               <h2 style={{ margin: '0 0 4px 0', color: '#0e7490', fontSize: '17px' }}>
                 بطاقة وخطة تحضير الدرس اليومي
               </h2>

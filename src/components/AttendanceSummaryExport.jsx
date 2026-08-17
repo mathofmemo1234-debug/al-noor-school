@@ -440,16 +440,28 @@ export default function AttendanceSummaryExport({ schoolId }) {
               <div style={{ fontWeight: 'bold' }}>{userData?.schoolName || 'مجمع المدارس المتقدمة للتعلم الذكي'}</div>
             </div>
 
-            <div style={{ textAlign: 'center' }}>
-              <img
-                src={`${import.meta.env.BASE_URL}minst.svg`}
-                alt="وزارة التعليم - Ministry of Education"
-                style={{ maxHeight: '65px', maxWidth: '140px', objectFit: 'contain', display: 'block', margin: '0 auto 4px auto' }}
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
-                }}
-              />
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', marginBottom: '4px' }}>
+                <img
+                  src={`${import.meta.env.BASE_URL}minst.svg`}
+                  alt="وزارة التعليم"
+                  style={{ height: '62px', width: 'auto', maxWidth: '105px', objectFit: 'contain', display: 'block' }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                  }}
+                />
+                <div style={{ width: '1.5px', height: '36px', background: '#cbd5e1' }}></div>
+                <img
+                  src={userData?.logoUrl || `${import.meta.env.BASE_URL}logo.webp`}
+                  alt="شعار المدرسة"
+                  style={{ height: '55px', width: 'auto', maxWidth: '85px', objectFit: 'contain', display: 'block' }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                  }}
+                />
+              </div>
               <h2 style={{ margin: 0, color: '#0e7490', fontSize: '17px' }}>تقرير ملخص غياب وحضور الطلاب</h2>
               <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#475569' }}>
                 تاريخ الاستخراج: {new Date().toLocaleDateString('ar-SA')}

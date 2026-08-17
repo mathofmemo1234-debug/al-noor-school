@@ -387,16 +387,28 @@ export default function PrintExamModal({
                 <div style={{ color: '#0e7490' }}>{schoolName}</div>
               </div>
 
-              <div style={{ textAlign: 'center' }}>
-                <img
-                  src={`${import.meta.env.BASE_URL}minst.svg`}
-                  alt="وزارة التعليم - Ministry of Education"
-                  style={{ maxHeight: '80px', maxWidth: '175px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
-                  }}
-                />
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px' }}>
+                  <img
+                    src={`${import.meta.env.BASE_URL}minst.svg`}
+                    alt="وزارة التعليم"
+                    style={{ height: '70px', width: 'auto', maxWidth: '115px', objectFit: 'contain', display: 'block' }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                    }}
+                  />
+                  <div style={{ width: '1.5px', height: '42px', background: '#cbd5e1' }}></div>
+                  <img
+                    src={logoUrl}
+                    alt="شعار المدرسة"
+                    style={{ height: '62px', width: 'auto', maxWidth: '95px', objectFit: 'contain', display: 'block' }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                    }}
+                  />
+                </div>
                 <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginTop: '4px' }}>
                   {academicYear}
                 </div>

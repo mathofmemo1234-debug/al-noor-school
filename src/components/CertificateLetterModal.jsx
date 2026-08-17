@@ -268,17 +268,33 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
               <div style={{ fontSize: '11px', color: '#64748b' }}>الرقم الوزاري المعتمد: 441029</div>
             </div>
 
-            {/* Center: Official Ministry Logo */}
-            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Center: Official Ministry Logo & School Logo Side-by-Side */}
+            <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
               <img
                 src={`${import.meta.env.BASE_URL}minst.svg`}
-                alt="وزارة التعليم - Ministry of Education"
+                alt="وزارة التعليم"
                 style={{
-                  maxHeight: '82px',
-                  maxWidth: '175px',
+                  height: '75px',
+                  width: 'auto',
+                  maxWidth: '125px',
                   objectFit: 'contain',
-                  display: 'block',
-                  margin: '0 auto'
+                  display: 'block'
+                }}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                }}
+              />
+              <div style={{ width: '1.5px', height: '48px', background: '#cbd5e1' }}></div>
+              <img
+                src={userData?.logoUrl || `${import.meta.env.BASE_URL}logo.webp`}
+                alt="شعار المدرسة"
+                style={{
+                  height: '68px',
+                  width: 'auto',
+                  maxWidth: '110px',
+                  objectFit: 'contain',
+                  display: 'block'
                 }}
                 onError={(e) => {
                   e.target.onerror = null;
