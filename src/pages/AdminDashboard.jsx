@@ -198,7 +198,7 @@ function AdminHome({ schoolId }) {
             <ShieldCheck size={32} />
           </div>
           <div className="stat-info">
-            <p>الكادر والوكلاء</p>
+            <p>{t('adminDashboard.totalStaff')}</p>
             <h3>{stats.staff}</h3>
           </div>
         </div>
@@ -208,7 +208,7 @@ function AdminHome({ schoolId }) {
             <UserCheck size={32} />
           </div>
           <div className="stat-info">
-            <p>المشرفون التعليميون</p>
+            <p>{t('adminDashboard.totalSupervisors')}</p>
             <h3>{stats.supervisors}</h3>
           </div>
         </div>
@@ -785,20 +785,20 @@ function ManageSupervisors({ schoolId }) {
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>إدارة المشرفين التعليميين</h2>
+        <h2>{t('adminDashboard.manageSupervisorsTitle')}</h2>
         <div style={{display: 'flex', gap: '10px'}}>
           <button className="btn" style={{background: 'var(--color-surface)', color: 'var(--color-primary-dark)', border: '1px solid var(--color-border)'}} onClick={() => setIsBulkAdding(true)}>
             {t('adminDashboard.bulkUpload')}
           </button>
           <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
-            إضافة مشرف تعليمي
+            {t('adminDashboard.addNewSupervisor')}
           </button>
         </div>
       </div>
 
       <div style={{ display: 'grid', gap: '12px' }}>
         {supervisors.length === 0 ? (
-          <p style={{ color: 'var(--color-text-muted)' }}>لم تتم إضافة أي مشرفين تعليميين بعد</p>
+          <p style={{ color: 'var(--color-text-muted)' }}>{t('adminDashboard.noSupervisorsAdded')}</p>
         ) : (
           supervisors.map(sup => (
             <div key={sup.id} style={{ padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -817,7 +817,7 @@ function ManageSupervisors({ schoolId }) {
                   </span>
                 </h3>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>
-                  {t('adminDashboard.nationalIdLabel')}{sup.nationalId} {sup.whatsapp ? `• ${t('adminDashboard.whatsappLabel')}${sup.whatsapp}` : ''}
+                  {t('adminDashboard.nationalIdLabel')}: {sup.nationalId} {sup.whatsapp ? `• ${t('adminDashboard.whatsappLabel')}: ${sup.whatsapp}` : ''}
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -838,7 +838,7 @@ function ManageSupervisors({ schoolId }) {
                     cursor: 'pointer'
                   }}
                 >
-                  <ShieldCheck size={15} /> تعديل الصلاحيات
+                  <ShieldCheck size={15} /> {t('adminDashboard.editPermissions')}
                 </button>
                 <button onClick={() => setEditingSupervisor(sup)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: '#0e7490', padding: '6px', display: 'flex', alignItems: 'center' }}><Edit size={16} /></button>
                 <button onClick={() => handleDelete(sup.id, sup.nationalId)} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#dc2626', padding: '6px', display: 'flex', alignItems: 'center' }}><Trash2 size={16} /></button>
@@ -855,10 +855,10 @@ function ManageSupervisors({ schoolId }) {
             <button onClick={() => setEditingPermissionsSupervisor(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
               <ShieldCheck size={24} color="#0e7490" />
-              <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>تعديل صلاحيات المشرف: {editingPermissionsSupervisor.name}</h3>
+              <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{t('adminDashboard.editPermissions')}: {editingPermissionsSupervisor.name}</h3>
             </div>
             <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--color-text-muted)' }}>
-              التخصص: <strong>{editingPermissionsSupervisor.specialty || 'إشراف عام'}</strong> • الهوية: {editingPermissionsSupervisor.nationalId}
+              {t('adminDashboard.specialty')}: <strong>{editingPermissionsSupervisor.specialty || 'إشراف عام'}</strong> • {t('adminDashboard.nationalIdLabel')}: {editingPermissionsSupervisor.nationalId}
             </p>
 
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -867,14 +867,14 @@ function ManageSupervisors({ schoolId }) {
                 onClick={() => setEditingPermissionsSupervisor({ ...editingPermissionsSupervisor, permissions: SUPERVISOR_ALL_PERMISSIONS.map(p => p.id) })}
                 style={{ padding: '6px 12px', borderRadius: '8px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
               >
-                ⚡ توسيع الصلاحيات (منح الكل)
+                ⚡ {t('adminDashboard.expandPermissions')}
               </button>
               <button
                 type="button"
                 onClick={() => setEditingPermissionsSupervisor({ ...editingPermissionsSupervisor, permissions: [] })}
                 style={{ padding: '6px 12px', borderRadius: '8px', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
               >
-                🚫 تقليص الصلاحيات (سحب الكل)
+                🚫 {t('adminDashboard.reducePermissions')}
               </button>
             </div>
 
@@ -903,7 +903,7 @@ function ManageSupervisors({ schoolId }) {
             </div>
 
             <button onClick={handleSaveSupervisorPermissions} className="btn btn-primary" disabled={isSaving} style={{ width: '100%', padding: '12px', fontWeight: 'bold', background: 'linear-gradient(135deg, #0e7490, #63B2C6)' }}>
-              {isSaving ? 'جاري الحفظ...' : '✓ اعتماد وحفظ تعديلات الصلاحيات'}
+              {isSaving ? t('adminDashboard.saving') : `✓ ${t('adminDashboard.savePermissions')}`}
             </button>
           </div>
         </div>
@@ -913,25 +913,25 @@ function ManageSupervisors({ schoolId }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
-            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>إضافة مشرف تعليمي جديد</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.addNewSupervisor')}</h3>
             <form onSubmit={handleSaveSingle} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم المشرف</label>
-                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="الاسم الثلاثي أو الرباعي" required />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.supervisorName')}</label>
+                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder={t('adminDashboard.fullNamePlaceholder')} required />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.nationalId')}</label>
                 <input type="text" className="input-field" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="10xxxxxxxx" required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>التخصص / المجال الإشرافي</label>
-                <input type="text" className="input-field" value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder="مثال: إشراف رياضيات، إشراف عام..." />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.specialty')}</label>
+                <input type="text" className="input-field" value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder={t('adminDashboard.specialtyPlaceholder')} />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.whatsappOptional')}</label>
                 <input type="text" className="input-field" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="05xxxxxxxx" />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.saving') : 'حفظ المشرف'}</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? t('adminDashboard.saving') : t('adminDashboard.saveSupervisor')}</button>
             </form>
           </div>
         </div>
@@ -941,14 +941,14 @@ function ManageSupervisors({ schoolId }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setEditingSupervisor(null)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
-            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>تعديل بيانات المشرف التعليمي</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.editSupervisorTitle')}</h3>
             <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>اسم المشرف</label>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.supervisorName')}</label>
                 <input type="text" className="input-field" value={editingSupervisor.name} onChange={e => setEditingSupervisor({...editingSupervisor, name: e.target.value})} required />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>التخصص / المجال الإشرافي</label>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-muted)' }}>{t('adminDashboard.specialty')}</label>
                 <input type="text" className="input-field" value={editingSupervisor.specialty || ''} onChange={e => setEditingSupervisor({...editingSupervisor, specialty: e.target.value})} />
               </div>
               <div>
@@ -965,9 +965,9 @@ function ManageSupervisors({ schoolId }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass-panel" style={{ width: '500px', padding: '24px', position: 'relative' }}>
             <button onClick={() => setIsBulkAdding(false)} style={{ position: 'absolute', top: '15px', left: '15px', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--color-text-muted)" /></button>
-            <h3 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--color-primary-dark)' }}>رفع قائمة المشرفين التعليميين</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--color-primary-dark)' }}>{t('adminDashboard.bulkUploadSupervisorsTitle')}</h3>
             <p style={{fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '15px'}}>
-              الترتيب المطلوب: <strong>رقم الهوية، اسم المشرف، التخصص</strong> مفصولة بفاصلة
+              {t('adminDashboard.requiredOrder')} <strong>{t('adminDashboard.bulkSupervisorsOrder')}</strong> {t('adminDashboard.separatedByCommaOrTab')}
             </p>
             <form onSubmit={handleSaveBulk} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <textarea 

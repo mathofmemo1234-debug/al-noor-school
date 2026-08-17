@@ -383,18 +383,18 @@ export default function ManageStaff({ schoolId }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h2 style={{ margin: '0 0 4px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ShieldCheck size={26} color="var(--color-primary)" /> إدارة الكادر المدرسي والصلاحيات
+            <ShieldCheck size={26} color="var(--color-primary)" /> {t('staff.title')}
           </h2>
           <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '14px' }}>
-            إضافة الوكلاء، المرشد الطلابي، مشرف النشاط، وتعيين الأدوار والصلاحيات المخصصة
+            {t('staff.subtitle')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn" style={{ background: 'var(--color-surface)', color: 'var(--color-primary-dark)', border: '1px solid var(--color-border)' }} onClick={() => setIsBulkAdding(true)}>
-            رفع جماعي
+            {t('staff.bulkUpload')}
           </button>
           <button className="btn btn-primary" onClick={() => setIsAdding(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <UserPlus size={18} /> إضافة عضو كادر / تعيين دور
+            <UserPlus size={18} /> {t('staff.addNew')}
           </button>
         </div>
       </div>
@@ -402,12 +402,12 @@ export default function ManageStaff({ schoolId }) {
       {/* Filter Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', overflowX: 'auto', paddingBottom: '6px' }}>
         {[
-          { id: 'all', label: `الكل (${staffList.length})` },
-          { id: 'deputy', label: 'الوكلاء' },
-          { id: 'counselor', label: 'المرشد الطلابي' },
-          { id: 'activity', label: 'مشرف النشاط' },
-          { id: 'supervisor', label: 'المشرفون التعليميون' },
-          { id: 'custom', label: 'أدوار مخصصة' }
+          { id: 'all', label: `${t('staff.tabAll')} (${staffList.length})` },
+          { id: 'deputy', label: t('staff.tabDeputies') },
+          { id: 'counselor', label: t('staff.tabCounselor') },
+          { id: 'activity', label: t('staff.tabActivity') },
+          { id: 'supervisor', label: t('staff.tabSupervisors') },
+          { id: 'custom', label: t('staff.tabCustom') }
         ].map(tab => (
           <button
             key={tab.id}
@@ -434,7 +434,7 @@ export default function ManageStaff({ schoolId }) {
         {filteredStaff.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)', background: 'white', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
             <Shield size={40} style={{ opacity: 0.3, marginBottom: '10px' }} />
-            <p style={{ margin: 0, fontSize: '15px' }}>لا يوجد أعضاء مسجلون في هذا القسم حالياً</p>
+            <p style={{ margin: 0, fontSize: '15px' }}>{t('staff.noStaff')}</p>
           </div>
         ) : (
           filteredStaff.map(staff => {

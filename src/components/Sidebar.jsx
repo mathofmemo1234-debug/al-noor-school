@@ -22,8 +22,8 @@ export default function Sidebar({ role }) {
 
   const adminLinks = [
     { path: '/admin', icon: Home, label: t('sidebar.overview') },
-    { path: '/admin/staff', icon: ShieldCheck, label: 'الكادر الإداري والوكلاء' },
-    { path: '/admin/supervisors', icon: UserCheck, label: 'المشرف التعليمي' },
+    { path: '/admin/staff', icon: ShieldCheck, label: t('sidebar.staff') },
+    { path: '/admin/supervisors', icon: UserCheck, label: t('sidebar.supervisors') },
     { path: '/admin/teachers', icon: Users, label: t('sidebar.teachers') },
     { path: '/admin/students', icon: Users, label: t('sidebar.students') },
     { path: '/admin/classes', icon: BookOpen, label: t('sidebar.classes') },
