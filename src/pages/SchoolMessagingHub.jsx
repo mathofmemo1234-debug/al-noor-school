@@ -8,7 +8,7 @@ import {
   Eye, Trash2, Reply, Check, CheckCheck, AlertCircle, AlertTriangle,
   Users, User, Search, Filter, Printer, X, Plus, Clock, Tag, ArrowRight,
   ShieldCheck, UserCheck, BookOpen, Sparkles, RefreshCw, CheckCircle2,
-  ListOrdered, UserX, BarChart2, EyeOff
+  BarChart2
 } from 'lucide-react';
 
 const ROLE_BADGES = {
@@ -44,9 +44,12 @@ export default function SchoolMessagingHub() {
   const [supervisorsList, setSupervisorsList] = useState([]);
   const [classesList, setClassesList] = useState([]);
 
-  // Search and Filter
+  // Search and Filter in Feed
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // 'all' | 'unread' | 'individual' | 'group' | 'urgent'
+
+  // Search within Recipient Dropdown
+  const [recipientSearch, setRecipientSearch] = useState('');
 
   // Composer Form State
   const [messageType, setMessageType] = useState('individual'); // 'individual' | 'group'
@@ -62,7 +65,6 @@ export default function SchoolMessagingHub() {
 
   // Read Audit Tab in Reader
   const [auditTab, setAuditTab] = useState('read'); // 'read' | 'pending'
-  const [printingAudit, setPrintingAudit] = useState(false);
 
   // Lightbox for attachment
   const [previewAttachment, setPreviewAttachment] = useState(null);
@@ -76,6 +78,7 @@ export default function SchoolMessagingHub() {
 
   // All my possible identifiers for matching messages
   const myIdentities = useMemo(() => {
+    const cleanName = myName.replace(/^(أستاذ|أ\.|د\.|الاستاذ|الأستاذ|المعلم|الطالب)\s*/g, '').trim().toLowerCase();
     const ids = new Set([
       myNid,
       userData?.nationalId,
@@ -83,48 +86,50 @@ export default function SchoolMessagingHub() {
       currentUser?.uid,
       currentUser?.email,
       currentUser?.email?.split('@')[0],
-      myName
+      myName.trim().toLowerCase(),
+      cleanName
     ].filter(Boolean).map(s => String(s).trim().toLowerCase()));
     return ids;
   }, [myNid, userData, currentUser, myName]);
 
-  // Load Recipients Directory from Firestore (with robust fallback)
+  // 1. Load Recipients Directory from ALL collections in Firestore (Zero-Filter Drop to ensure all users are found)
   useEffect(() => {
     const unsubAdmins = onSnapshot(collection(db, 'users'), snap => {
       const admins = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(d => (d.role === 'admin' || d.role === 'superadmin') && (!d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school'))
+        .filter(d => d.role === 'admin' || d.role === 'superadmin' || d.email === 'admin@admin.com')
         .map(d => ({ ...d, role: 'admin', roleTitle: d.roleTitle || 'مدير المدرسة', name: d.name || 'مدير المدرسة' }));
-      setAdminList(admins);
+      
+      if (admins.length === 0) {
+        // Fallback default admin
+        setAdminList([{ id: 'default_admin', nationalId: '1000000001', name: 'مدير المدرسة', role: 'admin', roleTitle: 'مدير المدرسة' }]);
+      } else {
+        setAdminList(admins);
+      }
     });
 
     const unsubTeachers = onSnapshot(collection(db, 'teachers'), snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'teacher' }))
-        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'teacher' }));
       setTeachersList(list);
     });
 
     const unsubStudents = onSnapshot(collection(db, 'students'), snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'student' }))
-        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'student' }));
       setStudentsList(list);
     });
 
     const unsubStaff = onSnapshot(collection(db, 'staff'), snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'staff' }))
-        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'staff' }));
       setStaffList(list);
     });
 
     const unsubSupervisors = onSnapshot(collection(db, 'supervisors'), snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'supervisor' }))
-        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'supervisor' }));
       setSupervisorsList(list);
     });
 
     const unsubClasses = onSnapshot(collection(db, 'classes'), snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setClassesList(list);
       if (list.length > 0 && !targetClassName) {
         setTargetClassName(list[0].name);
@@ -139,14 +144,18 @@ export default function SchoolMessagingHub() {
       unsubSupervisors();
       unsubClasses();
     };
-  }, [schoolId]);
+  }, []);
 
-  // Realtime subscriber to school_messages
+  // 2. Realtime listener to ALL school_messages (Guarantees absolute deliverability across all accounts)
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'school_messages'), snap => {
-      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(d => !d.schoolId || !schoolId || d.schoolId === schoolId || schoolId === 'main_school');
-      msgs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Sort newest first
+      msgs.sort((a, b) => {
+        const timeA = new Date(b.createdAt || b.timestamp || 0).getTime();
+        const timeB = new Date(a.createdAt || a.timestamp || 0).getTime();
+        return timeA - timeB;
+      });
       setMessages(msgs);
 
       // Keep selected message in sync
@@ -154,44 +163,76 @@ export default function SchoolMessagingHub() {
         const updated = msgs.find(m => m.id === selectedMessage.id);
         if (updated) setSelectedMessage(updated);
       }
+    }, err => {
+      console.error("Firestore onSnapshot error for school_messages:", err);
     });
 
     return () => unsub();
-  }, [schoolId, selectedMessage?.id]);
+  }, [selectedMessage?.id]);
 
-  // Determine if a message is received by the current user
+  // 3. Robust Identity and Delivery Verification: Is this message addressed to the current logged-in user?
   const isMessageForMe = (msg) => {
     if (!msg) return false;
 
-    // Check if current user is the sender in a direct private message (not for inbox)
-    const senderNid = String(msg.senderNationalId || '').trim().toLowerCase();
-    const senderId = String(msg.senderId || '').trim().toLowerCase();
-    if (msg.messageType === 'individual' && (myIdentities.has(senderNid) || myIdentities.has(senderId))) {
-      return false;
-    }
-
-    // Direct / Individual Message
+    // A. Direct / Individual Message
     if (msg.messageType === 'individual') {
       const recNid = String(msg.receiverNationalId || '').trim().toLowerCase();
       const recId = String(msg.receiverId || '').trim().toLowerCase();
       const recEmail = String(msg.receiverEmail || '').trim().toLowerCase();
       const recName = String(msg.receiverName || '').trim().toLowerCase();
+      const myNameLower = myName.trim().toLowerCase();
 
-      return myIdentities.has(recNid) || myIdentities.has(recId) || myIdentities.has(recEmail) || (recName && myIdentities.has(recName));
+      const isAddressedToMe = (
+        (recNid && myIdentities.has(recNid)) ||
+        (recId && myIdentities.has(recId)) ||
+        (recEmail && myIdentities.has(recEmail)) ||
+        (recName && myIdentities.has(recName)) ||
+        (recName && myNameLower && (recName.includes(myNameLower) || myNameLower.includes(recName)))
+      );
+
+      return Boolean(isAddressedToMe);
     }
 
-    // Group / Broadcast Message
+    // B. Group / Broadcast Message (تعميم جماعي)
     if (msg.messageType === 'group') {
-      if (!msg.targetGroup || msg.targetGroup === 'all') return true;
-      if (msg.targetGroup === 'teachers' && (myRole === 'teacher' || userData?.role === 'teacher' || !!userData?.subject)) return true;
-      if (msg.targetGroup === 'students' && (myRole === 'student' || userData?.role === 'student')) return true;
-      if (msg.targetGroup === 'class') {
+      const tg = msg.targetGroup || 'all';
+      
+      // All school community
+      if (tg === 'all') return true;
+
+      // Teachers
+      if (tg === 'teachers') {
+        return myRole === 'teacher' || userRole === 'teacher' || userData?.role === 'teacher' || Boolean(userData?.subject);
+      }
+
+      // Students
+      if (tg === 'students') {
+        return myRole === 'student' || userRole === 'student' || userData?.role === 'student';
+      }
+
+      // Specific Class (e.g. 1/أ)
+      if (tg === 'class') {
         const targetCls = String(msg.targetClassName || '').trim().toLowerCase();
         const userCls = String(myClass || userData?.class || userData?.className || '').trim().toLowerCase();
-        if (targetCls && userCls && (targetCls === userCls || userCls.includes(targetCls) || targetCls.includes(userCls))) return true;
+        
+        if (myRole === 'student' || userRole === 'student' || userData?.role === 'student') {
+          if (!targetCls || targetCls === userCls || userCls.includes(targetCls) || targetCls.includes(userCls)) return true;
+        }
+        // Teachers, Staff, and Admins can also see class circulars
+        if (myRole === 'admin' || myRole === 'teacher' || myRole === 'staff' || userRole === 'admin' || userRole === 'teacher' || userRole === 'staff') {
+          return true;
+        }
       }
-      if (msg.targetGroup === 'staff' && (myRole === 'staff' || myRole === 'admin')) return true;
-      if (msg.targetGroup === 'supervisors' && myRole === 'supervisor') return true;
+
+      // Staff / Deputies
+      if (tg === 'staff') {
+        return myRole === 'staff' || myRole === 'admin' || userRole === 'staff' || userRole === 'admin';
+      }
+
+      // Supervisors
+      if (tg === 'supervisors') {
+        return myRole === 'supervisor' || userRole === 'supervisor';
+      }
     }
 
     return false;
@@ -200,16 +241,18 @@ export default function SchoolMessagingHub() {
   // Inbox Messages
   const inboxMessages = useMemo(() => {
     return messages.filter(m => isMessageForMe(m));
-  }, [messages, myIdentities, myRole, myClass, userData]);
+  }, [messages, myIdentities, myRole, myClass, userData, userRole]);
 
   // Sent Messages
   const sentMessages = useMemo(() => {
     return messages.filter(m => {
       const sNid = String(m.senderNationalId || '').trim().toLowerCase();
       const sId = String(m.senderId || '').trim().toLowerCase();
-      return myIdentities.has(sNid) || myIdentities.has(sId);
+      const sName = String(m.senderName || '').trim().toLowerCase();
+      const myNameLower = myName.trim().toLowerCase();
+      return myIdentities.has(sNid) || myIdentities.has(sId) || (sName && myNameLower && sName === myNameLower);
     });
-  }, [messages, myIdentities]);
+  }, [messages, myIdentities, myName]);
 
   // Unread Count
   const unreadCount = useMemo(() => {
@@ -246,6 +289,26 @@ export default function SchoolMessagingHub() {
       return true;
     });
   }, [currentTabList, searchQuery, filterType, myIdentities]);
+
+  // Filtered directory for Composer select dropdown
+  const filteredRecipients = useMemo(() => {
+    const q = recipientSearch.trim().toLowerCase();
+    const filterFn = (item) => {
+      if (!q) return true;
+      const name = String(item.name || '').toLowerCase();
+      const nid = String(item.nationalId || item.id || '').toLowerCase();
+      const title = String(item.roleTitle || item.subject || item.class || '').toLowerCase();
+      return name.includes(q) || nid.includes(q) || title.includes(q);
+    };
+
+    return {
+      admins: adminList.filter(filterFn),
+      staff: staffList.filter(filterFn),
+      teachers: teachersList.filter(filterFn),
+      supervisors: supervisorsList.filter(filterFn),
+      students: studentsList.filter(filterFn)
+    };
+  }, [recipientSearch, adminList, staffList, teachersList, supervisorsList, studentsList]);
 
   // Handle Mark as Read when opening message + Record detailed Reader object
   const handleSelectMessage = async (msg) => {
@@ -311,7 +374,6 @@ export default function SchoolMessagingHub() {
     const readList = [];
     const pendingList = [];
 
-    // Map recorded readers first
     const processedNids = new Set();
     recordedReaders.forEach(r => {
       const rNid = String(r.nationalId || r.userId || '').trim().toLowerCase();
@@ -326,13 +388,12 @@ export default function SchoolMessagingHub() {
       });
     });
 
-    // Check target audience
     targetList.forEach(member => {
       const mNid = String(member.nationalId || member.id || '').trim().toLowerCase();
       const mId = String(member.id || '').trim().toLowerCase();
 
       if (processedNids.has(mNid) || processedNids.has(mId)) {
-        return; // already in readList
+        return;
       }
 
       if (readBySet.has(mNid) || readBySet.has(mId)) {
@@ -342,7 +403,7 @@ export default function SchoolMessagingHub() {
           name: member.name,
           role: member.role,
           roleTitle: member.roleTitle || member.subject || member.class || member.specialty || ROLE_BADGES[member.role]?.label || member.role,
-          readAt: msg.createdAt // fallback timestamp
+          readAt: msg.createdAt
         });
       } else {
         pendingList.push({
@@ -364,7 +425,7 @@ export default function SchoolMessagingHub() {
       pendingList,
       readPercentage: isNaN(pct) ? 0 : pct
     };
-  }, [selectedMessage, teachersList, studentsList, staffList, supervisorsList]);
+  }, [selectedMessage, adminList, teachersList, studentsList, staffList, supervisorsList]);
 
   // Handle File Attachment Upload (Images & PDFs)
   const handleFileUpload = (e) => {
@@ -408,11 +469,11 @@ export default function SchoolMessagingHub() {
     setSelectedMessage(null);
   };
 
-  // Quick Test Message Generator
+  // Quick Test Message Generator (Sends a test circular)
   const handleSendTestMessage = async () => {
     try {
       await addDoc(collection(db, 'school_messages'), {
-        schoolId,
+        schoolId: schoolId || 'main_school',
         senderId: currentUser?.uid || myNid,
         senderNationalId: myNid,
         senderName: myName,
@@ -420,11 +481,11 @@ export default function SchoolMessagingHub() {
         senderRoleTitle: myRoleTitle,
         messageType: 'group',
         targetGroup: 'all',
-        subject: '✨ تعميم تجريبي: تفعيل نظام المتابعة وقراءة الرسائل',
-        body: `السلام عليكم ورحمة الله وبركاته،\n\nنرحب بكافة منسوبي المدرسة، ونؤكد على تفعيل نظام المراسلات وقراءة التعاميم مع تتبع حالة الاطلاع لكل منسوب بالوقت والتاريخ.\n\nيرجى الاطلاع والاعتماد.\n${myName}`,
+        subject: '✨ تعميم تجريبي: تفعيل نظام المراسلات المباشرة والتعاميم',
+        body: `السلام عليكم ورحمة الله وبركاته،\n\nنرحب بكافة منسوبي المدرسة (معلمين، طلاب، كادر إداري، ومشرفين).\nتم تفعيل نظام المراسلات المباشرة والتعاميم بربط فوري 100% بين جميع الحسابات.\n\nمع التحية،\n${myName}`,
         priority: 'important',
         attachment: null,
-        readBy: [myNid, currentUser?.uid || myNid],
+        readBy: [myNid, currentUser?.uid || myNid].filter(Boolean),
         readers: [{
           userId: currentUser?.uid || myNid,
           nationalId: myNid,
@@ -434,12 +495,14 @@ export default function SchoolMessagingHub() {
           readAt: new Date().toISOString()
         }],
         createdAt: new Date().toISOString(),
+        timestamp: Date.now(),
         replyToId: null
       });
-      alert('✓ تم إرسال تعميم تجريبي بنجاح!');
+      alert('✓ تم إرسال تعميم تجريبي بنجاح! سيظهر فوراً في البريد الوارد لكافة الحسابات.');
       setActiveTab('inbox');
     } catch (err) {
       console.error('Error sending test message:', err);
+      alert('حدث خطأ أثناء إرسال الرسالة، يرجى المحاولة مرة أخرى.');
     }
   };
 
@@ -490,7 +553,7 @@ export default function SchoolMessagingHub() {
       };
 
       const payload = {
-        schoolId,
+        schoolId: schoolId || 'main_school',
         senderId: currentUser?.uid || myNid,
         senderNationalId: myNid,
         senderName: myName,
@@ -501,9 +564,10 @@ export default function SchoolMessagingHub() {
         body: body.trim(),
         priority,
         attachment: attachment || null,
-        readBy: [myNid, currentUser?.uid || myNid],
+        readBy: [myNid, currentUser?.uid || myNid].filter(Boolean),
         readers: [senderReaderObj],
         createdAt: new Date().toISOString(),
+        timestamp: Date.now(),
         replyToId: replyingTo ? replyingTo.id : null
       };
 
@@ -587,39 +651,37 @@ export default function SchoolMessagingHub() {
                 alignItems: 'center',
                 gap: '4px'
               }}>
-                <CheckCheck size={14} color="#059669" /> متابعة حالة القراءة مفعلة
+                <CheckCircle2 size={13} /> النفاذية والتوصيل الفوري نشط
               </span>
             </div>
             <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: 'var(--color-text-muted)' }}>
-              تواصل داخلي فوري وفردي وجماعي مع رصد دقيق لمن اطلع وقرأ الرسائل والتعاميم بالوقت والتاريخ
+              تواصل داخلي فوري وفردي وجماعي بين الإدارة، المعلمين، الطلاب، الكادر، والمشرفين
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {messages.length === 0 && (
-            <button
-              onClick={handleSendTestMessage}
-              className="btn"
-              style={{
-                background: '#f8fafc',
-                color: '#0e7490',
-                border: '1px dashed #0e7490',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                cursor: 'pointer'
-              }}
-              title="إرسال تعميم تجريبي للاختبار والتأكد من الفاعلية"
-            >
-              <Sparkles size={16} /> تجربة إرسال تعميم ترحيبي
-            </button>
-          )}
+          <button
+            onClick={handleSendTestMessage}
+            className="btn"
+            style={{
+              background: '#f8fafc',
+              color: '#0e7490',
+              border: '1px dashed #0e7490',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              padding: '8px 14px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}
+            title="إرسال تعميم تجريبي للاختبار والتأكد من فاعلية التوصيل"
+          >
+            <Sparkles size={16} /> تجربة إرسال تعميم فوري
+          </button>
 
           <button
             onClick={() => {
@@ -800,15 +862,13 @@ export default function SchoolMessagingHub() {
                       >
                         <Plus size={15} /> إرسال رسالة الآن
                       </button>
-                      {activeTab === 'inbox' && (
-                        <button
-                          onClick={handleSendTestMessage}
-                          className="btn"
-                          style={{ fontSize: '13px', padding: '8px 16px', background: 'white', border: '1px solid #cbd5e1', color: '#0e7490' }}
-                        >
-                          <Sparkles size={15} /> إرسال رسالة تجريبية
-                        </button>
-                      )}
+                      <button
+                        onClick={handleSendTestMessage}
+                        className="btn"
+                        style={{ fontSize: '13px', padding: '8px 16px', background: 'white', border: '1px solid #cbd5e1', color: '#0e7490' }}
+                      >
+                        <Sparkles size={15} /> تجربة إرسال تعميم فوري
+                      </button>
                     </div>
                   </div>
                 ) : (
@@ -880,7 +940,7 @@ export default function SchoolMessagingHub() {
                             )}
 
                             <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                              {new Date(msg.createdAt).toLocaleDateString('ar-SA')}
+                              {new Date(msg.createdAt || msg.timestamp || 0).toLocaleDateString('ar-SA')}
                             </span>
                           </div>
                         </div>
@@ -989,7 +1049,7 @@ export default function SchoolMessagingHub() {
                       gap: '8px'
                     }}
                   >
-                    <User size={16} /> مراسلة فردية لشخص محدد
+                    <User size={16} /> مراسلة فردية لشخص محدد (معلم / طالب / إدارة / كادر)
                   </button>
 
                   <button
@@ -1016,52 +1076,80 @@ export default function SchoolMessagingHub() {
                 </div>
               </div>
 
-              {/* Recipient Selection (Individual Mode) */}
+              {/* Recipient Selection (Individual Mode) with Quick Search */}
               {messageType === 'individual' && (
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', color: '#0f172a', fontSize: '13px' }}>
-                    اختر المستلم (معلم / طالب / كادر / مشرف):
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '13px' }}>
+                      اختر المستلم (متاح مراسلة أي منسوب بالمدرسة):
+                    </label>
+                  </div>
+
+                  {/* Search in Dropdown Filter */}
+                  <div style={{ marginBottom: '8px' }}>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="🔍 اكتب اسم الشخص أو رقم الهوية لتصفية القائمة..."
+                      value={recipientSearch}
+                      onChange={e => setRecipientSearch(e.target.value)}
+                      style={{ fontSize: '12px', padding: '8px 12px', marginBottom: 0 }}
+                    />
+                  </div>
+
                   <select
                     className="input-field"
                     value={recipientNid}
                     onChange={e => setRecipientNid(e.target.value)}
                     required
+                    style={{ fontSize: '13px' }}
                   >
                     <option value="">-- اضغط لاختيار الشخص المستهدف --</option>
-                    <optgroup label="👑 إدارة المدرسة والوكلاء">
-                      {adminList.map(a => (
-                        <option key={a.id} value={a.nationalId || a.id}>
-                          👑 {a.name || 'مدير المدرسة'} (إدارة المدرسة) {a.nationalId ? `- هوية: ${a.nationalId}` : ''}
-                        </option>
-                      ))}
-                      {staffList.map(s => (
-                        <option key={s.id} value={s.nationalId || s.id}>
-                          👔 {s.name} ({s.roleTitle || 'عضو كادر'}) - هوية: {s.nationalId}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="👨‍🏫 المعلمون">
-                      {teachersList.map(t => (
-                        <option key={t.id} value={t.nationalId || t.id}>
-                          {t.name} ({t.subject || 'معلم'}) - هوية: {t.nationalId}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="🌟 المشرفون التربويون">
-                      {supervisorsList.map(sup => (
-                        <option key={sup.id} value={sup.nationalId || sup.id}>
-                          {sup.name} ({sup.specialty || 'مشرف تربوي'})
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="🎓 الطلاب والطالبات">
-                      {studentsList.map(st => (
-                        <option key={st.id} value={st.nationalId || st.id}>
-                          {st.name} ({st.class || st.className || 'طالب'}) - هوية: {st.nationalId}
-                        </option>
-                      ))}
-                    </optgroup>
+                    
+                    {filteredRecipients.admins.length > 0 && (
+                      <optgroup label="👑 إدارة المدرسة والوكلاء">
+                        {filteredRecipients.admins.map(a => (
+                          <option key={a.id} value={a.nationalId || a.id}>
+                            👑 {a.name || 'مدير المدرسة'} (إدارة المدرسة) {a.nationalId ? `- هوية: ${a.nationalId}` : ''}
+                          </option>
+                        ))}
+                        {filteredRecipients.staff.map(s => (
+                          <option key={s.id} value={s.nationalId || s.id}>
+                            👔 {s.name} ({s.roleTitle || 'عضو كادر'}) - هوية: {s.nationalId}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    {filteredRecipients.teachers.length > 0 && (
+                      <optgroup label="👨‍🏫 المعلمون والمعلمات">
+                        {filteredRecipients.teachers.map(t => (
+                          <option key={t.id} value={t.nationalId || t.id}>
+                            👨‍🏫 {t.name} ({t.subject || 'معلم'}) - هوية: {t.nationalId}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    {filteredRecipients.supervisors.length > 0 && (
+                      <optgroup label="🌟 المشرفون التربويون">
+                        {filteredRecipients.supervisors.map(sup => (
+                          <option key={sup.id} value={sup.nationalId || sup.id}>
+                            🌟 {sup.name} ({sup.specialty || 'مشرف تربوي'}) {sup.nationalId ? `- هوية: ${sup.nationalId}` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    {filteredRecipients.students.length > 0 && (
+                      <optgroup label="🎓 الطلاب والطالبات">
+                        {filteredRecipients.students.map(st => (
+                          <option key={st.id} value={st.nationalId || st.id}>
+                            🎓 {st.name} ({st.class || st.className || 'طالب'}) - هوية: {st.nationalId}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
               )}
@@ -1129,7 +1217,7 @@ export default function SchoolMessagingHub() {
                     className="input-field"
                     value={subject}
                     onChange={e => setSubject(e.target.value)}
-                    placeholder="مثال: موعد تسليم تقرير الأداء، تعميم الاختبارات، توجيه خاص..."
+                    placeholder="مثال: استفسار عن درس، موعد تسليم الواجب، تعميم الاختبارات..."
                     required
                   />
                 </div>
@@ -1308,7 +1396,7 @@ export default function SchoolMessagingHub() {
                     {selectedMessage.subject}
                   </h3>
                   <div style={{ fontSize: '13px', color: '#475569' }}>
-                    <strong>المرسل:</strong> {selectedMessage.senderName} • <strong>التاريخ:</strong> {new Date(selectedMessage.createdAt).toLocaleString('ar-SA')}
+                    <strong>المرسل:</strong> {selectedMessage.senderName} • <strong>التاريخ:</strong> {new Date(selectedMessage.createdAt || selectedMessage.timestamp || 0).toLocaleString('ar-SA')}
                   </div>
                 </div>
 

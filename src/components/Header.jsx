@@ -35,8 +35,9 @@ export default function Header({ title, role }) {
   const myNid = (userData?.nationalId || currentUser?.email?.replace('@school.local', '') || currentUser?.uid || '').trim();
   const myClass = (userData?.class || userData?.className || '')?.trim();
 
-  // Listen to unread messages
+  // Listen to unread messages in real-time across all school messages
   useEffect(() => {
+    const cleanName = (userData?.name || '').replace(/^(أستاذ|أ\.|د\.|الاستاذ|الأستاذ|المعلم|الطالب)\s*/g, '').trim().toLowerCase();
     const myIdentities = new Set([
       myNid,
       userData?.nationalId,
@@ -44,49 +45,54 @@ export default function Header({ title, role }) {
       currentUser?.uid,
       currentUser?.email,
       currentUser?.email?.split('@')[0],
-      userData?.name
+      (userData?.name || '').trim().toLowerCase(),
+      cleanName
     ].filter(Boolean).map(s => String(s).trim().toLowerCase()));
 
     const unsub = onSnapshot(collection(db, 'school_messages'), (snap) => {
       let count = 0;
       snap.docs.forEach(docSnap => {
         const msg = docSnap.data();
-        if (schoolId && schoolId !== 'main_school' && msg.schoolId && msg.schoolId !== schoolId) return;
 
         const readBy = msg.readBy || [];
         const hasRead = Array.isArray(readBy) && readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()));
         if (hasRead) return; // already read
 
-        // Check if current user is the sender of a direct message
-        const senderNid = String(msg.senderNationalId || '').trim().toLowerCase();
-        const senderId = String(msg.senderId || '').trim().toLowerCase();
-        if (msg.messageType === 'individual' && (myIdentities.has(senderNid) || myIdentities.has(senderId))) {
-          return;
-        }
-
-        // Check if message belongs to this user
+        // Check if message is for me
         if (msg.messageType === 'individual') {
           const recNid = String(msg.receiverNationalId || '').trim().toLowerCase();
           const recId = String(msg.receiverId || '').trim().toLowerCase();
           const recEmail = String(msg.receiverEmail || '').trim().toLowerCase();
           const recName = String(msg.receiverName || '').trim().toLowerCase();
+          const myNameLower = (userData?.name || '').trim().toLowerCase();
 
-          if (myIdentities.has(recNid) || myIdentities.has(recId) || myIdentities.has(recEmail) || (recName && myIdentities.has(recName))) {
-            count++;
-          }
+          const isToMe = (
+            (recNid && myIdentities.has(recNid)) ||
+            (recId && myIdentities.has(recId)) ||
+            (recEmail && myIdentities.has(recEmail)) ||
+            (recName && myIdentities.has(recName)) ||
+            (recName && myNameLower && (recName.includes(myNameLower) || myNameLower.includes(recName)))
+          );
+
+          if (isToMe) count++;
         } else if (msg.messageType === 'group') {
-          if (!msg.targetGroup || msg.targetGroup === 'all') count++;
-          else if (msg.targetGroup === 'teachers' && (effectiveRole === 'teacher' || userData?.role === 'teacher' || !!userData?.subject)) count++;
-          else if (msg.targetGroup === 'students' && (effectiveRole === 'student' || userData?.role === 'student')) count++;
-          else if (msg.targetGroup === 'class' && (effectiveRole === 'student' || userData?.role === 'student')) {
+          const tg = msg.targetGroup || 'all';
+          if (tg === 'all') count++;
+          else if (tg === 'teachers' && (effectiveRole === 'teacher' || userData?.role === 'teacher' || !!userData?.subject)) count++;
+          else if (tg === 'students' && (effectiveRole === 'student' || userData?.role === 'student')) count++;
+          else if (tg === 'class') {
             const targetCls = String(msg.targetClassName || '').trim().toLowerCase();
             const userCls = String(myClass || userData?.class || userData?.className || '').trim().toLowerCase();
-            if (targetCls && userCls && (targetCls === userCls || userCls.includes(targetCls) || targetCls.includes(userCls))) {
+            if (effectiveRole === 'student' || userData?.role === 'student') {
+              if (!targetCls || targetCls === userCls || userCls.includes(targetCls) || targetCls.includes(userCls)) {
+                count++;
+              }
+            } else if (effectiveRole === 'admin' || effectiveRole === 'teacher' || effectiveRole === 'staff') {
               count++;
             }
           }
-          else if (msg.targetGroup === 'staff' && (effectiveRole === 'staff' || effectiveRole === 'admin')) count++;
-          else if (msg.targetGroup === 'supervisors' && effectiveRole === 'supervisor') count++;
+          else if (tg === 'staff' && (effectiveRole === 'staff' || effectiveRole === 'admin')) count++;
+          else if (tg === 'supervisors' && effectiveRole === 'supervisor') count++;
         }
       });
       setUnreadMsgCount(count);
