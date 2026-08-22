@@ -1,6 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  where, 
+  onSnapshot, 
+  addDoc, 
+  doc, 
+  updateDoc, 
+  deleteDoc, 
+  serverTimestamp, 
+  getDocs,
+  writeBatch
+} from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Edit, 
@@ -23,7 +35,13 @@ import {
   Sparkles,
   ArrowRight,
   CheckCircle2,
-  XCircle
+  XCircle,
+  FileSpreadsheet,
+  Download,
+  Upload,
+  Check,
+  RotateCcw,
+  Sparkle
 } from 'lucide-react';
 import MarkdownInput from '../components/MarkdownInput';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -37,10 +55,10 @@ export default function TeacherExams() {
   const [subjectsList, setSubjectsList] = useState([]);
   const [teacherDocId, setTeacherDocId] = useState(null);
   
-  // Views: 'list' | 'create' | 'edit' | 'item_analysis' | 'results_analytics'
+  // Views: 'list' | 'create' | 'edit' | 'external_exam' | 'item_analysis' | 'results_analytics'
   const [activeView, setActiveView] = useState('list');
   
-  // Form State
+  // Electronic Exam Form State
   const [currentExam, setCurrentExam] = useState(null);
   const [title, setTitle] = useState('');
   const [targetClass, setTargetClass] = useState('');
@@ -52,7 +70,18 @@ export default function TeacherExams() {
   const [numQuestions, setNumQuestions] = useState(1);
   const [questions, setQuestions] = useState([]);
   
-  // Results & Analytics state
+  // External (Paper) Exam Form & Results State
+  const [maxScore, setMaxScore] = useState('20');
+  const [externalStudentsList, setExternalStudentsList] = useState([]);
+  const [manualScores, setManualScores] = useState({}); // { [studentId]: score }
+  const [manualNotes, setManualNotes] = useState({}); // { [studentId]: note }
+  const [externalEntryTab, setExternalEntryTab] = useState('manual'); // 'manual' | 'excel'
+  const [excelPasteText, setExcelPasteText] = useState('');
+  const [importNotice, setImportNotice] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Common Results & Analytics state
   const [examResults, setExamResults] = useState([]);
   const [studentsCache, setStudentsCache] = useState({});
   const [isSaving, setIsSaving] = useState(false);
@@ -65,6 +94,19 @@ export default function TeacherExams() {
   const [trackingStudent, setTrackingStudent] = useState(null);
   const [studentHistory, setStudentHistory] = useState([]);
   const [inspectingStudentAnswers, setInspectingStudentAnswers] = useState(null);
+
+  // Preset titles for quick selection
+  const EXAM_PRESETS = [
+    'اختبار الفترة الأولى',
+    'اختبار الفترة الثانية',
+    'اختبار منتصف الفصل الدراسي',
+    'اختبار نهاية الفصل الدراسي',
+    'اختبار فتري قصير',
+    'اختبار تشخيصي قبلي',
+    'اختبار بعدي / تقويمي',
+    'اختبار تعزيز المهارات',
+    'اختبار أعمال السنة'
+  ];
 
   // Get teacher ID & subjects
   useEffect(() => {
@@ -96,7 +138,7 @@ export default function TeacherExams() {
     const unsub = onSnapshot(q, snap => {
       const data = [];
       snap.forEach(d => data.push({ id: d.id, ...d.data() }));
-      data.sort((a, b) => new Date(`${b.examDate}T${b.startTime}`) - new Date(`${a.examDate}T${a.startTime}`));
+      data.sort((a, b) => new Date(`${b.examDate}T${b.startTime || '00:00'}`) - new Date(`${a.examDate}T${a.startTime || '00:00'}`));
       setExams(data);
     });
     return () => unsub();
@@ -114,9 +156,25 @@ export default function TeacherExams() {
     });
   }, []);
 
-  // Handle Question numbers synchronization
+  // Fetch students for target class when in external exam mode
   useEffect(() => {
-    if (activeView === 'list' || activeView === 'item_analysis' || activeView === 'results_analytics') return;
+    if (activeView !== 'external_exam' || !targetClass) {
+      setExternalStudentsList([]);
+      return;
+    }
+    const unsub = onSnapshot(collection(db, 'students'), (snap) => {
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(s => (s.class || s.className || '').trim() === targetClass.trim());
+      list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+      setExternalStudentsList(list);
+    });
+    return () => unsub();
+  }, [targetClass, activeView]);
+
+  // Handle Question numbers synchronization for electronic exams
+  useEffect(() => {
+    if (activeView === 'list' || activeView === 'item_analysis' || activeView === 'results_analytics' || activeView === 'external_exam') return;
     const count = parseInt(numQuestions) || 1;
     setQuestions(prev => {
       const newQs = [...prev];
@@ -151,30 +209,70 @@ export default function TeacherExams() {
     setTitle('');
     setTargetClass(classesList[0] || '');
     setSubject(subjectsList[0] || '');
-    setExamDate('');
+    setExamDate(new Date().toISOString().split('T')[0]);
     setStartTime('');
     setEntryDeadline('');
     setDuration('45');
     setNumQuestions(1);
     setQuestions([]);
+    setMaxScore('20');
+    setManualScores({});
+    setManualNotes({});
+    setExcelPasteText('');
+    setImportNotice('');
     setActiveView('list');
     setExamResults([]);
     setTrackingStudent(null);
     setInspectingStudentAnswers(null);
   };
 
-  const handleEdit = (exam) => {
+  // Open Electronic Exam Form
+  const handleCreateElectronic = () => {
+    resetForm();
+    setTitle('اختبار قصير');
+    setExamDate(new Date().toISOString().split('T')[0]);
+    setActiveView('create');
+  };
+
+  // Open External / Paper Exam Form
+  const handleCreateExternal = () => {
+    resetForm();
+    setTitle(EXAM_PRESETS[0]);
+    setMaxScore('20');
+    setExamDate(new Date().toISOString().split('T')[0]);
+    setActiveView('external_exam');
+  };
+
+  const handleEdit = async (exam) => {
     setCurrentExam(exam);
     setTitle(exam.title);
     setTargetClass(exam.targetClass);
     setSubject(exam.subject);
     setExamDate(exam.examDate);
-    setStartTime(exam.startTime);
-    setEntryDeadline(exam.entryDeadline || calculateDefaultCutoff(exam.startTime));
-    setDuration(exam.duration);
-    setNumQuestions(exam.questions.length);
-    setQuestions(exam.questions);
-    setActiveView('edit');
+    
+    if (exam.isExternal) {
+      setMaxScore(String(exam.maxScore || exam.totalQuestions || 20));
+      // Fetch existing results for this external exam
+      const q = query(collection(db, 'exam_results'), where('examId', '==', exam.id));
+      const snap = await getDocs(q);
+      const scores = {};
+      const notes = {};
+      snap.forEach(d => {
+        const data = d.data();
+        scores[data.studentId] = data.score;
+        if (data.note) notes[data.studentId] = data.note;
+      });
+      setManualScores(scores);
+      setManualNotes(notes);
+      setActiveView('external_exam');
+    } else {
+      setStartTime(exam.startTime);
+      setEntryDeadline(exam.entryDeadline || calculateDefaultCutoff(exam.startTime));
+      setDuration(exam.duration);
+      setNumQuestions(exam.questions.length);
+      setQuestions(exam.questions);
+      setActiveView('edit');
+    }
   };
 
   // 1. Open Item Analysis (تحليل بنود ومفردات الاختبار)
@@ -225,12 +323,23 @@ export default function TeacherExams() {
   };
 
   const handleDelete = async (examId) => {
-    if (window.confirm(t('teacherExams.confirmDelete'))) {
-      await deleteDoc(doc(db, 'exams', examId));
+    if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا الاختبار وكافة النتائج المسجلة له نهائياً؟')) {
+      try {
+        await deleteDoc(doc(db, 'exams', examId));
+        // Also delete all related exam_results
+        const q = query(collection(db, 'exam_results'), where('examId', '==', examId));
+        const snap = await getDocs(q);
+        const batch = writeBatch(db);
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      } catch (err) {
+        console.error('Error deleting exam:', err);
+      }
     }
   };
 
-  const handleSave = async (e) => {
+  // Save Electronic Exam
+  const handleSaveElectronic = async (e) => {
     e.preventDefault();
     if (!teacherDocId) return;
     
@@ -258,6 +367,7 @@ export default function TeacherExams() {
       startTime,
       entryDeadline: finalCutoff,
       duration: parseInt(duration),
+      isExternal: false,
       questions,
       updatedAt: serverTimestamp()
     };
@@ -278,6 +388,202 @@ export default function TeacherExams() {
     }
   };
 
+  // Save External (Paper) Exam & Results
+  const handleSaveExternalExam = async (e) => {
+    e.preventDefault();
+    if (!teacherDocId) return alert('الرجاء التأكد من تسجيل الدخول كمعلم');
+    if (!title.trim()) return alert('الرجاء كتابة أو اختيار اسم الاختبار');
+    if (!targetClass) return alert('الرجاء اختيار الفصل الدراسي');
+    if (!subject) return alert('الرجاء اختيار المادة');
+
+    const totalMax = parseFloat(maxScore) || 20;
+    setIsSaving(true);
+
+    try {
+      let examId = currentExam?.id;
+      const examPayload = {
+        teacherId: teacherDocId,
+        title: title.trim(),
+        targetClass,
+        subject,
+        examDate: examDate || new Date().toISOString().split('T')[0],
+        duration: 45,
+        isExternal: true,
+        type: 'paper_exam',
+        maxScore: totalMax,
+        totalQuestions: totalMax,
+        questions: [],
+        updatedAt: serverTimestamp()
+      };
+
+      if (examId) {
+        await updateDoc(doc(db, 'exams', examId), examPayload);
+      } else {
+        examPayload.createdAt = serverTimestamp();
+        const newDoc = await addDoc(collection(db, 'exams'), examPayload);
+        examId = newDoc.id;
+      }
+
+      // Save / Update Student Results in batch
+      const existingResultsQuery = query(collection(db, 'exam_results'), where('examId', '==', examId));
+      const existingSnap = await getDocs(existingResultsQuery);
+      const existingMap = {};
+      existingSnap.forEach(d => {
+        existingMap[d.data().studentId] = d.id;
+      });
+
+      const batch = writeBatch(db);
+
+      externalStudentsList.forEach(student => {
+        const rawScore = manualScores[student.id];
+        const hasScore = rawScore !== undefined && rawScore !== '' && !isNaN(rawScore);
+        const numScore = hasScore ? Math.min(totalMax, Math.max(0, parseFloat(rawScore))) : 0;
+        const note = manualNotes[student.id] || '';
+
+        if (hasScore) {
+          const resPayload = {
+            examId,
+            studentId: student.id,
+            studentName: student.name,
+            nationalId: student.nationalId || '',
+            className: targetClass,
+            subject,
+            examTitle: title.trim(),
+            score: numScore,
+            totalQuestions: totalMax,
+            maxScore: totalMax,
+            percentage: Math.round((numScore / totalMax) * 100),
+            note,
+            isExternal: true,
+            timestamp: serverTimestamp()
+          };
+
+          if (existingMap[student.id]) {
+            batch.update(doc(db, 'exam_results', existingMap[student.id]), resPayload);
+          } else {
+            const newResRef = doc(collection(db, 'exam_results'));
+            batch.set(newResRef, resPayload);
+          }
+        } else if (existingMap[student.id]) {
+          // If score was cleared, remove from results
+          batch.delete(doc(db, 'exam_results', existingMap[student.id]));
+        }
+      });
+
+      await batch.commit();
+      alert('✅ تم حفظ واعتماد نتائج الاختبار الورقي بنجاح!');
+      resetForm();
+    } catch (err) {
+      console.error('Error saving external exam:', err);
+      alert('حدث خطأ أثناء حفظ نتائج الاختبار: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Bulk score helper tools
+  const handleBulkFillFullScore = () => {
+    const full = parseFloat(maxScore) || 20;
+    const scores = { ...manualScores };
+    externalStudentsList.forEach(s => {
+      scores[s.id] = full;
+    });
+    setManualScores(scores);
+  };
+
+  const handleBulkClearScores = () => {
+    if (window.confirm('هل تريد تصفير جميع الدرجات المدخلة؟')) {
+      setManualScores({});
+    }
+  };
+
+  // Download CSV / Excel Template for this class
+  const handleDownloadTemplate = () => {
+    if (!targetClass || externalStudentsList.length === 0) {
+      alert('الرجاء اختيار الفصل الدراسي أولاً');
+      return;
+    }
+    const headers = ['رقم الهوية', 'اسم الطالب', 'الصف', `الدرجة (من ${maxScore})`, 'ملاحظات'];
+    const rows = externalStudentsList.map(s => [
+      `"${s.nationalId || ''}"`,
+      `"${s.name || ''}"`,
+      `"${targetClass}"`,
+      manualScores[s.id] !== undefined ? manualScores[s.id] : '',
+      `"${manualNotes[s.id] || ''}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `كشف_رصد_${title || 'اختبار'}_${targetClass}.csv`;
+    link.click();
+  };
+
+  // Parse Text / Excel Paste or CSV
+  const parseAndApplyImportData = (content) => {
+    if (!content.trim()) return;
+    const lines = content.split(/\r?\n/).filter(line => line.trim().length > 0);
+    if (lines.length === 0) return;
+
+    let matchedCount = 0;
+    const newScores = { ...manualScores };
+    const newNotes = { ...manualNotes };
+    const totalMax = parseFloat(maxScore) || 20;
+
+    lines.forEach(line => {
+      // Split by tab or comma or semicolon
+      const delimiter = line.includes('\t') ? '\t' : line.includes(';') ? ';' : ',';
+      const parts = line.split(delimiter).map(p => p.trim().replace(/^["']|["']$/g, ''));
+
+      if (parts.length >= 2) {
+        // Try to identify National ID, Name, and Grade
+        let foundStudent = null;
+        let scoreVal = null;
+        let noteVal = '';
+
+        parts.forEach((part, colIdx) => {
+          // Check if part matches national ID
+          const matchByNid = externalStudentsList.find(s => String(s.nationalId || '').trim() === part);
+          if (matchByNid) foundStudent = matchByNid;
+
+          // Check if part matches name
+          const matchByName = externalStudentsList.find(s => s.name && s.name.trim().toLowerCase() === part.toLowerCase());
+          if (matchByName) foundStudent = matchByName;
+
+          // Check if numeric score
+          const num = parseFloat(part);
+          if (!isNaN(num) && num >= 0 && num <= totalMax * 1.5 && colIdx > 0) {
+            scoreVal = Math.min(totalMax, num);
+          }
+        });
+
+        if (foundStudent && scoreVal !== null) {
+          newScores[foundStudent.id] = scoreVal;
+          if (parts[4]) newNotes[foundStudent.id] = parts[4];
+          matchedCount++;
+        }
+      }
+    });
+
+    setManualScores(newScores);
+    setManualNotes(newNotes);
+    setImportNotice(`✅ تم بنجاح مطابقة واستيراد درجات (${matchedCount}) طالب من الكشف!`);
+    setTimeout(() => setImportNotice(''), 6000);
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      parseAndApplyImportData(event.target.result);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const updateQuestion = (index, field, value) => {
     const newQs = [...questions];
     newQs[index][field] = value;
@@ -294,12 +600,10 @@ export default function TeacherExams() {
   // PSYCHOMETRIC & ITEM ANALYSIS CALCULATIONS
   // ==========================================
   const itemAnalysisData = useMemo(() => {
-    if (!currentExam || !currentExam.questions || examResults.length === 0) {
-      return null;
-    }
+    if (!currentExam || examResults.length === 0) return null;
 
     const N = examResults.length;
-    const K = currentExam.questions.length;
+    const K = currentExam.questions?.length || 1;
     const sortedResults = [...examResults].sort((a, b) => b.score - a.score);
 
     const groupSize = N >= 20 ? Math.max(1, Math.round(N * 0.27)) : Math.max(1, Math.floor(N / 2));
@@ -309,7 +613,7 @@ export default function TeacherExams() {
     let sumP = 0;
     let sumPItemVariance = 0;
 
-    const questionsAnalysis = currentExam.questions.map((q, qIndex) => {
+    const questionsAnalysis = (currentExam.questions || []).map((q, qIndex) => {
       let totalCorrect = 0;
       let upperCorrect = 0;
       let lowerCorrect = 0;
@@ -319,12 +623,8 @@ export default function TeacherExams() {
 
       examResults.forEach(res => {
         const studentAns = res.answers ? parseInt(res.answers[qIndex]) : -1;
-        if (studentAns >= 0 && studentAns < 4) {
-          optionCounts[studentAns]++;
-        }
-        if (studentAns === q.correctOption) {
-          totalCorrect++;
-        }
+        if (studentAns >= 0 && studentAns < 4) optionCounts[studentAns]++;
+        if (studentAns === q.correctOption) totalCorrect++;
       });
 
       upperGroup.forEach(res => {
@@ -339,15 +639,11 @@ export default function TeacherExams() {
         if (ans === q.correctOption) lowerCorrect++;
       });
 
-      // Difficulty Index P = Correct / N
       const p = totalCorrect / N;
       sumP += p;
       sumPItemVariance += (p * (1 - p));
-
-      // Discrimination Index D = (Ru - Rl) / groupSize
       const d = groupSize > 0 ? (upperCorrect - lowerCorrect) / groupSize : 0;
 
-      // Difficulty Category
       let diffCategory = 'متوازن ومثالي';
       let diffColor = '#16a34a';
       let diffBg = '#dcfce7';
@@ -361,14 +657,11 @@ export default function TeacherExams() {
         diffBg = '#fee2e2';
       }
 
-      // Discrimination Category
-      let discCategory = 'تمييز ممتاز';
+      let discCategory = 'تمييز ممتاز (D ≥ 0.40)';
       let discColor = '#16a34a';
       let discBg = '#dcfce7';
       if (d >= 0.40) {
         discCategory = 'تمييز ممتاز (D ≥ 0.40)';
-        discColor = '#16a34a';
-        discBg = '#dcfce7';
       } else if (d >= 0.30) {
         discCategory = 'تمييز جيد (0.30 - 0.39)';
         discColor = '#0284c7';
@@ -383,8 +676,7 @@ export default function TeacherExams() {
         discBg = '#fee2e2';
       }
 
-      // Distractor Evaluation
-      const distractors = q.options.map((optText, optIdx) => {
+      const distractors = (q.options || []).map((optText, optIdx) => {
         const isCorrect = optIdx === q.correctOption;
         const count = optionCounts[optIdx];
         const pct = Math.round((count / N) * 100);
@@ -393,13 +685,9 @@ export default function TeacherExams() {
 
         let note = '';
         if (!isCorrect) {
-          if (count === 0) {
-            note = 'مشتت غير فعال (لم يختره أحد)';
-          } else if (uCount > lCount) {
-            note = 'مشتت جذاب مضلل (جذب المتفوقين أكثر)';
-          } else {
-            note = 'مشتت فعال ومناسب';
-          }
+          if (count === 0) note = 'مشتت غير فعال (لم يختره أحد)';
+          else if (uCount > lCount) note = 'مشتت جذاب مضلل (جذب المتفوقين)';
+          else note = 'مشتت فعال ومناسب';
         }
 
         return {
@@ -452,7 +740,7 @@ export default function TeacherExams() {
     }
     const validity = Math.sqrt(kr20);
     const sem = stdDev * Math.sqrt(Math.max(0, 1 - kr20));
-    const meanDifficulty = sumP / K;
+    const meanDifficulty = K > 0 ? (sumP / K) : 0;
 
     return {
       totalStudents: N,
@@ -478,6 +766,7 @@ export default function TeacherExams() {
     let passed = 0;
     let highest = 0;
     let lowest = 100;
+    const maxPoss = currentExam.maxScore || currentExam.totalQuestions || 20;
 
     const bands = {
       excellent: { label: 'ممتاز (90% - 100%)', count: 0, color: '#16a34a', bg: '#dcfce7' },
@@ -488,7 +777,8 @@ export default function TeacherExams() {
     };
 
     const studentRows = examResults.map(res => {
-      const pct = Math.round((res.score / res.totalQuestions) * 100);
+      const denom = res.totalQuestions || res.maxScore || maxPoss;
+      const pct = Math.round((res.score / denom) * 100);
       sumScores += pct;
       if (pct >= 50) passed++;
       if (pct > highest) highest = pct;
@@ -502,23 +792,26 @@ export default function TeacherExams() {
 
       const correctIndices = [];
       const incorrectIndices = [];
-      currentExam.questions?.forEach((q, idx) => {
-        const studentPick = res.answers ? parseInt(res.answers[idx]) : -1;
-        if (studentPick === q.correctOption) {
-          correctIndices.push(idx + 1);
-        } else {
-          incorrectIndices.push(idx + 1);
-        }
-      });
+      if (currentExam.questions && currentExam.questions.length > 0) {
+        currentExam.questions.forEach((q, idx) => {
+          const studentPick = res.answers ? parseInt(res.answers[idx]) : -1;
+          if (studentPick === q.correctOption) {
+            correctIndices.push(idx + 1);
+          } else {
+            incorrectIndices.push(idx + 1);
+          }
+        });
+      }
 
       return {
         id: res.id,
         studentId: res.studentId,
-        studentName: studentsCache[res.studentId] || 'طالب',
+        studentName: res.studentName || studentsCache[res.studentId] || 'طالب',
         score: res.score,
-        totalQuestions: res.totalQuestions,
+        totalQuestions: denom,
         percentage: pct,
         isPass: pct >= 50,
+        note: res.note || '',
         correctIndices,
         incorrectIndices,
         rawResult: res,
@@ -548,9 +841,453 @@ export default function TeacherExams() {
     };
   }, [currentExam, examResults, studentsCache]);
 
-  // ==========================================
-  // 1. ITEM ANALYSIS VIEW (تحليل الاختبار)
-  // ==========================================
+  // =========================================================================
+  // 1. EXTERNAL / PAPER EXAM VIEW (رصد واستيراد نتائج اختبار خارجي ورقي)
+  // =========================================================================
+  if (activeView === 'external_exam') {
+    const totalMax = parseFloat(maxScore) || 20;
+
+    return (
+      <div className="glass-panel" style={{ padding: '24px', background: 'white' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '2px solid rgba(0,0,0,0.08)', paddingBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h2 style={{ margin: '0 0 6px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <FileSpreadsheet size={26} color="#0e7490" />
+              {currentExam ? 'تعديل درجات الاختبار الورقي / الخارجي' : '📥 رصد واستيراد نتائج اختبار ورقي (خارج المنصة)'}
+            </h2>
+            <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
+              يمكنك تسمية الاختبار واختيار الفترة، وتعبئة الدرجات يدوياً أو سحبها مباشرة من كشف Excel، مع تحليل إحصائي فوري للنتائج.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-outline" onClick={resetForm}>
+              <ArrowRight size={16} /> العودة للاختبارات
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSaveExternalExam}>
+          {/* Preset Name Selector & Custom Title */}
+          <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: 'var(--color-primary-dark)', marginBottom: '8px' }}>
+              نوع ومسمى الاختبار (اختر تسمية سريعة أو اكتب المسمى يدوياً):
+            </label>
+            
+            {/* Presets Chips */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
+              {EXAM_PRESETS.map(preset => (
+                <button
+                  type="button"
+                  key={preset}
+                  onClick={() => setTitle(preset)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    fontWeight: title === preset ? 'bold' : 'normal',
+                    background: title === preset ? '#0e7490' : 'white',
+                    color: title === preset ? 'white' : '#334155',
+                    border: `1.5px solid ${title === preset ? '#0e7490' : '#cbd5e1'}`,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+
+            {/* Editable Title Input */}
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                className="input-field"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="أدخل مسمى الاختبار المخصص هنا (مثال: اختبار الفترة الأولى - رياضيات)..."
+                required
+                style={{ fontSize: '15px', fontWeight: 'bold', padding: '12px 16px', background: 'white' }}
+              />
+            </div>
+          </div>
+
+          {/* Core Fields Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <div className="form-group">
+              <label style={{ fontWeight: 'bold' }}>الصف / الفصل الدراسي</label>
+              <select 
+                className="input-field" 
+                value={targetClass} 
+                onChange={e => setTargetClass(e.target.value)} 
+                required
+              >
+                <option value="">اختر الفصل...</option>
+                {classesList.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label style={{ fontWeight: 'bold' }}>المادة الدراسية</label>
+              <select 
+                className="input-field" 
+                value={subject} 
+                onChange={e => setSubject(e.target.value)} 
+                required
+              >
+                <option value="">اختر المادة...</option>
+                {subjectsList.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label style={{ fontWeight: 'bold' }}>تاريخ إجراء الاختبار</label>
+              <input 
+                type="date" 
+                className="input-field" 
+                value={examDate} 
+                onChange={e => setExamDate(e.target.value)} 
+                required 
+              />
+            </div>
+
+            <div className="form-group">
+              <label style={{ fontWeight: 'bold' }}>
+                الدرجة الكلية (النهاية العظمى)
+              </label>
+              <input 
+                type="number" 
+                min="1" 
+                max="1000" 
+                className="input-field" 
+                value={maxScore} 
+                onChange={e => setMaxScore(e.target.value)} 
+                required 
+                style={{ fontWeight: 'bold', color: '#0e7490' }}
+              />
+            </div>
+          </div>
+
+          {/* Results Entry Modes: Manual vs Excel */}
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setExternalEntryTab('manual')}
+                  className="btn"
+                  style={{
+                    padding: '10px 18px',
+                    background: externalEntryTab === 'manual' ? 'var(--color-primary-dark)' : 'white',
+                    color: externalEntryTab === 'manual' ? 'white' : 'var(--color-primary-dark)',
+                    border: '1px solid var(--color-border)',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Edit size={16} /> 1. الرصد اليدوي للدرجات
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExternalEntryTab('excel')}
+                  className="btn"
+                  style={{
+                    padding: '10px 18px',
+                    background: externalEntryTab === 'excel' ? 'var(--color-primary-dark)' : 'white',
+                    color: externalEntryTab === 'excel' ? 'white' : 'var(--color-primary-dark)',
+                    border: '1px solid var(--color-border)',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Upload size={16} /> 2. سحب واستيراد كشف Excel / CSV
+                </button>
+              </div>
+
+              {/* Bulk actions */}
+              {targetClass && externalStudentsList.length > 0 && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="btn btn-outline"
+                    style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    title="تحميل كشف بأسماء وهوية طلاب الفصل بصيغة Excel"
+                  >
+                    <Download size={15} /> تحميل نموذج Excel للفصل
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleBulkFillFullScore}
+                    className="btn btn-outline"
+                    style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', borderColor: '#86efac' }}
+                  >
+                    <Sparkles size={15} /> تعيين الدرجة الكاملة ({totalMax}) للجميع
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleBulkClearScores}
+                    className="btn btn-outline"
+                    style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', color: '#dc2626', borderColor: '#fca5a5' }}
+                  >
+                    <RotateCcw size={15} /> تصفير الدرجات
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {importNotice && (
+              <div style={{ background: '#dcfce7', color: '#166534', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+                <Check size={18} /> {importNotice}
+              </div>
+            )}
+
+            {/* TAB 2: EXCEL IMPORT ZONE */}
+            {externalEntryTab === 'excel' && (
+              <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  
+                  {/* File Upload / Drag Drop */}
+                  <div
+                    onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={e => {
+                      e.preventDefault();
+                      setIsDragOver(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = ev => parseAndApplyImportData(ev.target.result);
+                        reader.readAsText(file);
+                      }
+                    }}
+                    style={{
+                      border: `2px dashed ${isDragOver ? '#0e7490' : '#cbd5e1'}`,
+                      background: isDragOver ? '#e0f2fe' : 'white',
+                      borderRadius: '12px',
+                      padding: '30px 20px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px'
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload size={36} color="#0e7490" />
+                    <strong style={{ fontSize: '15px', color: '#0f172a' }}>اسحب وأفلت كشف Excel / CSV هنا</strong>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>أو اضغط لتصفح الملف من جهازك (.csv, .txt, .tsv)</span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv,.txt,.tsv"
+                      onChange={handleFileUpload}
+                      style={{ display: 'none' }}
+                    />
+                  </div>
+
+                  {/* Direct Paste Box */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>
+                      📋 أو انسخ جدول الدرجات من Excel والصقه مباشرة هنا:
+                    </label>
+                    <textarea
+                      rows={5}
+                      className="input-field"
+                      placeholder="انسخ صفوف وأعمدة الدرجات من Excel ثم الصقها هنا مباشرة..."
+                      value={excelPasteText}
+                      onChange={e => setExcelPasteText(e.target.value)}
+                      style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: '12px', marginBottom: 0 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        parseAndApplyImportData(excelPasteText);
+                        setExcelPasteText('');
+                      }}
+                      disabled={!excelPasteText.trim()}
+                      style={{ alignSelf: 'flex-start', padding: '6px 16px', fontSize: '13px' }}
+                    >
+                      تطبيق الدرجات المنسوخة
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 1: STUDENTS GRADES TABLE */}
+            {!targetClass ? (
+              <div style={{ textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                <Users size={36} style={{ opacity: 0.4, marginBottom: '8px' }} />
+                <p style={{ margin: 0, fontSize: '15px' }}>يرجى اختيار الفصل الدراسي لعرض قائمة الطلاب ورصد درجاتهم.</p>
+              </div>
+            ) : externalStudentsList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                <AlertCircle size={36} style={{ opacity: 0.4, marginBottom: '8px' }} />
+                <p style={{ margin: 0, fontSize: '15px' }}>لا يوجد طلاب مسجلون في فصل ({targetClass}).</p>
+              </div>
+            ) : (
+              <div style={{ background: 'white', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+                  <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                    <tr>
+                      <th style={{ padding: '12px 14px', fontSize: '13px', width: '40px' }}>#</th>
+                      <th style={{ padding: '12px 14px', fontSize: '13px' }}>اسم الطالب</th>
+                      <th style={{ padding: '12px 14px', fontSize: '13px' }}>رقم الهوية</th>
+                      <th style={{ padding: '12px 14px', fontSize: '13px', width: '160px', textAlign: 'center' }}>
+                        الدرجة (من {totalMax})
+                      </th>
+                      <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center', width: '90px' }}>النسبة</th>
+                      <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center', width: '110px' }}>الحالة</th>
+                      <th style={{ padding: '12px 14px', fontSize: '13px' }}>الملاحظات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {externalStudentsList.map((student, idx) => {
+                      const scoreVal = manualScores[student.id];
+                      const numScore = parseFloat(scoreVal);
+                      const hasScore = scoreVal !== undefined && scoreVal !== '' && !isNaN(numScore);
+                      const pct = hasScore ? Math.round((numScore / totalMax) * 100) : null;
+                      const isPass = pct !== null && pct >= 50;
+
+                      return (
+                        <tr 
+                          key={student.id} 
+                          style={{ 
+                            borderBottom: '1px solid #f1f5f9', 
+                            background: idx % 2 === 0 ? 'white' : '#fafafa' 
+                          }}
+                        >
+                          <td style={{ padding: '12px 14px', color: '#64748b', fontWeight: 'bold' }}>{idx + 1}</td>
+                          <td style={{ padding: '12px 14px', fontWeight: '700', color: '#0f172a' }}>{student.name}</td>
+                          <td style={{ padding: '12px 14px', color: '#64748b', fontFamily: 'monospace' }}>{student.nationalId || '—'}</td>
+                          
+                          {/* Score Input */}
+                          <td style={{ padding: '8px 14px', textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <input
+                                type="number"
+                                step="0.25"
+                                min="0"
+                                max={totalMax}
+                                placeholder="0"
+                                value={scoreVal !== undefined ? scoreVal : ''}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setManualScores(prev => ({
+                                    ...prev,
+                                    [student.id]: val
+                                  }));
+                                }}
+                                style={{
+                                  width: '80px',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  border: `1.5px solid ${hasScore ? '#0e7490' : '#cbd5e1'}`,
+                                  textAlign: 'center',
+                                  fontWeight: 'bold',
+                                  fontSize: '14px'
+                                }}
+                              />
+                              <span style={{ color: '#64748b', fontSize: '13px' }}>/ {totalMax}</span>
+                            </div>
+                          </td>
+
+                          {/* Live Percentage */}
+                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 'bold', color: pct === null ? '#94a3b8' : isPass ? '#16a34a' : '#dc2626' }}>
+                            {pct !== null ? `${pct}%` : '—'}
+                          </td>
+
+                          {/* Pass/Fail Status */}
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            {pct === null ? (
+                              <span style={{ color: '#94a3b8', fontSize: '12px' }}>غير مرصود</span>
+                            ) : (
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '3px 8px',
+                                borderRadius: '10px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                background: isPass ? '#dcfce7' : '#fee2e2',
+                                color: isPass ? '#166534' : '#991b1b'
+                              }}>
+                                {isPass ? 'ناجح ✅' : 'يحتاج متابعة ⚠️'}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Notes */}
+                          <td style={{ padding: '6px 14px' }}>
+                            <input
+                              type="text"
+                              placeholder="ملاحظات اختيارية..."
+                              value={manualNotes[student.id] || ''}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setManualNotes(prev => ({ ...prev, [student.id]: val }));
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                border: '1px solid #e2e8f0',
+                                fontSize: '13px'
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Submit Action */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '30px' }}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isSaving || !targetClass || externalStudentsList.length === 0}
+              style={{
+                padding: '12px 36px',
+                fontSize: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'linear-gradient(135deg, #0e7490, #0284c7)'
+              }}
+            >
+              <Save size={20} />
+              {isSaving ? 'جاري حفظ واعتماد النتائج...' : 'حفظ واعتماد نتائج الاختبار الورقي'}
+            </button>
+
+            <button type="button" className="btn btn-outline" onClick={resetForm} style={{ padding: '12px 24px' }}>
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // 2. ITEM ANALYSIS VIEW (تحليل الاختبار ومفرداته)
+  // =========================================================================
   if (activeView === 'item_analysis' && currentExam) {
     return (
       <div className="glass-panel" style={{ padding: '24px' }}>
@@ -560,7 +1297,7 @@ export default function TeacherExams() {
               <Activity size={26} color="#0e7490" /> تقرير التحليل السيكومتري ومفردات الاختبار: {currentExam.title}
             </h2>
             <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-              الفصل: <strong>{currentExam.targetClass}</strong> | المادة: <strong>{currentExam.subject}</strong> | عدد الأسئلة: <strong>{currentExam.questions.length}</strong> | المختبرين: <strong>{examResults.length}</strong>
+              الفصل: <strong>{currentExam.targetClass}</strong> | المادة: <strong>{currentExam.subject}</strong> | عدد الأسئلة: <strong>{currentExam.questions?.length || 0}</strong> | المختبرين: <strong>{examResults.length}</strong>
             </p>
           </div>
 
@@ -582,7 +1319,6 @@ export default function TeacherExams() {
           <div style={{ textAlign: 'center', padding: '50px', color: 'var(--color-text-muted)', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
             <AlertCircle size={40} style={{ opacity: 0.4, marginBottom: '10px' }} />
             <h3>لا توجد نتائج مسجلة لهذا الاختبار حتى الآن</h3>
-            <p>سيتم توليد التحليل السيكومتري تلقائياً فور قيام الطلاب بحل الاختبار وتسليمه.</p>
           </div>
         ) : itemAnalysisData && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -621,72 +1357,77 @@ export default function TeacherExams() {
             </div>
 
             {/* Questions Detailed Analysis Table & Cards */}
-            <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-              <h3 style={{ margin: '0 0 16px 0', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <HelpCircle size={20} color="#0e7490" /> جدول تحليل مفردات وبنود الأسئلة (Item Psychometrics)
-              </h3>
+            {itemAnalysisData.questionsAnalysis && itemAnalysisData.questionsAnalysis.length > 0 ? (
+              <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: '0 0 16px 0', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <HelpCircle size={20} color="#0e7490" /> جدول تحليل مفردات وبنود الأسئلة (Item Psychometrics)
+                </h3>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {itemAnalysisData.questionsAnalysis.map((item, idx) => (
-                  <div key={item.qIndex} style={{ background: '#f8fafc', padding: '18px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
-                      <div style={{ flex: 1 }}>
-                        <span style={{ background: 'var(--color-primary)', color: 'white', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', marginInlineEnd: '8px' }}>
-                          السؤال {idx + 1}
-                        </span>
-                        <strong style={{ fontSize: '15px', color: '#0f172a' }}>{item.question.text}</strong>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', background: item.diffBg, color: item.diffColor, border: `1px solid ${item.diffColor}40` }}>
-                          معامل السهولة P: {item.p.toFixed(2)} ({item.diffCategory})
-                        </span>
-                        <span style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', background: item.discBg, color: item.discColor, border: `1px solid ${item.discColor}40` }}>
-                          معامل التمييز D: {item.d.toFixed(2)} ({item.discCategory})
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Distractor Choices Frequency Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginTop: '12px' }}>
-                      {item.distractors.map((d) => (
-                        <div
-                          key={d.optIndex}
-                          style={{
-                            background: d.isCorrect ? '#f0fdf4' : 'white',
-                            border: `1.5px solid ${d.isCorrect ? '#22c55e' : '#cbd5e1'}`,
-                            borderRadius: '8px',
-                            padding: '10px',
-                            fontSize: '13px'
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <strong style={{ color: d.isCorrect ? '#166534' : '#334155' }}>
-                              الخيار {d.optIndex + 1} {d.isCorrect && '✅ (الإجابة الصحيحة)'}
-                            </strong>
-                            <span style={{ fontWeight: 'bold', color: d.isCorrect ? '#166534' : '#64748b' }}>
-                              {d.count} طلاب ({d.pct}%)
-                            </span>
-                          </div>
-                          <div style={{ color: '#475569', fontSize: '12px', marginBottom: '6px' }}>{d.text}</div>
-                          {d.note && (
-                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: d.note.includes('مضلل') ? '#dc2626' : d.note.includes('غير فعال') ? '#d97706' : '#16a34a' }}>
-                              💡 {d.note}
-                            </div>
-                          )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {itemAnalysisData.questionsAnalysis.map((item, idx) => (
+                    <div key={item.qIndex} style={{ background: '#f8fafc', padding: '18px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                        <div style={{ flex: 1 }}>
+                          <span style={{ background: 'var(--color-primary)', color: 'white', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', marginInlineEnd: '8px' }}>
+                            السؤال {idx + 1}
+                          </span>
+                          <strong style={{ fontSize: '15px', color: '#0f172a' }}>{item.question.text}</strong>
                         </div>
-                      ))}
-                    </div>
 
-                    {/* Pedagogical Recommendation */}
-                    <div style={{ marginTop: '12px', background: 'white', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
-                      <Sparkles size={16} color="#0e7490" />
-                      <span><strong>التوصية التربوية:</strong> {item.recommendation}</span>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', background: item.diffBg, color: item.diffColor, border: `1px solid ${item.diffColor}40` }}>
+                            معامل السهولة P: {item.p.toFixed(2)} ({item.diffCategory})
+                          </span>
+                          <span style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', background: item.discBg, color: item.discColor, border: `1px solid ${item.discColor}40` }}>
+                            معامل التمييز D: {item.d.toFixed(2)} ({item.discCategory})
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Distractors Frequency */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginTop: '12px' }}>
+                        {item.distractors.map((d) => (
+                          <div
+                            key={d.optIndex}
+                            style={{
+                              background: d.isCorrect ? '#f0fdf4' : 'white',
+                              border: `1.5px solid ${d.isCorrect ? '#22c55e' : '#cbd5e1'}`,
+                              borderRadius: '8px',
+                              padding: '10px',
+                              fontSize: '13px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <strong style={{ color: d.isCorrect ? '#166534' : '#334155' }}>
+                                الخيار {d.optIndex + 1} {d.isCorrect && '✅ (الصحيح)'}
+                              </strong>
+                              <span style={{ fontWeight: 'bold', color: d.isCorrect ? '#166534' : '#64748b' }}>
+                                {d.count} طلاب ({d.pct}%)
+                              </span>
+                            </div>
+                            <div style={{ color: '#475569', fontSize: '12px', marginBottom: '6px' }}>{d.text}</div>
+                            {d.note && (
+                              <div style={{ fontSize: '11px', fontWeight: 'bold', color: d.note.includes('مضلل') ? '#dc2626' : d.note.includes('غير فعال') ? '#d97706' : '#16a34a' }}>
+                                💡 {d.note}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ marginTop: '12px', background: 'white', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
+                        <Sparkles size={16} color="#0e7490" />
+                        <span><strong>التوصية التربوية:</strong> {item.recommendation}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center', color: '#64748b' }}>
+                <p>تم رصد درجات هذا الاختبار كدرجة إجمالية مباشرة (اختبار ورقي/خارجي). يمكنك استعراض كافة المؤشرات والتحليلات الإحصائية للفصل والطلاب عبر زر "تحليل نتائج الاختبار".</p>
+              </div>
+            )}
 
           </div>
         )}
@@ -695,7 +1436,7 @@ export default function TeacherExams() {
   }
 
   // =========================================================================
-  // 2. RESULTS ANALYTICS VIEW (تحليل النتائج على مستوى الفصل ومستوى الطالب)
+  // 3. RESULTS ANALYTICS VIEW (تحليل نتائج الاختبار على مستوى الفصل والطالب)
   // =========================================================================
   if (activeView === 'results_analytics' && currentExam) {
     const data = resultsAnalyticsData;
@@ -708,7 +1449,7 @@ export default function TeacherExams() {
               <BarChart2 size={26} color="#0e7490" /> تحليل نتائج الاختبار: {currentExam.title}
             </h2>
             <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-              الفصل: <strong>{currentExam.targetClass}</strong> | المادة: <strong>{currentExam.subject}</strong> | التاريخ: <strong>{currentExam.examDate}</strong>
+              الفصل: <strong>{currentExam.targetClass}</strong> | المادة: <strong>{currentExam.subject}</strong> | التاريخ: <strong>{currentExam.examDate}</strong> {currentExam.isExternal && <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', marginInlineStart: '6px' }}>📝 اختبار ورقي</span>}
             </p>
           </div>
 
@@ -776,9 +1517,7 @@ export default function TeacherExams() {
           </div>
         ) : (
           <>
-            {/* ===================================== */}
-            {/* SUB-TAB 1: CLASS LEVEL ANALYTICS      */}
-            {/* ===================================== */}
+            {/* SUB-TAB 1: CLASS LEVEL ANALYTICS */}
             {analyticsTab === 'class' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 
@@ -846,9 +1585,7 @@ export default function TeacherExams() {
               </div>
             )}
 
-            {/* ===================================== */}
-            {/* SUB-TAB 2: STUDENT LEVEL ANALYTICS    */}
-            {/* ===================================== */}
+            {/* SUB-TAB 2: STUDENT LEVEL ANALYTICS */}
             {analyticsTab === 'student' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 
@@ -880,7 +1617,9 @@ export default function TeacherExams() {
                         <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center' }}>الدرجة</th>
                         <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center' }}>النسبة</th>
                         <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center' }}>المستوى بالنسبة للمتوسط</th>
-                        <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center' }}>نقاط القوة / الضعف</th>
+                        {currentExam.questions?.length > 0 && (
+                          <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center' }}>نقاط القوة / الضعف</th>
+                        )}
                         <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center' }}>الإجراءات</th>
                       </tr>
                     </thead>
@@ -904,24 +1643,28 @@ export default function TeacherExams() {
                             <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold' }}>
                               {student.comparison}
                             </td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: '12px' }}>
-                              <span style={{ color: '#16a34a', marginInlineEnd: '8px' }}>
-                                صحيحة: {student.correctIndices.length}
-                              </span>
-                              <span style={{ color: '#dc2626' }}>
-                                خاطئة: {student.incorrectIndices.length}
-                              </span>
-                            </td>
+                            {currentExam.questions?.length > 0 && (
+                              <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: '12px' }}>
+                                <span style={{ color: '#16a34a', marginInlineEnd: '8px' }}>
+                                  صحيحة: {student.correctIndices.length}
+                                </span>
+                                <span style={{ color: '#dc2626' }}>
+                                  خاطئة: {student.incorrectIndices.length}
+                                </span>
+                              </td>
+                            )}
                             <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                               <div style={{ display: 'inline-flex', gap: '6px' }}>
-                                <button
-                                  className="btn btn-outline"
-                                  style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                                  onClick={() => setInspectingStudentAnswers(student)}
-                                  title="فحص إجابات الطالب"
-                                >
-                                  فحص الحل
-                                </button>
+                                {currentExam.questions?.length > 0 && (
+                                  <button
+                                    className="btn btn-outline"
+                                    style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    onClick={() => setInspectingStudentAnswers(student)}
+                                    title="فحص إجابات الطالب"
+                                  >
+                                    فحص الحل
+                                  </button>
+                                )}
                                 <button
                                   className="btn btn-outline"
                                   style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -941,60 +1684,6 @@ export default function TeacherExams() {
               </div>
             )}
           </>
-        )}
-
-        {/* Modal: Student Inspection */}
-        {inspectingStudentAnswers && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ background: 'white', padding: '24px', borderRadius: '12px', width: '90%', maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-                <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>
-                  إجابات الطالب: {inspectingStudentAnswers.studentName} ({inspectingStudentAnswers.score} / {inspectingStudentAnswers.totalQuestions})
-                </h3>
-                <button className="btn btn-outline" onClick={() => setInspectingStudentAnswers(null)}>إغلاق</button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {currentExam.questions?.map((q, qIdx) => {
-                  const studentAnswer = inspectingStudentAnswers.rawResult?.answers?.[qIdx];
-                  const isCorrect = studentAnswer === q.correctOption;
-
-                  return (
-                    <div key={q.id || qIdx} style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: `1px solid ${isCorrect ? '#86efac' : '#fca5a5'}` }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <strong>السؤال {qIdx + 1}: {q.text}</strong>
-                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: isCorrect ? '#166534' : '#991b1b' }}>
-                          {isCorrect ? '✅ إجابة صحيحة' : '❌ إجابة خاطئة'}
-                        </span>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
-                        {q.options?.map((opt, optIdx) => {
-                          const isStudentPick = studentAnswer === optIdx;
-                          const isTheCorrectOne = q.correctOption === optIdx;
-
-                          let bg = '#fff';
-                          let border = '#e2e8f0';
-                          if (isTheCorrectOne) {
-                            bg = '#dcfce7';
-                            border = '#22c55e';
-                          } else if (isStudentPick && !isCorrect) {
-                            bg = '#fee2e2';
-                            border = '#ef4444';
-                          }
-
-                          return (
-                            <div key={optIdx} style={{ padding: '8px 12px', background: bg, border: `1px solid ${border}`, borderRadius: '6px' }}>
-                              {opt} {isTheCorrectOne ? ' (الإجابة الصحيحة)' : ''} {isStudentPick ? ' (اختيار الطالب)' : ''}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
         )}
 
         {/* Modal: Student History Tracking */}
@@ -1020,10 +1709,12 @@ export default function TeacherExams() {
                   </thead>
                   <tbody>
                     {studentHistory.map((h, i) => {
-                      const pct = Math.round((h.score / h.totalQuestions) * 100);
+                      const denom = h.totalQuestions || h.maxScore || 1;
+                      const pct = Math.round((h.score / denom) * 100);
                       let trend = null;
                       if (i > 0) {
-                        const prevPct = Math.round((studentHistory[i-1].score / studentHistory[i-1].totalQuestions) * 100);
+                        const prevDenom = studentHistory[i-1].totalQuestions || studentHistory[i-1].maxScore || 1;
+                        const prevPct = Math.round((studentHistory[i-1].score / prevDenom) * 100);
                         if (pct > prevPct) trend = <span style={{ color: '#10b981', fontSize: '12px', fontWeight: 'bold' }}>▲ (+{pct - prevPct}%)</span>;
                         else if (pct < prevPct) trend = <span style={{ color: '#ef4444', fontSize: '12px', fontWeight: 'bold' }}>▼ ({pct - prevPct}%)</span>;
                         else trend = <span style={{ color: '#64748b', fontSize: '12px' }}>◀▶ (0%)</span>;
@@ -1032,7 +1723,7 @@ export default function TeacherExams() {
                         <tr key={h.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                           <td style={{ padding: '12px', fontWeight: 'bold', color: '#0f172a' }}>{h.examTitle}</td>
                           <td style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>{h.examDate}</td>
-                          <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>{h.score} / {h.totalQuestions}</td>
+                          <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>{h.score} / {denom}</td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                               <span style={{ color: pct >= 50 ? '#166534' : '#991b1b', fontWeight: 'bold' }}>{pct}%</span>
@@ -1063,25 +1754,46 @@ export default function TeacherExams() {
   }
 
   // =========================================================================
-  // MAIN LIST VIEW (بطاقات الاختبارات مع زري التحليل)
+  // 4. MAIN LIST VIEW (بطاقات الاختبارات الإلكترونية والورقية)
   // =========================================================================
   if (activeView === 'list') {
     return (
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 style={{ margin: '0 0 4px 0' }}><FileText style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} /> {t('teacherExams.electronicExams')}</h2>
+            <h2 style={{ margin: '0 0 4px 0' }}>
+              <FileText style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} /> {t('teacherExams.electronicExams')} والاختبارات الورقية
+            </h2>
             <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-              إدارة الاختبارات الإلكترونية، تحليل مفردات وبنود الاختبار، وتحليل النتائج على مستوى الفصل والطالب
+              إنشاء الاختبارات الإلكترونية، رصد نتائج الاختبارات الورقية (خارج المنصة)، وتحليل النتائج على مستوى الفصل والطالب
             </p>
           </div>
-          <button className="btn btn-primary" onClick={() => {
-            setTargetClass(classesList[0] || '');
-            setSubject(subjectsList[0] || '');
-            setActiveView('create');
-          }}>
-            <Plus size={18} /> {t('teacherExams.createNewExam')}
-          </button>
+
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Button 1: Create Electronic Exam */}
+            <button className="btn btn-primary" onClick={handleCreateElectronic} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Plus size={18} /> {t('teacherExams.createNewExam')}
+            </button>
+
+            {/* Button 2: Import / Record External Paper Exam */}
+            <button 
+              className="btn" 
+              onClick={handleCreateExternal}
+              style={{
+                background: 'linear-gradient(135deg, #0e7490, #0284c7)',
+                color: 'white',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                fontWeight: 'bold',
+                boxShadow: '0 2px 6px rgba(14, 116, 144, 0.25)'
+              }}
+            >
+              <FileSpreadsheet size={18} /> 📥 رصد / استيراد اختبار ورقي (خارج المنصة)
+            </button>
+          </div>
         </div>
 
         {exams.length === 0 ? (
@@ -1091,23 +1803,54 @@ export default function TeacherExams() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
             {exams.map(exam => (
-              <div key={exam.id} style={{ background: 'rgba(255,255,255,0.85)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{exam.title}</h3>
+              <div 
+                key={exam.id} 
+                style={{ 
+                  background: 'rgba(255,255,255,0.9)', 
+                  padding: '20px', 
+                  borderRadius: '12px', 
+                  border: exam.isExternal ? '1.5px solid #67e8f9' : '1px solid rgba(0,0,0,0.06)', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '14px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <h3 style={{ margin: 0, color: 'var(--color-primary-dark)', fontSize: '17px' }}>{exam.title}</h3>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    whiteSpace: 'nowrap',
+                    background: exam.isExternal ? '#e0f2fe' : 'rgba(37, 211, 102, 0.1)',
+                    color: exam.isExternal ? '#0369a1' : '#166534',
+                    border: `1px solid ${exam.isExternal ? '#bae6fd' : '#bbf7d0'}`
+                  }}>
+                    {exam.isExternal ? '📝 اختبار ورقي' : '💻 اختبار إلكتروني'}
+                  </span>
+                </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#475569' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={16}/> {t('teacherExams.classLabel')} <strong>{exam.targetClass}</strong></div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><BookOpen size={16}/> {t('teacherExams.subjectLabel')} <strong>{exam.subject}</strong></div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={16}/> {t('teacherExams.timeLabel')} {exam.examDate} | {exam.startTime} ({exam.duration} {t('teacherExams.minutes')})</div>
-                  <div style={{ fontSize: '12px', color: '#0e7490', background: 'rgba(14, 116, 144, 0.08)', padding: '4px 8px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    ⏳ آخر موعد للدخول: <strong>{exam.entryDeadline || calculateDefaultCutoff(exam.startTime)}</strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock size={16}/> التاريخ: <strong>{exam.examDate}</strong> {exam.startTime && `| ${exam.startTime} (${exam.duration} دقيقة)`}
                   </div>
-                  <div>{t('teacherExams.questionsCount')} <strong>{exam.questions.length} أسئلة</strong></div>
+                  {exam.isExternal ? (
+                    <div style={{ fontSize: '13px', color: '#0e7490', background: 'rgba(14, 116, 144, 0.08)', padding: '4px 8px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      🎯 النهاية العظمى: <strong>{exam.maxScore || exam.totalQuestions} درجة</strong>
+                    </div>
+                  ) : (
+                    <div>{t('teacherExams.questionsCount')} <strong>{exam.questions?.length || 0} أسئلة</strong></div>
+                  )}
                 </div>
                 
                 {/* Analysis Action Buttons */}
                 <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    {/* Button 1: Item & Exam Analysis */}
+                    {/* Button 1: Item & Exam Analysis (Electronic only, or statistical summary) */}
                     <button 
                       className="btn btn-primary" 
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', padding: '10px 8px', fontWeight: 'bold' }} 
@@ -1124,27 +1867,31 @@ export default function TeacherExams() {
                       onClick={() => handleOpenResultsAnalytics(exam)}
                       title="تحليل نتائج الاختبار على مستوى الفصل وعلى مستوى الطالب"
                     >
-                      <BarChart2 size={16} /> تحليل نتائج الاختبار
+                      <BarChart2 size={16} /> تحليل النتائج (فصل/طالب)
                     </button>
                   </div>
 
                   <div style={{ display: 'flex', gap: '6px' }}>
+                    {!exam.isExternal && (
+                      <button 
+                        className="btn btn-outline" 
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '12px', padding: '6px' }} 
+                        onClick={() => setPrintingExamData(exam)}
+                        title="طباعة وتصدير أسئلة الاختبار بصيغة Word و PDF"
+                      >
+                        <Printer size={14} /> طباعة الأسئلة
+                      </button>
+                    )}
+                    
                     <button 
                       className="btn btn-outline" 
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '12px', padding: '6px' }} 
-                      onClick={() => setPrintingExamData(exam)}
-                      title="طباعة وتصدير أسئلة الاختبار بصيغة Word و PDF"
-                    >
-                      <Printer size={14} /> طباعة الأسئلة (Word/PDF)
-                    </button>
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '12px', padding: '6px 12px' }} 
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '12px', padding: '6px 12px' }} 
                       onClick={() => handleEdit(exam)}
-                      title="تعديل الاختبار"
+                      title={exam.isExternal ? 'تعديل درجات وبيانات الاختبار' : 'تعديل الاختبار'}
                     >
-                      <Edit size={14} /> {t('teacherExams.edit')}
+                      <Edit size={14} /> {exam.isExternal ? 'تعديل الدرجات' : t('teacherExams.edit')}
                     </button>
+
                     <button 
                       className="btn btn-outline" 
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', borderColor: '#fca5a5', padding: '6px 10px' }} 
@@ -1168,7 +1915,7 @@ export default function TeacherExams() {
   }
 
   // =========================================================================
-  // CREATE / EDIT FORM
+  // 5. CREATE / EDIT ELECTRONIC EXAM FORM
   // =========================================================================
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
@@ -1177,7 +1924,7 @@ export default function TeacherExams() {
         <button className="btn btn-outline" onClick={resetForm}>{t('teacherExams.backToList')}</button>
       </div>
 
-      <form onSubmit={handleSave}>
+      <form onSubmit={handleSaveElectronic}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
           <div className="form-group">
             <label>{t('teacherExams.examTitle')}</label>
