@@ -286,7 +286,7 @@ export default function AttendanceSummaryExport({ schoolId }) {
   const schoolMetrics = useMemo(() => {
     const totalRecords = filteredRecords.length;
     if (totalRecords === 0) {
-      return { totalRecords: 0, present: 0, absent: 0, late: 0, excused: 0, attendanceRate: 0, absenceRate: 0 };
+      return { total: 0, totalRecords: 0, present: 0, absent: 0, late: 0, excused: 0, attendanceRate: 0, absenceRate: 0, lateRate: 0 };
     }
 
     let present = 0;
@@ -303,8 +303,9 @@ export default function AttendanceSummaryExport({ schoolId }) {
 
     const attendanceRate = Math.round(((present + late) / totalRecords) * 100);
     const absenceRate = Math.round(((absent + excused) / totalRecords) * 100);
+    const lateRate = Math.round((late / totalRecords) * 100);
 
-    return { totalRecords, present, absent, late, excused, attendanceRate, absenceRate };
+    return { total: totalRecords, totalRecords, present, absent, late, excused, attendanceRate, absenceRate, lateRate };
   }, [filteredRecords]);
 
   const classMetrics = useMemo(() => {
@@ -354,6 +355,8 @@ export default function AttendanceSummaryExport({ schoolId }) {
     return result.sort((a, b) => b.absenceRate - a.absenceRate);
   }, [filteredRecords, classesList]);
 
+  const classStatsList = classMetrics;
+
   const studentMetrics = useMemo(() => {
     const map = new Map();
 
@@ -361,6 +364,7 @@ export default function AttendanceSummaryExport({ schoolId }) {
       const sid = r.studentId || r.studentName;
       if (!map.has(sid)) {
         map.set(sid, {
+          id: sid,
           studentId: sid,
           name: r.studentName,
           nationalId: r.nationalId,
@@ -371,7 +375,8 @@ export default function AttendanceSummaryExport({ schoolId }) {
           late: 0,
           excused: 0,
           totalAbsences: 0,
-          absenceRate: 0
+          absenceRate: 0,
+          attendanceRate: 0
         });
       }
       const entry = map.get(sid);
@@ -391,6 +396,7 @@ export default function AttendanceSummaryExport({ schoolId }) {
     let list = Array.from(map.values());
     list.forEach(s => {
       s.absenceRate = s.totalDays > 0 ? Math.round((s.totalAbsences / s.totalDays) * 100) : 0;
+      s.attendanceRate = s.totalDays > 0 ? Math.round(((s.present + s.late) / s.totalDays) * 100) : 0;
       let warningStatus = 'good';
       if (s.totalAbsences >= 5) warningStatus = 'danger';
       else if (s.totalAbsences >= 3) warningStatus = 'warning';
@@ -404,6 +410,8 @@ export default function AttendanceSummaryExport({ schoolId }) {
 
     return list.sort((a, b) => b.totalAbsences - a.totalAbsences || b.late - a.late);
   }, [filteredRecords, analyticsStudentSearch]);
+
+  const studentStatsList = studentMetrics;
 
   // 7. Save Attendance Record (For Admin & Deputy)
   const handleSaveAttendance = async () => {
