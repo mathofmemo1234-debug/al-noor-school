@@ -1,5 +1,5 @@
 import Settings from './Settings';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
@@ -70,31 +70,420 @@ function StudentWeeklyPlan() {
   return <WeeklyPlanView studentClass={studentClass} />;
 }
 
+import MarkdownViewer from '../components/MarkdownViewer';
+import { Download, Link as LinkIcon, Award, Play, CheckCircle2, XCircle, RotateCcw, BarChart2, Calendar, FileText, BookOpen, AlertCircle } from 'lucide-react';
+
 function StudentAssignments() {
   const { t } = useLanguage();
+  const { userData } = useAuth();
   const studentClass = useStudentClass();
   const [assignments, setAssignments] = useState([]);
+  const [studentDocId, setStudentDocId] = useState(null);
+  const [mySubmissions, setMySubmissions] = useState({}); // { [assignmentId]: [submission1, submission2] }
+  
+  // Interactive Solver State
+  const [activeAssignment, setActiveAssignment] = useState(null);
+  const [currentAnswers, setCurrentAnswers] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedbackView, setFeedbackView] = useState(null); // { score, total, isLate, answers, assignment, attemptNumber }
 
+  // Resolve Student ID
   useEffect(() => {
-    if (!studentClass) return;
-    const q = query(collection(db, 'assignments'), where('className', '==', studentClass));
-    const unsub = onSnapshot(q, (snapshot) => {
+    const nid = (userData?.nationalId || auth.currentUser?.email?.replace('@school.local', '') || '').trim();
+    if (!nid && !auth.currentUser?.email) return;
+
+    const q = nid 
+      ? query(collection(db, 'students'), where('nationalId', '==', nid))
+      : query(collection(db, 'students'), where('email', '==', auth.currentUser.email));
+
+    const unsub = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        setStudentDocId(snap.docs[0].id);
+      }
+    });
+    return () => unsub();
+  }, [userData]);
+
+  // Fetch Assignments for Student's Class
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'assignments'), (snapshot) => {
+      const norm = (s) => (s || '').replace(/\s+/g, '').replace(/[-_]/g, '/').toLowerCase();
+      const sCls = norm(studentClass);
+
       const data = [];
-      snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
+      snapshot.forEach((docSnap) => {
+        const d = { id: docSnap.id, ...docSnap.data() };
+        const aCls = norm(d.targetClass || d.className || d.class);
+        
+        if (!studentClass || !aCls || aCls === sCls || aCls.includes(sCls) || sCls.includes(aCls)) {
+          data.push(d);
+        }
+      });
+      data.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       setAssignments(data);
     });
     return () => unsub();
   }, [studentClass]);
 
+  // Fetch Student Submissions
+  useEffect(() => {
+    if (!studentDocId) return;
+    const q = query(collection(db, 'assignment_results'), where('studentId', '==', studentDocId));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const map = {};
+      snapshot.forEach(docSnap => {
+        const sub = { id: docSnap.id, ...docSnap.data() };
+        if (!map[sub.assignmentId]) map[sub.assignmentId] = [];
+        map[sub.assignmentId].push(sub);
+      });
+      // Sort each assignment submissions by attemptNumber descending
+      Object.keys(map).forEach(aid => {
+        map[aid].sort((a, b) => (b.attemptNumber || 1) - (a.attemptNumber || 1));
+      });
+      setMySubmissions(map);
+    });
+    return () => unsub();
+  }, [studentDocId]);
+
+  const handleStartHomework = (assignment) => {
+    setActiveAssignment(assignment);
+    const saved = localStorage.getItem(`hw_checkpoint_${assignment.id}_${studentDocId}`);
+    if (saved) {
+      try {
+        setCurrentAnswers(JSON.parse(saved));
+      } catch {
+        setCurrentAnswers({});
+      }
+    } else {
+      setCurrentAnswers({});
+    }
+    setFeedbackView(null);
+  };
+
+  const handleAnswerSelect = (qIndex, optIndex) => {
+    setCurrentAnswers(prev => {
+      const next = { ...prev, [qIndex]: optIndex };
+      if (activeAssignment && studentDocId) {
+        localStorage.setItem(`hw_checkpoint_${activeAssignment.id}_${studentDocId}`, JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
+  const handleSubmitHomework = async () => {
+    if (!activeAssignment || !studentDocId) return;
+
+    const questions = activeAssignment.questions || [];
+    if (Object.keys(currentAnswers).length < questions.length) {
+      if (!window.confirm('لم تقم بالإجابة على جميع الأسئلة. هل أنت متأكد من رغبتك في تسليم الواجب الآن؟')) {
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    let correctCount = 0;
+    questions.forEach((q, idx) => {
+      if (currentAnswers[idx] === q.correctOption) {
+        correctCount++;
+      }
+    });
+
+    const previousAttempts = mySubmissions[activeAssignment.id] || [];
+    const attemptNumber = previousAttempts.length + 1;
+    
+    // Check if submitted after due date
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isLate = activeAssignment.dueDate ? todayStr > activeAssignment.dueDate : false;
+
+    const submissionData = {
+      assignmentId: activeAssignment.id,
+      studentId: studentDocId,
+      studentName: userData?.name || 'طالب',
+      nationalId: userData?.nationalId || '',
+      className: studentClass,
+      subject: activeAssignment.subject || 'عام',
+      assignmentTitle: activeAssignment.title || 'واجب إلكتروني',
+      score: correctCount,
+      totalQuestions: questions.length,
+      answers: currentAnswers,
+      isLate,
+      attemptNumber,
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      await addDoc(collection(db, 'assignment_results'), submissionData);
+      localStorage.removeItem(`hw_checkpoint_${activeAssignment.id}_${studentDocId}`);
+      setFeedbackView({
+        score: correctCount,
+        total: questions.length,
+        isLate,
+        answers: currentAnswers,
+        assignment: activeAssignment,
+        attemptNumber
+      });
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تسليم الواجب: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!studentClass) {
     return <div className="glass-panel" style={{ padding: '24px' }}>{t('studentDashboard.loadingData')}</div>;
   }
 
+  // 1. Interactive Solver View (Untimed)
+  if (activeAssignment && !feedbackView) {
+    const questions = activeAssignment.questions || [];
+
+    return (
+      <div className="glass-panel" style={{ padding: '24px', maxWidth: '850px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h2 style={{ margin: '0 0 4px 0', color: 'var(--color-primary-dark)' }}>
+              📝 {activeAssignment.title}
+            </h2>
+            <div style={{ fontSize: '13px', color: '#64748b', display: 'flex', gap: '16px' }}>
+              <span>المادة: <strong>{activeAssignment.subject || 'عام'}</strong></span>
+              <span>آخر موعد: <strong>{activeAssignment.dueDate}</strong></span>
+              <span style={{ color: '#0e7490' }}>⭐ واجب مفتوح بدون توقيت زمني</span>
+            </div>
+          </div>
+          <button className="btn btn-outline" onClick={() => setActiveAssignment(null)}>خروج وإلغاء</button>
+        </div>
+
+        {/* Question Cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {questions.map((q, qIndex) => (
+            <div key={q.id || qIndex} style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}>
+              <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#0f172a', marginBottom: '16px' }}>
+                <span style={{ color: 'var(--color-primary)', marginInlineEnd: '8px' }}>السؤال {qIndex + 1}:</span>
+                <MarkdownViewer content={q.text} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+                {q.options?.map((opt, optIndex) => {
+                  const isSelected = currentAnswers[qIndex] === optIndex;
+                  return (
+                    <label
+                      key={optIndex}
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        border: `1.5px solid ${isSelected ? 'var(--color-primary)' : '#e2e8f0'}`,
+                        background: isSelected ? 'rgba(99, 178, 198, 0.12)' : '#f8fafc',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name={`q_${qIndex}`}
+                        checked={isSelected}
+                        onChange={() => handleAnswerSelect(qIndex, optIndex)}
+                        style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                      />
+                      <span style={{ fontSize: '14px', fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? 'var(--color-primary-dark)' : '#334155' }}>
+                        <MarkdownViewer content={opt} />
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'center' }}>
+          <button
+            onClick={handleSubmitHomework}
+            disabled={isSubmitting}
+            className="btn btn-primary"
+            style={{ padding: '12px 40px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}
+          >
+            <CheckCircle2 size={20} />
+            {isSubmitting ? 'جاري تسليم الواجب...' : 'تسليم إجابات الواجب'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Feedback & Correct Answers View (Immediately shown on submit or reviewing)
+  if (feedbackView) {
+    const { score, total, isLate, answers, assignment, attemptNumber } = feedbackView;
+    const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+    const isPass = percentage >= 50;
+    const questions = assignment.questions || [];
+
+    const allowed = assignment.allowedAttempts === 'unlimited' ? Infinity : (parseInt(assignment.allowedAttempts) || 1);
+    const canRetry = attemptNumber < allowed;
+
+    return (
+      <div className="glass-panel" style={{ padding: '24px', maxWidth: '850px', margin: '0 auto' }}>
+        {/* Instant Score Header */}
+        <div style={{
+          background: isPass ? 'linear-gradient(135deg, #059669, #10b981)' : 'linear-gradient(135deg, #dc2626, #f87171)',
+          color: 'white',
+          padding: '24px',
+          borderRadius: '16px',
+          textAlign: 'center',
+          marginBottom: '24px',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.1)'
+        }}>
+          <h2 style={{ margin: '0 0 8px 0', fontSize: '24px' }}>
+            {isPass ? '🎉 أحسنت! تم تسليم الواجب ورصد الدرجة فورياً' : 'تم تسليم الواجب ورصد الدرجة'}
+          </h2>
+          <div style={{ fontSize: '36px', fontWeight: '900', margin: '12px 0' }}>
+            {score} / {total} ({percentage}%)
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', fontSize: '14px', flexWrap: 'wrap' }}>
+            <span>المحاولة رقم: <strong>{attemptNumber}</strong></span>
+            <span>حالة التسليم: <strong>{isLate ? '⚠️ تسليم متأخر' : '✅ تسليم في الموعد'}</strong></span>
+            <span>تم الحفظ في: <strong>سجل الإنجاز والدرجات</strong></span>
+          </div>
+        </div>
+
+        {/* Detailed Question Review & Correct Answers */}
+        <div style={{ marginBottom: '24px' }}>
+          <h3 style={{ margin: '0 0 16px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CheckCircle2 size={20} color="#059669" /> مراجعة الإجابات والتغذية الراجعة التفصيلية
+          </h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {questions.map((q, qIndex) => {
+              const studentAnswer = answers[qIndex];
+              const isCorrect = studentAnswer === q.correctOption;
+
+              return (
+                <div key={q.id || qIndex} style={{
+                  background: 'white',
+                  padding: '18px',
+                  borderRadius: '12px',
+                  border: `1.5px solid ${isCorrect ? '#86efac' : '#fca5a5'}`,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
+                      <span style={{ marginInlineEnd: '8px' }}>السؤال {qIndex + 1}:</span>
+                      <MarkdownViewer content={q.text} />
+                    </div>
+                    <span style={{
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      background: isCorrect ? '#dcfce7' : '#fee2e2',
+                      color: isCorrect ? '#166534' : '#991b1b',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {isCorrect ? '✅ إجابة صحيحة' : '❌ إجابة خاطئة'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+                    {q.options?.map((opt, optIdx) => {
+                      const isStudentPick = studentAnswer === optIdx;
+                      const isTheCorrectOne = q.correctOption === optIdx;
+
+                      let bg = '#f8fafc';
+                      let border = '#e2e8f0';
+                      let textTag = '';
+                      let tagColor = '';
+
+                      if (isTheCorrectOne) {
+                        bg = '#dcfce7';
+                        border = '#22c55e';
+                        textTag = ' (الإجابة الصحيحة ✅)';
+                        tagColor = '#166534';
+                      } else if (isStudentPick && !isCorrect) {
+                        bg = '#fee2e2';
+                        border = '#ef4444';
+                        textTag = ' (إجابتك ❌)';
+                        tagColor = '#991b1b';
+                      }
+
+                      return (
+                        <div key={optIdx} style={{
+                          padding: '10px 14px',
+                          background: bg,
+                          border: `1.5px solid ${border}`,
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}>
+                          <MarkdownViewer content={opt} />
+                          {textTag && (
+                            <span style={{ fontSize: '11px', fontWeight: 'bold', color: tagColor, marginInlineStart: '6px' }}>
+                              {textTag}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          {canRetry && (
+            <button
+              onClick={() => {
+                setFeedbackView(null);
+                setCurrentAnswers({});
+              }}
+              className="btn"
+              style={{
+                background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+                color: 'white',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 24px',
+                fontSize: '15px'
+              }}
+            >
+              <RotateCcw size={18} /> إعادة محاولة الواجب ({attemptNumber + 1} من {allowed === Infinity ? '∞' : allowed})
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              setActiveAssignment(null);
+              setFeedbackView(null);
+            }}
+            className="btn btn-outline"
+            style={{ padding: '10px 24px', fontSize: '15px' }}
+          >
+            العودة لقائمة الواجبات
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Assignment Cards List View
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
-        <h2>{t('studentDashboard.assignmentsClass')} {studentClass}</h2>
-        <p style={{ color: 'var(--color-text-muted)' }}>{t('studentDashboard.assignmentsSubtitle')}</p>
+        <h2 style={{ margin: '0 0 6px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <BookOpen /> واجباتي الإلكترونية - فصل {studentClass}
+        </h2>
+        <p style={{ color: 'var(--color-text-muted)', margin: 0 }}>
+          حل الواجبات تفاعلياً بدون توقيت، ومعرفة درجتك ومراجعة الإجابات الصحيحة فورياً
+        </p>
       </div>
 
       {assignments.length === 0 ? (
@@ -102,24 +491,417 @@ function StudentAssignments() {
           {t('studentDashboard.noAssignmentsClass')}
         </p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {assignments.map(a => (
-            <div key={a.id} style={{ background: 'white', padding: '16px', borderRadius: '8px', borderLeft: '4px solid var(--color-primary)' }}>
-              <h4 style={{ margin: '0 0 8px 0' }}>{a.title}</h4>
-              <div style={{ color: 'var(--color-text-muted)', fontSize: '0.9em', display: 'flex', gap: '16px' }}>
-                <span><strong>{t('studentDashboard.teacherLabel')}</strong> {a.teacherEmail}</span>
-                <span><strong>{t('studentDashboard.deadlineLabel')}</strong> {a.dueDate}</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+          {assignments.map(a => {
+            const submissions = mySubmissions[a.id] || [];
+            const hasSubmitted = submissions.length > 0;
+            const latestSub = hasSubmitted ? submissions[0] : null;
+            const allowed = a.allowedAttempts === 'unlimited' ? Infinity : (parseInt(a.allowedAttempts) || 1);
+            const remainingAttempts = allowed === Infinity ? 'غير محدود' : Math.max(0, allowed - submissions.length);
+            const canAttempt = allowed === Infinity || submissions.length < allowed;
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const isLateDeadline = a.dueDate ? todayStr > a.dueDate : false;
+
+            return (
+              <div
+                key={a.id}
+                style={{
+                  background: 'white',
+                  padding: '20px',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <h3 style={{ margin: 0, color: 'var(--color-primary-dark)', fontSize: '16px' }}>{a.title}</h3>
+                  {hasSubmitted && (
+                    <span style={{
+                      padding: '3px 8px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      background: '#dcfce7',
+                      color: '#166534'
+                    }}>
+                      تم الحل ({latestSub.score}/{latestSub.totalQuestions})
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#475569' }}>
+                  <div>المادة: <strong>{a.subject || 'عام'}</strong></div>
+                  <div>المعلم: <strong>{a.teacherEmail}</strong></div>
+                  <div>آخر موعد للتسليم: <strong style={{ color: isLateDeadline ? '#dc2626' : 'inherit' }}>{a.dueDate || 'مفتوح'}</strong></div>
+                  <div>المحاولات المستنفدة: <strong>{submissions.length}</strong> من <strong>{allowed === Infinity ? 'غير محدود' : allowed}</strong></div>
+                  {a.questions && <div>عدد الأسئلة: <strong>{a.questions.length}</strong> أسئلة (بدون توقيت)</div>}
+                </div>
+
+                <div style={{ marginTop: 'auto', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {canAttempt ? (
+                    <button
+                      onClick={() => handleStartHomework(a)}
+                      className="btn btn-primary"
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                      <Play size={16} /> {hasSubmitted ? `إعادة محاولة الواجب (${remainingAttempts} متبقية)` : 'بدء حل الواجب'}
+                    </button>
+                  ) : (
+                    <div style={{ background: '#f1f5f9', color: '#64748b', padding: '10px', borderRadius: '8px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold' }}>
+                      استنفدت جميع المحاولات المسموحة ({allowed})
+                    </div>
+                  )}
+
+                  {hasSubmitted && latestSub && (
+                    <button
+                      onClick={() => setFeedbackView({
+                        score: latestSub.score,
+                        total: latestSub.totalQuestions,
+                        isLate: latestSub.isLate,
+                        answers: latestSub.answers || {},
+                        assignment: a,
+                        attemptNumber: latestSub.attemptNumber || 1
+                      })}
+                      className="btn btn-outline"
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
+                    >
+                      <CheckCircle2 size={14} color="#059669" /> مراجعة الإجابات الصحيحة والتغذية الراجعة
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-import MarkdownViewer from '../components/MarkdownViewer';
-import { Download, Link as LinkIcon } from 'lucide-react';
+function StudentPortfolio() {
+  const { userData } = useAuth();
+  const { t } = useLanguage();
+  const [studentDocId, setStudentDocId] = useState(null);
+  const [examResults, setExamResults] = useState([]);
+  const [assignmentResults, setAssignmentResults] = useState([]);
+  const [examsMap, setExamsMap] = useState({});
+  const [filterType, setFilterType] = useState('all'); // 'all' | 'homework' | 'exam'
+  const [viewingAnswersModal, setViewingAnswersModal] = useState(null);
+
+  // Resolve Student ID
+  useEffect(() => {
+    const nid = (userData?.nationalId || auth.currentUser?.email?.replace('@school.local', '') || '').trim();
+    if (!nid && !auth.currentUser?.email) return;
+
+    const q = nid 
+      ? query(collection(db, 'students'), where('nationalId', '==', nid))
+      : query(collection(db, 'students'), where('email', '==', auth.currentUser.email));
+
+    const unsub = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        setStudentDocId(snap.docs[0].id);
+      }
+    });
+    return () => unsub();
+  }, [userData]);
+
+  // Fetch Exams Map for metadata
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'exams'), (snap) => {
+      const map = {};
+      snap.docs.forEach(d => {
+        map[d.id] = { id: d.id, ...d.data() };
+      });
+      setExamsMap(map);
+    });
+    return () => unsub();
+  }, []);
+
+  // Fetch Student Exam Results
+  useEffect(() => {
+    if (!studentDocId) return;
+    const q = query(collection(db, 'exam_results'), where('studentId', '==', studentDocId));
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, type: 'exam', ...d.data() }));
+      setExamResults(list);
+    });
+    return () => unsub();
+  }, [studentDocId]);
+
+  // Fetch Student Assignment Results
+  useEffect(() => {
+    if (!studentDocId) return;
+    const q = query(collection(db, 'assignment_results'), where('studentId', '==', studentDocId));
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, type: 'homework', ...d.data() }));
+      setAssignmentResults(list);
+    });
+    return () => unsub();
+  }, [studentDocId]);
+
+  // Combined Portfolio Records
+  const allRecords = useMemo(() => {
+    const combined = [];
+
+    // Map Exams
+    examResults.forEach(er => {
+      const examMeta = examsMap[er.examId] || {};
+      const pct = er.totalQuestions > 0 ? Math.round((er.score / er.totalQuestions) * 100) : 0;
+      const dateStr = er.timestamp?.toDate ? er.timestamp.toDate().toISOString().split('T')[0] : (examMeta.examDate || '—');
+      
+      combined.push({
+        id: er.id,
+        type: 'exam',
+        typeLabel: 'اختبار إلكتروني',
+        title: examMeta.title || 'اختبار إلكتروني',
+        subject: examMeta.subject || 'عام',
+        score: er.score,
+        totalQuestions: er.totalQuestions,
+        percentage: pct,
+        date: dateStr,
+        isLate: false,
+        rawTime: new Date(dateStr).getTime() || 0,
+        answers: er.answers,
+        questions: examMeta.questions || []
+      });
+    });
+
+    // Map Homeworks
+    assignmentResults.forEach(ar => {
+      const pct = ar.totalQuestions > 0 ? Math.round((ar.score / ar.totalQuestions) * 100) : 0;
+      const dateStr = ar.timestamp ? ar.timestamp.split('T')[0] : '—';
+
+      combined.push({
+        id: ar.id,
+        type: 'homework',
+        typeLabel: 'واجب إلكتروني',
+        title: ar.assignmentTitle || 'واجب إلكتروني',
+        subject: ar.subject || 'عام',
+        score: ar.score,
+        totalQuestions: ar.totalQuestions,
+        percentage: pct,
+        date: dateStr,
+        isLate: ar.isLate,
+        rawTime: new Date(dateStr).getTime() || 0,
+        attemptNumber: ar.attemptNumber || 1,
+        answers: ar.answers
+      });
+    });
+
+    return combined.sort((a, b) => b.rawTime - a.rawTime);
+  }, [examResults, assignmentResults, examsMap]);
+
+  // Filtered Records
+  const filteredRecords = useMemo(() => {
+    if (filterType === 'all') return allRecords;
+    return allRecords.filter(r => r.type === filterType);
+  }, [allRecords, filterType]);
+
+  // Portfolio Summary Statistics
+  const summary = useMemo(() => {
+    const totalTasks = allRecords.length;
+    if (totalTasks === 0) return { totalTasks: 0, gpa: 0, hwCount: 0, hwAvg: 0, examCount: 0, examAvg: 0 };
+
+    let totalPct = 0;
+    let hwPct = 0;
+    let hwCount = 0;
+    let examPct = 0;
+    let examCount = 0;
+
+    allRecords.forEach(r => {
+      totalPct += r.percentage;
+      if (r.type === 'homework') {
+        hwPct += r.percentage;
+        hwCount++;
+      } else {
+        examPct += r.percentage;
+        examCount++;
+      }
+    });
+
+    return {
+      totalTasks,
+      gpa: Math.round(totalPct / totalTasks),
+      hwCount,
+      hwAvg: hwCount > 0 ? Math.round(hwPct / hwCount) : 0,
+      examCount,
+      examAvg: examCount > 0 ? Math.round(examPct / examCount) : 0
+    };
+  }, [allRecords]);
+
+  return (
+    <div className="glass-panel" style={{ padding: '24px' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h2 style={{ margin: '0 0 6px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Award size={26} color="#0e7490" /> سجل الإنجاز والدرجات الأكاديمية للطالب
+          </h2>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
+            السجل الموحد لنتائج جميع الواجبات والاختبارات الإلكترونية المرصودة فورياً
+          </p>
+        </div>
+
+        {/* Filter Badges */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setFilterType('all')}
+            className="btn"
+            style={{
+              padding: '6px 14px',
+              fontSize: '13px',
+              background: filterType === 'all' ? 'var(--color-primary-dark)' : 'white',
+              color: filterType === 'all' ? 'white' : 'var(--color-primary-dark)',
+              border: '1px solid var(--color-border)'
+            }}
+          >
+            الكل ({allRecords.length})
+          </button>
+          <button
+            onClick={() => setFilterType('homework')}
+            className="btn"
+            style={{
+              padding: '6px 14px',
+              fontSize: '13px',
+              background: filterType === 'homework' ? 'var(--color-primary-dark)' : 'white',
+              color: filterType === 'homework' ? 'white' : 'var(--color-primary-dark)',
+              border: '1px solid var(--color-border)'
+            }}
+          >
+            الواجبات ({summary.hwCount})
+          </button>
+          <button
+            onClick={() => setFilterType('exam')}
+            className="btn"
+            style={{
+              padding: '6px 14px',
+              fontSize: '13px',
+              background: filterType === 'exam' ? 'var(--color-primary-dark)' : 'white',
+              color: filterType === 'exam' ? 'white' : 'var(--color-primary-dark)',
+              border: '1px solid var(--color-border)'
+            }}
+          >
+            الاختبارات ({summary.examCount})
+          </button>
+        </div>
+      </div>
+
+      {/* Metrics Cards */}
+      <div className="stats-grid" style={{ marginBottom: '24px' }}>
+        <div className="stat-card glass-panel" style={{ background: 'white' }}>
+          <div className="stat-icon" style={{ color: '#0e7490', background: '#e0f2fe' }}>
+            <Award size={28} />
+          </div>
+          <div className="stat-info">
+            <p>المعدل العام للإنجاز</p>
+            <h3 style={{ color: '#0e7490' }}>{summary.gpa}%</h3>
+          </div>
+        </div>
+
+        <div className="stat-card glass-panel" style={{ background: 'white' }}>
+          <div className="stat-icon" style={{ color: '#16a34a', background: '#dcfce7' }}>
+            <BookOpen size={28} />
+          </div>
+          <div className="stat-info">
+            <p>متوسط الواجبات ({summary.hwCount})</p>
+            <h3 style={{ color: '#16a34a' }}>{summary.hwAvg}%</h3>
+          </div>
+        </div>
+
+        <div className="stat-card glass-panel" style={{ background: 'white' }}>
+          <div className="stat-icon" style={{ color: '#8b5cf6', background: '#f3e8ff' }}>
+            <FileText size={28} />
+          </div>
+          <div className="stat-info">
+            <p>متوسط الاختبارات ({summary.examCount})</p>
+            <h3 style={{ color: '#8b5cf6' }}>{summary.examAvg}%</h3>
+          </div>
+        </div>
+
+        <div className="stat-card glass-panel" style={{ background: 'white' }}>
+          <div className="stat-icon" style={{ color: '#d97706', background: '#fef3c7' }}>
+            <CheckCircle2 size={28} />
+          </div>
+          <div className="stat-info">
+            <p>إجمالي المهام المنجزة</p>
+            <h3 style={{ color: '#d97706' }}>{summary.totalTasks}</h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Records Table */}
+      {filteredRecords.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+          لا توجد نتائج مسجلة حتى الآن
+        </div>
+      ) : (
+        <div style={{ background: 'white', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+            <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+              <tr>
+                <th style={{ padding: '12px 14px', fontSize: '13px' }}>#</th>
+                <th style={{ padding: '12px 14px', fontSize: '13px' }}>التكليف</th>
+                <th style={{ padding: '12px 14px', fontSize: '13px' }}>النوع</th>
+                <th style={{ padding: '12px 14px', fontSize: '13px' }}>المادة</th>
+                <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center' }}>الدرجة</th>
+                <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center' }}>النسبة</th>
+                <th style={{ padding: '12px 14px', fontSize: '13px' }}>التاريخ</th>
+                <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center' }}>التقييم</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRecords.map((r, idx) => {
+                const isPass = r.percentage >= 50;
+                return (
+                  <tr key={r.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : '#fafafa' }}>
+                    <td style={{ padding: '12px 14px', color: '#64748b' }}>{idx + 1}</td>
+                    <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#0f172a' }}>{r.title}</td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <span style={{
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        background: r.type === 'exam' ? '#f3e8ff' : '#e0f2fe',
+                        color: r.type === 'exam' ? '#7e22ce' : '#0369a1'
+                      }}>
+                        {r.typeLabel}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 14px', color: '#475569' }}>{r.subject}</td>
+                    <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 'bold' }}>
+                      {r.score} / {r.totalQuestions}
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 'bold', color: isPass ? '#166534' : '#991b1b' }}>
+                      {r.percentage}%
+                    </td>
+                    <td style={{ padding: '12px 14px', color: '#64748b', fontSize: '13px' }}>{r.date}</td>
+                    <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        background: r.percentage >= 90 ? '#dcfce7' : r.percentage >= 75 ? '#e0f2fe' : r.percentage >= 50 ? '#fef3c7' : '#fee2e2',
+                        color: r.percentage >= 90 ? '#166534' : r.percentage >= 75 ? '#0369a1' : r.percentage >= 50 ? '#92400e' : '#991b1b'
+                      }}>
+                        {r.percentage >= 90 ? 'ممتاز ⭐' : r.percentage >= 75 ? 'جيد جداً' : r.percentage >= 50 ? 'ناجح' : 'يحتاج تحسين'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function StudentMaterials() {
   const { t } = useLanguage();
@@ -299,6 +1081,7 @@ export default function StudentDashboard() {
       <Routes>
         <Route path="/" element={<StudentHome />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
+        <Route path="/portfolio" element={<StudentPortfolio />} />
         <Route path="/weekly-plan" element={<StudentWeeklyPlan />} />
         <Route path="/assignments" element={<StudentAssignments />} />
         <Route path="/schedule" element={<StudentSchedule />} />
