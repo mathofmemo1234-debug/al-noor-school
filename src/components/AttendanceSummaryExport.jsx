@@ -215,6 +215,7 @@ export default function AttendanceSummaryExport({ schoolId }) {
         const studentNid = studentObj?.nationalId || (studentKey.match(/^\d+$/) ? studentKey : '—');
         const studentClass = studentObj?.class || studentObj?.className || docClass || '—';
         const studentId = studentObj?.id || studentKey;
+        const studentNote = docData.notes?.[studentKey] || docData.notes?.[studentId] || '';
 
         let statusText = 'حاضر';
         let statusColor = '#16a34a';
