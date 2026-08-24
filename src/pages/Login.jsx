@@ -231,9 +231,12 @@ export default function Login() {
     setError('');
     setLoading(true);
 
-    const trimmedParentNid = nationalId.trim();
-    const trimmedStudentNid = parentStudentId.trim();
-    const trimmedPassword = password.trim() || trimmedParentNid;
+    const trimmedParentNid = nationalId.trim().replace(/\s+/g, '');
+    const trimmedStudentNid = parentStudentId.trim().replace(/\s+/g, '');
+    let trimmedPassword = password.trim();
+    if (!trimmedPassword) {
+      trimmedPassword = trimmedParentNid;
+    }
 
     if (!trimmedParentNid || !trimmedStudentNid) {
       setError('يرجى إدخال رقم هوية ولي الأمر ورقم هوية الطالب المسجل.');
@@ -241,14 +244,30 @@ export default function Login() {
       return;
     }
 
+    if (trimmedPassword.length < 6) {
+      setError('كلمة المرور يجب أن لا تقل عن 6 أرقام/خانات.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // 1. Verify student exists in system
-      let sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', trimmedStudentNid)));
+      // 1. Verify student exists in system (check string and number)
       let studentDoc = null;
+      
+      // A. Query students collection with string & number
+      let sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', trimmedStudentNid)));
+      if (sSnap.empty && !isNaN(trimmedStudentNid)) {
+        sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', Number(trimmedStudentNid))));
+      }
+
       if (!sSnap.empty) {
         studentDoc = sSnap.docs[0].data();
       } else {
-        const uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', trimmedStudentNid)));
+        // B. Query users collection for student
+        let uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', trimmedStudentNid)));
+        if (uSnap.empty && !isNaN(trimmedStudentNid)) {
+          uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', Number(trimmedStudentNid))));
+        }
         if (!uSnap.empty) {
           const uMatch = uSnap.docs.map(d => d.data()).find(d => d.role === 'student');
           if (uMatch) studentDoc = uMatch;
@@ -262,12 +281,35 @@ export default function Login() {
       }
 
       const email = getFakeEmail(trimmedParentNid);
-      // 2. Create Firebase Auth user
-      const userCredential = await createUserWithEmailAndPassword(auth, email, trimmedPassword);
-      const user = userCredential.user;
+      let user = null;
 
+      // 2. Try creating Firebase Auth user or sign in if already exists
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, trimmedPassword);
+        user = userCredential.user;
+      } catch (authErr) {
+        if (authErr.code === 'auth/email-already-in-use') {
+          // If already created, try signing in with the provided password
+          try {
+            const userCredential = await signInWithEmailAndPassword(auth, email, trimmedPassword);
+            user = userCredential.user;
+          } catch (signInErr) {
+            setError('هذا الحساب مسجل مسبقاً بكلمة مرور مختلفة. يمكنك الانتقال لتبويب تسجيل الدخول.');
+            setLoading(false);
+            return;
+          }
+        } else if (authErr.code === 'auth/weak-password') {
+          setError('كلمة المرور ضعيفة. يرجى اختيار كلمة مرور من 6 أرقام/خانات على الأقل.');
+          setLoading(false);
+          return;
+        } else {
+          throw authErr;
+        }
+      }
+
+      // 3. Prepare parent record
       const parentRecord = {
-        uid: user.uid,
+        uid: user ? user.uid : '',
         email: email,
         nationalId: trimmedParentNid,
         name: parentName.trim() || 'ولي أمر',
@@ -279,17 +321,28 @@ export default function Login() {
         createdAt: new Date()
       };
 
-      await addDoc(collection(db, 'users'), parentRecord);
-      await addDoc(collection(db, 'parents'), parentRecord);
+      // 4. Save/Update record in users and parents collections
+      try {
+        const uExist = await getDocs(query(collection(db, 'users'), where('nationalId', '==', trimmedParentNid)));
+        if (uExist.empty) {
+          await addDoc(collection(db, 'users'), parentRecord);
+        }
+        const pExist = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', trimmedParentNid)));
+        if (pExist.empty) {
+          await addDoc(collection(db, 'parents'), parentRecord);
+        }
+      } catch (docErr) {
+        console.warn("Firestore parent record save warning:", docErr);
+      }
 
       setLoginRole('parent');
       navigate('/parent');
     } catch (createErr) {
       console.error("Parent Signup Error:", createErr);
-      if (createErr.code === 'auth/email-already-in-use') {
-        setError('هذا الحساب أو رقم الهوية مسجل مسبقاً. يمكنك التبديل لتبويب تسجيل الدخول.');
+      if (createErr.code === 'auth/weak-password') {
+        setError('كلمة المرور يجب أن تكون 6 أرقام/خانات على الأقل.');
       } else {
-        setError('حدث خطأ أثناء إنشاء حساب ولي الأمر. يرجى التأكد من البيانات والمحاولة لاحقاً.');
+        setError('تعذر إنشاء حساب ولي الأمر. يرجى التأكد من البيانات أو تسجيل الدخول إن كان الحساب مسجلاً.');
       }
     } finally {
       setLoading(false);
