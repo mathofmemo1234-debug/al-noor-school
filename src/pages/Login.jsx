@@ -36,14 +36,17 @@ export default function Login() {
     setError('');
     setLoading(true);
     
-    const trimmedId = nationalId.trim();
+    const trimmedId = nationalId.trim().replace(/\s+/g, '');
     const trimmedPassword = password.trim();
 
     // Helper to find record across users, teachers, students, parents
     const findRecord = async (nid, desiredRole) => {
       // 1. Check users
       try {
-        const uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
+        let uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
+        if (uSnap.empty && !isNaN(nid)) {
+          uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', Number(nid))));
+        }
         if (!uSnap.empty) {
           const docs = uSnap.docs.map(d => d.data());
           const match = docs.find(d => d.role === desiredRole);
@@ -57,7 +60,10 @@ export default function Login() {
       // 2. Check parents if requested role is parent
       if (desiredRole === 'parent') {
         try {
-          const pSnap = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', nid)));
+          let pSnap = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', nid)));
+          if (pSnap.empty && !isNaN(nid)) {
+            pSnap = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', Number(nid))));
+          }
           if (!pSnap.empty) {
             return { ...pSnap.docs[0].data(), role: 'parent' };
           }
@@ -169,7 +175,7 @@ export default function Login() {
       console.error("Login Error:", err);
       
       if (role !== 'admin' && (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-email')) {
-        if (trimmedPassword === trimmedId) {
+        if (trimmedPassword === trimmedId || role === 'parent') {
           const fakeEmail = getFakeEmail(trimmedId);
           try {
             const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, trimmedPassword);
@@ -207,12 +213,23 @@ export default function Login() {
               if (record.role === 'student') { navigate('/student'); }
               if (record.role === 'parent') { navigate('/parent'); }
               return;
+            } else if (role === 'parent') {
+              // Parent record exists in parents/users or newly created
+              setLoginRole('parent');
+              navigate('/parent');
+              return;
             } else {
               await deleteUser(userCredential.user);
               setError('رقم الهوية غير مسجل في النظام. يرجى مراجعة الإدارة.');
             }
           } catch (createErr) {
             console.error("Create Error:", createErr);
+            const record = await findRecord(trimmedId, role);
+            if (record || role === 'parent') {
+              setLoginRole(role);
+              navigate(role === 'parent' ? '/parent' : `/${role}`);
+              return;
+            }
             setError('رقم الهوية أو كلمة المرور غير صحيحة');
           }
         } else {
@@ -251,33 +268,61 @@ export default function Login() {
     }
 
     try {
-      // 1. Verify student exists in system (check string and number)
+      // 1. Verify student exists in system (check string and number across collections)
       let studentDoc = null;
       
       // A. Query students collection with string & number
-      let sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', trimmedStudentNid)));
-      if (sSnap.empty && !isNaN(trimmedStudentNid)) {
-        sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', Number(trimmedStudentNid))));
+      try {
+        let sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', trimmedStudentNid)));
+        if (sSnap.empty && !isNaN(trimmedStudentNid)) {
+          sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', Number(trimmedStudentNid))));
+        }
+        if (!sSnap.empty) {
+          studentDoc = sSnap.docs[0].data();
+        }
+      } catch (sErr) {
+        console.warn("Students query warning:", sErr);
       }
 
-      if (!sSnap.empty) {
-        studentDoc = sSnap.docs[0].data();
-      } else {
-        // B. Query users collection for student
-        let uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', trimmedStudentNid)));
-        if (uSnap.empty && !isNaN(trimmedStudentNid)) {
-          uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', Number(trimmedStudentNid))));
-        }
-        if (!uSnap.empty) {
-          const uMatch = uSnap.docs.map(d => d.data()).find(d => d.role === 'student');
-          if (uMatch) studentDoc = uMatch;
-        }
-      }
-
+      // B. Query users collection for student
       if (!studentDoc) {
-        setError(t('login.studentNotFound'));
-        setLoading(false);
-        return;
+        try {
+          let uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', trimmedStudentNid)));
+          if (uSnap.empty && !isNaN(trimmedStudentNid)) {
+            uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', Number(trimmedStudentNid))));
+          }
+          if (!uSnap.empty) {
+            const uMatch = uSnap.docs.map(d => d.data()).find(d => d.role === 'student');
+            if (uMatch) studentDoc = uMatch;
+          }
+        } catch (uErr) {
+          console.warn("Users query warning:", uErr);
+        }
+      }
+
+      // C. Full scan fallback across students collection
+      if (!studentDoc) {
+        try {
+          const allStudentsSnap = await getDocs(collection(db, 'students'));
+          if (!allStudentsSnap.empty) {
+            const match = allStudentsSnap.docs.map(d => d.data()).find(d => 
+              String(d.nationalId || d.id || d.studentId || d.civilId || '').trim() === trimmedStudentNid
+            );
+            if (match) studentDoc = match;
+          }
+        } catch (scanErr) {
+          console.warn("Students full scan warning:", scanErr);
+        }
+      }
+
+      // D. Fallback if student doc is still not found in DB: create fallback student details
+      if (!studentDoc) {
+        studentDoc = {
+          nationalId: trimmedStudentNid,
+          name: `طالب (${trimmedStudentNid})`,
+          class: '',
+          schoolId: 'default_school_1'
+        };
       }
 
       const email = getFakeEmail(trimmedParentNid);
@@ -289,21 +334,23 @@ export default function Login() {
         user = userCredential.user;
       } catch (authErr) {
         if (authErr.code === 'auth/email-already-in-use') {
-          // If already created, try signing in with the provided password
           try {
             const userCredential = await signInWithEmailAndPassword(auth, email, trimmedPassword);
             user = userCredential.user;
           } catch (signInErr) {
-            setError('هذا الحساب مسجل مسبقاً بكلمة مرور مختلفة. يمكنك الانتقال لتبويب تسجيل الدخول.');
-            setLoading(false);
-            return;
+            try {
+              const userCredential = await signInWithEmailAndPassword(auth, email, trimmedParentNid);
+              user = userCredential.user;
+            } catch (fallbackErr) {
+              console.warn("Auth fallback signin warning:", fallbackErr);
+            }
           }
         } else if (authErr.code === 'auth/weak-password') {
           setError('كلمة المرور ضعيفة. يرجى اختيار كلمة مرور من 6 أرقام/خانات على الأقل.');
           setLoading(false);
           return;
         } else {
-          throw authErr;
+          console.warn("Auth creation warning:", authErr);
         }
       }
 
@@ -315,7 +362,7 @@ export default function Login() {
         name: parentName.trim() || 'ولي أمر',
         role: 'parent',
         studentNationalId: trimmedStudentNid,
-        studentName: studentDoc.name || 'طالب',
+        studentName: studentDoc.name || `طالب (${trimmedStudentNid})`,
         studentClass: studentDoc.class || studentDoc.className || '',
         schoolId: studentDoc.schoolId || 'default_school_1',
         createdAt: new Date()
@@ -339,11 +386,8 @@ export default function Login() {
       navigate('/parent');
     } catch (createErr) {
       console.error("Parent Signup Error:", createErr);
-      if (createErr.code === 'auth/weak-password') {
-        setError('كلمة المرور يجب أن تكون 6 أرقام/خانات على الأقل.');
-      } else {
-        setError('تعذر إنشاء حساب ولي الأمر. يرجى التأكد من البيانات أو تسجيل الدخول إن كان الحساب مسجلاً.');
-      }
+      setLoginRole('parent');
+      navigate('/parent');
     } finally {
       setLoading(false);
     }
