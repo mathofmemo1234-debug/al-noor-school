@@ -54,6 +54,9 @@ export default function Header({ title, role }) {
       snap.docs.forEach(docSnap => {
         const msg = docSnap.data();
 
+        // Multi-school strict isolation
+        if (msg.schoolId && msg.schoolId !== 'ALL' && msg.schoolId !== schoolId) return;
+
         const readBy = msg.readBy || [];
         const hasRead = Array.isArray(readBy) && readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()));
         if (hasRead) return; // already read
@@ -67,7 +70,7 @@ export default function Header({ title, role }) {
           const myNameLower = (userData?.name || '').trim().toLowerCase();
 
           const isToMe = (
-            (recNid && myIdentities.has(recNid)) ||
+            (recNid && (myIdentities.has(recNid) || recNid === String(userData?.studentNationalId || '').trim().toLowerCase())) ||
             (recId && myIdentities.has(recId)) ||
             (recEmail && myIdentities.has(recEmail)) ||
             (recName && myIdentities.has(recName)) ||
@@ -80,10 +83,11 @@ export default function Header({ title, role }) {
           if (tg === 'all') count++;
           else if (tg === 'teachers' && (effectiveRole === 'teacher' || userData?.role === 'teacher' || !!userData?.subject)) count++;
           else if (tg === 'students' && (effectiveRole === 'student' || userData?.role === 'student')) count++;
+          else if (tg === 'parents' && (effectiveRole === 'parent' || userData?.role === 'parent')) count++;
           else if (tg === 'class') {
             const targetCls = String(msg.targetClassName || '').trim().toLowerCase();
-            const userCls = String(myClass || userData?.class || userData?.className || '').trim().toLowerCase();
-            if (effectiveRole === 'student' || userData?.role === 'student') {
+            const userCls = String(myClass || userData?.class || userData?.className || userData?.studentClass || '').trim().toLowerCase();
+            if (effectiveRole === 'student' || effectiveRole === 'parent' || userData?.role === 'student' || userData?.role === 'parent') {
               if (!targetCls || targetCls === userCls || userCls.includes(targetCls) || targetCls.includes(userCls)) {
                 count++;
               }
@@ -106,6 +110,7 @@ export default function Header({ title, role }) {
                       effectiveRole === 'staff' ? (userData?.schoolName ? `${userData?.roleTitle || 'كادر مدرسي'} • ${userData.schoolName}` : (userData?.roleTitle || 'كادر مدرسي')) :
                       effectiveRole === 'supervisor' ? (userData?.schoolName ? `مشرف تعليمي${supervisorSpecialty ? ` (${supervisorSpecialty})` : ''} • ${userData.schoolName}` : `مشرف تعليمي${supervisorSpecialty ? ` (${supervisorSpecialty})` : ''}`) :
                       effectiveRole === 'teacher' ? (extraDetail ? `معلم • ${extraDetail}` : 'معلم') : 
+                      effectiveRole === 'parent' ? (userData?.studentName ? `ولي أمر • الطالب: ${userData.studentName}` : 'ولي أمر') : 
                       (extraDetail ? `طالب • ${extraDetail}` : 'طالب');
 
   const displayName = userData?.name || currentUser?.email?.split('@')[0] || t('header.user');

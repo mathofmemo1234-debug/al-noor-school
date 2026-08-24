@@ -14,6 +14,8 @@ const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 const Migration = lazy(() => import('./pages/Migration'));
 
+const ParentDashboard = lazy(() => import('./pages/ParentDashboard'));
+
 function App() {
   return (
     <LanguageProvider>
@@ -52,6 +54,11 @@ function App() {
           <Route path="/student/*" element={
             <ProtectedRoute allowedRole="student">
               <StudentDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/parent/*" element={
+            <ProtectedRoute allowedRole="parent">
+              <ParentDashboard />
             </ProtectedRoute>
           } />
             </Routes>

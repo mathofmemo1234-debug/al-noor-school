@@ -100,11 +100,23 @@ export default function Sidebar({ role }) {
     { path: '/student/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
+  const parentLinks = [
+    { path: '/parent', icon: Home, label: t('sidebar.overview') },
+    { path: '/parent/messages', icon: Mail, label: 'المراسلات والتعاميم' },
+    { path: '/parent/portfolio', icon: Award, label: 'سجل إنجاز الطالب والدرجات' },
+    { path: '/parent/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
+    { path: '/parent/schedule', icon: Calendar, label: t('sidebar.schedule') },
+    { path: '/parent/assignments', icon: BookOpen, label: t('sidebar.assignments') },
+    { path: '/parent/exams', icon: FileText, label: t('sidebar.exams') },
+    { path: '/parent/settings', icon: Settings, label: t('sidebar.settings') },
+  ];
+
   const links = role === 'superadmin' ? superAdminLinks : 
                 role === 'admin' ? adminLinks : 
                 role === 'staff' ? staffLinks : 
                 role === 'supervisor' ? supervisorLinks : 
-                role === 'teacher' ? teacherLinks : studentLinks;
+                role === 'teacher' ? teacherLinks : 
+                role === 'parent' ? parentLinks : studentLinks;
   
   const logoSrc = userData?.logoUrl || `${import.meta.env.BASE_URL}logo.webp`;
 

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, AlertCircle } from 'lucide-react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser, signInWithPopup } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { auth, db, googleProvider } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import './Login.css';
@@ -20,6 +20,13 @@ export default function Login() {
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Google Login & Parent Student Link Modal State
+  const [googleUser, setGoogleUser] = useState(null);
+  const [showStudentLinkModal, setShowStudentLinkModal] = useState(false);
+  const [studentNationalIdInput, setStudentNationalIdInput] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const [linkLoading, setLinkLoading] = useState(false);
 
   const getFakeEmail = (id) => {
     if (id.includes('@')) return id;
@@ -207,12 +214,117 @@ export default function Login() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      
+      // Check if user is already registered as a parent
+      let q = query(collection(db, 'users'), where('email', '==', user.email));
+      let snap = await getDocs(q);
+      if (snap.empty && user.uid) {
+        q = query(collection(db, 'users'), where('uid', '==', user.uid));
+        snap = await getDocs(q);
+      }
+
+      let pData = null;
+      if (!snap.empty) {
+        pData = snap.docs.find(d => d.data().role === 'parent')?.data() || snap.docs[0].data();
+      }
+
+      if (!pData || pData.role !== 'parent') {
+        const pSnap = await getDocs(query(collection(db, 'parents'), where('email', '==', user.email)));
+        if (!pSnap.empty) {
+          pData = pSnap.docs[0].data();
+        }
+      }
+
+      if (pData && pData.studentNationalId) {
+        setLoginRole('parent');
+        navigate('/parent');
+      } else {
+        setGoogleUser(user);
+        setShowStudentLinkModal(true);
+      }
+    } catch (err) {
+      console.error("Google Auth Error:", err);
+      setError('حدث خطأ أثناء تسجيل الدخول عبر Google. يرجى المحاولة لاحقاً');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLinkStudent = async (e) => {
+    e.preventDefault();
+    setLinkError('');
+    setLinkLoading(true);
+
+    const sNid = studentNationalIdInput.trim();
+    if (!sNid) {
+      setLinkError('يرجى إدخال رقم هوية الطالب');
+      setLinkLoading(false);
+      return;
+    }
+
+    try {
+      // Find student in students collection
+      let sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', sNid)));
+      let studentDoc = null;
+      if (!sSnap.empty) {
+        studentDoc = sSnap.docs[0].data();
+      } else {
+        // Fallback: check users collection for student
+        const uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', sNid)));
+        if (!uSnap.empty) {
+          const uDoc = uSnap.docs.map(d => d.data()).find(d => d.role === 'student');
+          if (uDoc) studentDoc = uDoc;
+        }
+      }
+
+      if (!studentDoc) {
+        setLinkError(t('login.studentNotFound'));
+        setLinkLoading(false);
+        return;
+      }
+
+      // Link parent account with student details
+      const parentRecord = {
+        uid: googleUser?.uid || '',
+        email: googleUser?.email || '',
+        name: googleUser?.displayName || 'ولي أمر',
+        role: 'parent',
+        studentNationalId: sNid,
+        studentName: studentDoc.name || 'طالب',
+        studentClass: studentDoc.class || studentDoc.className || '',
+        schoolId: studentDoc.schoolId || 'default_school_1',
+        createdAt: new Date()
+      };
+
+      // Add to users collection
+      await addDoc(collection(db, 'users'), parentRecord);
+      
+      // Add to parents collection
+      await addDoc(collection(db, 'parents'), parentRecord);
+
+      setShowStudentLinkModal(false);
+      setLoginRole('parent');
+      navigate('/parent');
+    } catch (err) {
+      console.error("Link Student Error:", err);
+      setLinkError('حدث خطأ أثناء ربط حساب الطالب. يرجى المحاولة لاحقاً.');
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
   return (
     <main role="main">
       <div className="login-container relative min-h-screen flex items-center justify-center overflow-hidden">
         {/* Background elements */}
         <div className="absolute inset-0 z-0">
-          <div className="login-card glass-panel" style={{ maxWidth: '450px' }}>
+          <div className="login-card glass-panel" style={{ maxWidth: '480px' }}>
             <div className="login-header">
               <div className="logo-container" style={{ width: '100px', height: '100px', background: 'transparent', boxShadow: 'none' }}>
                 <img 
@@ -231,27 +343,36 @@ export default function Login() {
               <p>{t('login.loginSubtitle')}</p>
             </div>
 
-            <div className="role-selector" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+            <div className="role-selector" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', marginBottom: '20px' }}>
               <button 
                 type="button"
                 className={`role-btn ${role === 'student' ? 'active' : ''}`}
                 onClick={() => { setRole('student'); setError(''); }}
+                style={{ padding: '8px 2px', fontSize: '12px' }}
               >{t('login.roleStudent')}</button>
               <button 
                 type="button"
                 className={`role-btn ${role === 'teacher' ? 'active' : ''}`}
                 onClick={() => { setRole('teacher'); setError(''); }}
+                style={{ padding: '8px 2px', fontSize: '12px' }}
               >{t('login.roleTeacher')}</button>
+              <button 
+                type="button"
+                className={`role-btn ${role === 'parent' ? 'active' : ''}`}
+                onClick={() => { setRole('parent'); setError(''); }}
+                style={{ padding: '8px 2px', fontSize: '12px' }}
+              >{t('login.roleParent')}</button>
               <button 
                 type="button"
                 className={`role-btn ${(role === 'staff' || role === 'supervisor') ? 'active' : ''}`}
                 onClick={() => { setRole('staff'); setError(''); }}
-                style={{ fontSize: '13px', padding: '10px 4px' }}
-              >وكيل / كادر / إشراف</button>
+                style={{ fontSize: '11px', padding: '8px 2px' }}
+              >وكيل / كادر</button>
               <button 
                 type="button"
                 className={`role-btn ${role === 'admin' ? 'active' : ''}`}
                 onClick={() => { setRole('admin'); setError(''); }}
+                style={{ padding: '8px 2px', fontSize: '12px' }}
               >{t('login.roleAdmin')}</button>
             </div>
 
@@ -262,40 +383,142 @@ export default function Login() {
               </div>
             )}
 
-            <form className="login-form" onSubmit={handleLogin}>
-              <div className="form-group">
-                <label>{role === 'admin' ? 'البريد الإلكتروني للإدارة' : t('login.nationalId')}</label>
-                <input 
-                  type={role === 'admin' ? 'email' : 'text'} 
-                  placeholder={role === 'admin' ? 'admin@school.com' : t('login.nationalIdPlaceholder')} 
-                  required 
-                  dir="ltr"
-                  value={nationalId}
-                  onChange={(e) => setNationalId(e.target.value)}
-                />
+            {role === 'parent' ? (
+              <div style={{ marginTop: '10px', textAlign: 'center' }}>
+                <p style={{ marginBottom: '16px', fontSize: '13px', color: '#64748b', lineHeight: '1.6' }}>
+                  {t('parent.welcomeSubtitle')}
+                </p>
+                <button 
+                  type="button" 
+                  className="btn btn-google btn-block" 
+                  onClick={handleGoogleSignIn}
+                  disabled={loading}
+                  style={{ 
+                    background: '#ffffff', 
+                    color: '#3c4043', 
+                    border: '1px solid #dadce0', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '12px', 
+                    padding: '12px 16px', 
+                    borderRadius: '10px', 
+                    fontWeight: '600', 
+                    fontSize: '14px',
+                    cursor: 'pointer', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+                    width: '100%',
+                    marginBottom: '15px',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                  </svg>
+                  {t('login.googleSignIn')}
+                </button>
               </div>
-              
-              <div className="form-group">
-                <label>{t('login.password')} {role !== 'admin' && <span style={{fontSize:'12px', color:'#666'}}>(الافتراضية هي رقم الهوية)</span>}</label>
-                <input 
-                  type="password" 
-                  placeholder={t('login.passwordPlaceholder')} 
-                  required 
-                  dir="ltr"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
+            ) : (
+              <form className="login-form" onSubmit={handleLogin}>
+                <div className="form-group">
+                  <label>{role === 'admin' ? 'البريد الإلكتروني للإدارة' : t('login.nationalId')}</label>
+                  <input 
+                    type={role === 'admin' ? 'email' : 'text'} 
+                    placeholder={role === 'admin' ? 'admin@school.com' : t('login.nationalIdPlaceholder')} 
+                    required 
+                    dir="ltr"
+                    value={nationalId}
+                    onChange={(e) => setNationalId(e.target.value)}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>{t('login.password')} {role !== 'admin' && <span style={{fontSize:'12px', color:'#666'}}>(الافتراضية هي رقم الهوية)</span>}</label>
+                  <input 
+                    type="password" 
+                    placeholder={t('login.passwordPlaceholder')} 
+                    required 
+                    dir="ltr"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
 
-              <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ marginBottom: '15px' }}>
-                {loading ? t('login.loading') : (
-                  <><LogIn size={18} /> {t('login.loginButton')}</>
-                )}
-              </button>
-            </form>
+                <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ marginBottom: '15px' }}>
+                  {loading ? t('login.loading') : (
+                    <><LogIn size={18} /> {t('login.loginButton')}</>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Student Verification & Linking Modal */}
+      {showStudentLinkModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '440px', background: 'var(--color-bg-card, #ffffff)', padding: '28px', borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', color: 'var(--color-text)' }}>
+              {t('login.linkStudentButton')}
+            </h2>
+            <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '20px', lineHeight: '1.6' }}>
+              {t('login.enterStudentIdPrompt')}
+            </p>
+
+            {linkError && (
+              <div className="error-message" style={{ marginBottom: '15px' }}>
+                <AlertCircle size={16} />
+                <span>{linkError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLinkStudent}>
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>
+                  رقم هوية/إقامة الطالب المسجل
+                </label>
+                <input 
+                  type="text"
+                  required
+                  dir="ltr"
+                  placeholder={t('login.studentIdPlaceholder')}
+                  value={studentNationalIdInput}
+                  onChange={(e) => setStudentNationalIdInput(e.target.value)}
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button"
+                  className="btn"
+                  onClick={() => { setShowStudentLinkModal(false); setLinkError(''); }}
+                  disabled={linkLoading}
+                  style={{ padding: '10px 18px', borderRadius: '8px', background: '#f1f5f9', color: '#475569', cursor: 'pointer' }}
+                >
+                  إلغاء
+                </button>
+                <button 
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={linkLoading}
+                  style={{ padding: '10px 22px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                >
+                  {linkLoading ? t('login.loading') : t('login.linkStudentButton')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

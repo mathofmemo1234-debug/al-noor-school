@@ -16,14 +16,16 @@ const ROLE_BADGES = {
   staff: { label: 'كادر إداري', bg: '#f0fdf4', color: '#166534', border: '#bbf7d0', icon: '👔' },
   supervisor: { label: 'مشرف تربوي', bg: '#faf5ff', color: '#6b21a8', border: '#e9d5ff', icon: '🌟' },
   teacher: { label: 'معلم', bg: '#f0fdfa', color: '#0f766e', border: '#99f6e4', icon: '👨‍🏫' },
-  student: { label: 'طالب', bg: '#fffbeb', color: '#92400e', border: '#fde68a', icon: '🎓' }
+  student: { label: 'طالب', bg: '#fffbeb', color: '#92400e', border: '#fde68a', icon: '🎓' },
+  parent: { label: 'ولي أمر', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca', icon: '👨‍👩‍👧‍👦' }
 };
 
 const TARGET_GROUPS = [
-  { id: 'all', label: '📢 تعميم عام لكافة منسوبي المدرسة', desc: 'يصل للمدير والمعلمين والطلاب والكادر والمشرفين' },
+  { id: 'all', label: '📢 تعميم عام لكافة منسوبي المدرسة', desc: 'يصل للمدير والمعلمين والطلاب والكادر والمشرفين وأولياء الأمور' },
   { id: 'teachers', label: '👨‍🏫 كافة المعلمين والمعلمات', desc: 'يصل لجميع معلمي المدرسة' },
   { id: 'students', label: '🎓 كافة الطلاب والطالبات', desc: 'يصل لجميع طلاب المدرسة' },
-  { id: 'class', label: '🏫 طلاب فصل دراسي محدد', desc: 'تحديد فصل معين لإرسال التوجيهات أو الواجبات' },
+  { id: 'parents', label: '👨‍👩‍👧‍👦 كافة أولياء الأمور', desc: 'يصل لأولياء أمور جميع طلاب المدرسة' },
+  { id: 'class', label: '🏫 طلاب وفصل دراسي محدد', desc: 'تحديد فصل معين لإرسال التوجيهات أو الواجبات' },
   { id: 'staff', label: '👔 كافة أعضاء الكادر الإداري والوكلاء', desc: 'يصل للوكلاء والإداريين' },
   { id: 'supervisors', label: '🌟 كافة المشرفين التربويين', desc: 'يصل للمشرفين التعليميين' }
 ];
@@ -92,12 +94,12 @@ export default function SchoolMessagingHub() {
     return ids;
   }, [myNid, userData, currentUser, myName]);
 
-  // 1. Load Recipients Directory from ALL collections in Firestore (Zero-Filter Drop to ensure all users are found)
+  // 1. Load Recipients Directory filtered by schoolId
   useEffect(() => {
     const unsubAdmins = onSnapshot(collection(db, 'users'), snap => {
       const admins = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(d => d.role === 'admin' || d.role === 'superadmin' || d.email === 'admin@admin.com')
+        .filter(d => (d.role === 'admin' || d.role === 'superadmin' || d.email === 'admin@admin.com') && (schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId))
         .map(d => ({ ...d, role: 'admin', roleTitle: d.roleTitle || 'مدير المدرسة', name: d.name || 'مدير المدرسة' }));
       
       if (admins.length === 0) {
@@ -109,27 +111,37 @@ export default function SchoolMessagingHub() {
     });
 
     const unsubTeachers = onSnapshot(collection(db, 'teachers'), snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'teacher' }));
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data(), role: 'teacher' }))
+        .filter(d => schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId);
       setTeachersList(list);
     });
 
     const unsubStudents = onSnapshot(collection(db, 'students'), snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'student' }));
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data(), role: 'student' }))
+        .filter(d => schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId);
       setStudentsList(list);
     });
 
     const unsubStaff = onSnapshot(collection(db, 'staff'), snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'staff' }));
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data(), role: 'staff' }))
+        .filter(d => schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId);
       setStaffList(list);
     });
 
     const unsubSupervisors = onSnapshot(collection(db, 'supervisors'), snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), role: 'supervisor' }));
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data(), role: 'supervisor' }))
+        .filter(d => schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId);
       setSupervisorsList(list);
     });
 
     const unsubClasses = onSnapshot(collection(db, 'classes'), snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId);
       setClassesList(list);
       if (list.length > 0 && !targetClassName) {
         setTargetClassName(list[0].name);
@@ -144,9 +156,9 @@ export default function SchoolMessagingHub() {
       unsubSupervisors();
       unsubClasses();
     };
-  }, []);
+  }, [schoolId]);
 
-  // 2. Realtime listener to ALL school_messages (Guarantees absolute deliverability across all accounts)
+  // 2. Realtime listener to school_messages
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'school_messages'), snap => {
       const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -174,6 +186,11 @@ export default function SchoolMessagingHub() {
   const isMessageForMe = (msg) => {
     if (!msg) return false;
 
+    // Multi-School Strict Guard: Block messages from other schools (unless message or user has schoolId 'ALL')
+    if (msg.schoolId && msg.schoolId !== 'ALL' && schoolId && schoolId !== 'ALL' && msg.schoolId !== schoolId) {
+      return false;
+    }
+
     // A. Direct / Individual Message
     if (msg.messageType === 'individual') {
       const recNid = String(msg.receiverNationalId || '').trim().toLowerCase();
@@ -181,9 +198,10 @@ export default function SchoolMessagingHub() {
       const recEmail = String(msg.receiverEmail || '').trim().toLowerCase();
       const recName = String(msg.receiverName || '').trim().toLowerCase();
       const myNameLower = myName.trim().toLowerCase();
+      const studentNidLower = String(userData?.studentNationalId || '').trim().toLowerCase();
 
       const isAddressedToMe = (
-        (recNid && myIdentities.has(recNid)) ||
+        (recNid && (myIdentities.has(recNid) || (studentNidLower && recNid === studentNidLower))) ||
         (recId && myIdentities.has(recId)) ||
         (recEmail && myIdentities.has(recEmail)) ||
         (recName && myIdentities.has(recName)) ||
@@ -210,12 +228,17 @@ export default function SchoolMessagingHub() {
         return myRole === 'student' || userRole === 'student' || userData?.role === 'student';
       }
 
+      // Parents
+      if (tg === 'parents') {
+        return myRole === 'parent' || userRole === 'parent' || userData?.role === 'parent';
+      }
+
       // Specific Class (e.g. 1/أ)
       if (tg === 'class') {
         const targetCls = String(msg.targetClassName || '').trim().toLowerCase();
-        const userCls = String(myClass || userData?.class || userData?.className || '').trim().toLowerCase();
+        const userCls = String(myClass || userData?.class || userData?.className || userData?.studentClass || '').trim().toLowerCase();
         
-        if (myRole === 'student' || userRole === 'student' || userData?.role === 'student') {
+        if (myRole === 'student' || myRole === 'parent' || userRole === 'student' || userRole === 'parent' || userData?.role === 'student' || userData?.role === 'parent') {
           if (!targetCls || targetCls === userCls || userCls.includes(targetCls) || targetCls.includes(userCls)) return true;
         }
         // Teachers, Staff, and Admins can also see class circulars
@@ -241,11 +264,14 @@ export default function SchoolMessagingHub() {
   // Inbox Messages
   const inboxMessages = useMemo(() => {
     return messages.filter(m => isMessageForMe(m));
-  }, [messages, myIdentities, myRole, myClass, userData, userRole]);
+  }, [messages, myIdentities, myRole, myClass, userData, userRole, schoolId]);
 
   // Sent Messages
   const sentMessages = useMemo(() => {
     return messages.filter(m => {
+      if (m.schoolId && m.schoolId !== 'ALL' && schoolId && schoolId !== 'ALL' && m.schoolId !== schoolId) {
+        return false;
+      }
       const sNid = String(m.senderNationalId || '').trim().toLowerCase();
       const sId = String(m.senderId || '').trim().toLowerCase();
       const sName = String(m.senderName || '').trim().toLowerCase();
@@ -359,7 +385,7 @@ export default function SchoolMessagingHub() {
         targetList = [...adminList, ...teachersList, ...studentsList, ...staffList, ...supervisorsList];
       } else if (msg.targetGroup === 'teachers') {
         targetList = [...teachersList];
-      } else if (msg.targetGroup === 'students') {
+      } else if (msg.targetGroup === 'students' || msg.targetGroup === 'parents') {
         targetList = [...studentsList];
       } else if (msg.targetGroup === 'class') {
         targetList = studentsList.filter(s => s.class === msg.targetClassName || s.className === msg.targetClassName);

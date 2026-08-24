@@ -31,9 +31,13 @@ export function AuthProvider({ children }) {
 
       const nid = user.email.replace('@school.local', '');
 
-      // 1. Fetch from 'users' collection
-      const q = query(collection(db, 'users'), where('email', '==', user.email));
-      const querySnapshot = await getDocs(q);
+      // 1. Fetch from 'users' collection (check by email or uid)
+      let q = query(collection(db, 'users'), where('email', '==', user.email));
+      let querySnapshot = await getDocs(q);
+      if (querySnapshot.empty && user.uid) {
+        q = query(collection(db, 'users'), where('uid', '==', user.uid));
+        querySnapshot = await getDocs(q);
+      }
 
       let data = null;
 
@@ -133,11 +137,54 @@ export function AuthProvider({ children }) {
             }
           }
         }
+
+        // 6. Fallback: Check 'parents' collection
+        if (!data && (!roleHint || roleHint === 'parent')) {
+          let pQ = query(collection(db, 'parents'), where('email', '==', user.email));
+          let pSnap = await getDocs(pQ);
+          if (pSnap.empty && user.uid) {
+            pQ = query(collection(db, 'parents'), where('uid', '==', user.uid));
+            pSnap = await getDocs(pQ);
+          }
+          if (!pSnap.empty) {
+            const pData = pSnap.docs[0].data();
+            data = { ...pData, role: 'parent', email: user.email, uid: user.uid };
+            try {
+              await addDoc(collection(db, 'users'), {
+                uid: user.uid,
+                email: user.email,
+                role: 'parent',
+                name: pData.name || user.displayName || 'ولي أمر',
+                studentNationalId: pData.studentNationalId || '',
+                studentName: pData.studentName || '',
+                studentClass: pData.studentClass || '',
+                schoolId: pData.schoolId || 'default_school_1'
+              });
+            } catch (e) {
+              console.warn("Could not sync parent to users collection", e);
+            }
+          }
+        }
       }
 
       if (data) {
-        // Enrich class for students, subject for teachers, permissions/roleTitle for staff, specialty for supervisors
-        if (data.role === 'student') {
+        // Enrich class for students, subject for teachers, permissions/roleTitle for staff, specialty for supervisors, student data for parents
+        if (data.role === 'parent') {
+          try {
+            if (data.studentNationalId) {
+              const sQ = query(collection(db, 'students'), where('nationalId', '==', String(data.studentNationalId).trim()));
+              const sSnap = await getDocs(sQ);
+              if (!sSnap.empty) {
+                const sDoc = sSnap.docs[0].data();
+                data.studentName = sDoc.name || data.studentName || 'الطالب';
+                data.studentClass = sDoc.class || sDoc.className || data.studentClass || '';
+                data.schoolId = sDoc.schoolId || data.schoolId || 'default_school_1';
+              }
+            }
+          } catch (e) {
+            console.warn("Could not enrich parent student data", e);
+          }
+        } else if (data.role === 'student') {
           try {
             const sQ = query(collection(db, 'students'), where('nationalId', '==', nid));
             const sSnap = await getDocs(sQ);
