@@ -56,17 +56,20 @@ export default function WeeklyPlanView({ studentClass = null, schoolId }) {
 
   useEffect(() => {
     if (!selectedClassName) return;
-    const q = query(
-      collection(db, 'preparations'), 
-      where('className', '==', selectedClassName)
-    );
+    const q = query(collection(db, 'preparations'));
     const unsub = onSnapshot(q, (snapshot) => {
       const data = [];
+      const clsName = selectedClassName.trim();
       snapshot.forEach(doc => {
         const p = doc.data();
-        if (!p.week || p.week === selectedWeek) {
-          if (!schoolId || schoolId === 'ALL' || !p.schoolId || p.schoolId === 'ALL' || p.schoolId === schoolId) {
-            data.push({ id: doc.id, ...p });
+        const pCls = (p.className || p.class || p.targetClass || '').trim();
+        const matchesClass = pCls === clsName || (pCls && clsName.includes(pCls)) || (pCls && pCls.includes(clsName));
+        
+        if (matchesClass) {
+          if (!p.week || p.week === selectedWeek) {
+            if (!schoolId || schoolId === 'ALL' || !p.schoolId || p.schoolId === 'ALL' || p.schoolId === schoolId) {
+              data.push({ id: doc.id, ...p });
+            }
           }
         }
       });
@@ -76,8 +79,7 @@ export default function WeeklyPlanView({ studentClass = null, schoolId }) {
   }, [selectedClassName, selectedWeek, schoolId]);
 
   useEffect(() => {
-    if (!schoolId) return;
-    const qTeachers = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
+    const qTeachers = query(collection(db, 'teachers'));
     const unsubTeachers = onSnapshot(qTeachers, (snap) => {
       const tMap = {};
       snap.docs.forEach(doc => {
@@ -86,19 +88,36 @@ export default function WeeklyPlanView({ studentClass = null, schoolId }) {
       setTeachers(tMap);
     });
 
-    if (selectedClassId) {
-      const unsubSchedule = onSnapshot(doc(db, 'schedules', selectedClassId), (docSnap) => {
-        if (docSnap.exists()) {
-          setScheduleData(docSnap.data().matrix || {});
+    const qSchedules = query(collection(db, 'schedules'));
+    const unsubSchedules = onSnapshot(qSchedules, (snap) => {
+      if (!snap.empty && (selectedClassId || selectedClassName)) {
+        const clsName = selectedClassName ? selectedClassName.trim() : '';
+        const foundDoc = snap.docs.find(d => {
+          const data = d.data();
+          const dClsName = (data.className || data.class || data.name || '').trim();
+          return (selectedClassId && (d.id === selectedClassId || data.classId === selectedClassId)) ||
+                 (clsName && (
+                   dClsName === clsName || 
+                   (dClsName && clsName.includes(dClsName)) ||
+                   (dClsName && dClsName.includes(clsName))
+                 ));
+        });
+
+        if (foundDoc) {
+          setScheduleData(foundDoc.data().matrix || foundDoc.data().schedule || {});
         } else {
           setScheduleData({});
         }
-      });
-      return () => { unsubTeachers(); unsubSchedule(); };
-    }
-    
-    return () => unsubTeachers();
-  }, [selectedClassId, schoolId]);
+      } else {
+        setScheduleData({});
+      }
+    });
+
+    return () => {
+      unsubTeachers();
+      unsubSchedules();
+    };
+  }, [selectedClassId, selectedClassName, schoolId]);
 
   if (studentClass && !selectedClassName) {
     return <div className="glass-panel" style={{ padding: '24px', textAlign: 'center' }}><p style={{color: 'var(--color-text-muted)'}}>{t('weeklyPlan.notRegistered')}</p></div>;
