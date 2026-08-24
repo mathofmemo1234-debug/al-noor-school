@@ -31,7 +31,13 @@ export default function StudentSchedule() {
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
 
   useEffect(() => {
-    const nid = (userData?.nationalId || auth.currentUser?.email?.replace('@school.local', '') || '').trim();
+    const isParent = userData?.role === 'parent';
+    const nid = (isParent ? (userData?.studentNationalId || userData?.nationalId) : (userData?.nationalId || auth.currentUser?.email?.replace('@school.local', '')) || '').trim();
+
+    if (isParent && userData?.studentClass) {
+      setStudentClass(userData.studentClass);
+    }
+
     if (!nid && !auth.currentUser?.email) return;
 
     const q = nid 
@@ -43,24 +49,31 @@ export default function StudentSchedule() {
         const docs = snap.docs.map(d => d.data());
         const validDoc = docs.find(d => (d.class || d.className)?.trim()) || docs[0];
         const cls = (validDoc?.class || validDoc?.className || '')?.trim();
-        setStudentClass(cls || null);
+        if (cls) setStudentClass(cls);
       } else {
+        if (!isNaN(nid)) {
+          getDocs(query(collection(db, 'students'), where('nationalId', '==', Number(nid)))).then(numSnap => {
+            if (!numSnap.empty) {
+              const docs = numSnap.docs.map(d => d.data());
+              const validDoc = docs.find(d => (d.class || d.className)?.trim()) || docs[0];
+              const cls = (validDoc?.class || validDoc?.className || '')?.trim();
+              if (cls) setStudentClass(cls);
+            }
+          });
+        }
         if (nid) {
           const uq = query(collection(db, 'users'), where('nationalId', '==', nid));
           const unsubUsers = onSnapshot(uq, (uSnap) => {
             if (!uSnap.empty) {
               const uData = uSnap.docs[0].data();
               setStudentClass((uData.class || uData.className || '')?.trim() || null);
-            } else {
-              setStudentClass(null);
             }
           });
           return () => unsubUsers();
-        } else {
-          setStudentClass(null);
         }
       }
     });
+
     return () => unsub();
   }, [userData]);
 

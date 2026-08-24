@@ -83,12 +83,28 @@ export default function StudentExams() {
 
   // Fetch student info
   useEffect(() => {
-    if (userData?.nationalId) {
-      const q = query(collection(db, 'students'), where('nationalId', '==', userData.nationalId));
+    const isParent = userData?.role === 'parent';
+    const nid = (isParent ? (userData?.studentNationalId || userData?.nationalId) : userData?.nationalId || '').trim();
+
+    if (isParent && userData?.studentClass) {
+      setStudentClass(userData.studentClass);
+    }
+
+    if (nid) {
+      let q = query(collection(db, 'students'), where('nationalId', '==', nid));
       const unsub = onSnapshot(q, snap => {
         if (!snap.empty) {
-          setStudentClass(snap.docs[0].data().class);
+          const dData = snap.docs[0].data();
+          setStudentClass(dData.class || dData.className || userData?.studentClass);
           setStudentDocId(snap.docs[0].id);
+        } else if (!isNaN(nid)) {
+          getDocs(query(collection(db, 'students'), where('nationalId', '==', Number(nid)))).then(numSnap => {
+            if (!numSnap.empty) {
+              const dData = numSnap.docs[0].data();
+              setStudentClass(dData.class || dData.className || userData?.studentClass);
+              setStudentDocId(numSnap.docs[0].id);
+            }
+          });
         }
       });
       return () => unsub();

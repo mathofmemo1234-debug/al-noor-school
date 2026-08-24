@@ -1,5 +1,5 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -8,11 +8,13 @@ import StudentExams from './StudentExams';
 import SchoolMessagingHub from './SchoolMessagingHub';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import Settings from './Settings';
-import { User, GraduationCap, School, BookOpen, Calendar, Award, Mail, FileText, CheckCircle2 } from 'lucide-react';
+import { User, GraduationCap, School, BookOpen, Calendar, Award, Mail, FileText, CheckCircle2, ChevronLeft } from 'lucide-react';
 
 function ParentHome() {
   const { userData, currentUser } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' | 'weekly-plan' | 'exams' | 'messages'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -54,55 +56,138 @@ function ParentHome() {
               <span>{t('parent.linkedStudent')} {userData?.studentName || 'الطالب المتابع'}</span>
             </div>
             <div style={{ fontSize: '13px', color: 'var(--color-text)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div><strong>الصف الدراسي:</strong> {userData?.studentClass || '—'}</div>
+              <div><strong>الصف الدراسي:</strong> {userData?.studentClass || 'غير محدد'}</div>
               <div><strong>المدرسة/المجمع:</strong> {userData?.schoolName || 'المدارس المتقدمة للتعلم الذكي'}</div>
-              <div><strong>رقم هوية الطالب:</strong> {userData?.studentNationalId || '—'}</div>
+              <div><strong>رقم هوية الطالب:</strong> {userData?.studentNationalId || 'غير محدد'}</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Quick Stats & Navigation Cards */}
+      {/* Quick Interactive Navigation Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-        <div className="glass-panel" style={{ padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Calendar size={24} />
+        <div 
+          onClick={() => setActiveTab('schedule')}
+          className="glass-panel" 
+          style={{ 
+            padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
+            cursor: 'pointer', border: activeTab === 'schedule' ? '2px solid #2563eb' : '1px solid var(--color-border)',
+            transition: 'all 0.2s', background: activeTab === 'schedule' ? '#eff6ff' : 'var(--color-bg-card)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Calendar size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>الجدول والتوقيت</div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text)' }}>جدول الطالب الأسبوعي</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}>الجدول والتوقيت</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold' }}>جدول الطالب الأسبوعي</div>
-          </div>
+          <ChevronLeft size={20} color="#94a3b8" />
         </div>
 
-        <div className="glass-panel" style={{ padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BookOpen size={24} />
+        <div 
+          onClick={() => setActiveTab('weekly-plan')}
+          className="glass-panel" 
+          style={{ 
+            padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
+            cursor: 'pointer', border: activeTab === 'weekly-plan' ? '2px solid #16a34a' : '1px solid var(--color-border)',
+            transition: 'all 0.2s', background: activeTab === 'weekly-plan' ? '#f0fdf4' : 'var(--color-bg-card)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <BookOpen size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>التحاضير والواجبات</div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text)' }}>تحاضير ومعلمي الصف</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}>التحاضير والواجبات</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold' }}>تحاضير ومعلمي الصف</div>
-          </div>
+          <ChevronLeft size={20} color="#94a3b8" />
         </div>
 
-        <div className="glass-panel" style={{ padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#faf5ff', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Award size={24} />
+        <div 
+          onClick={() => setActiveTab('exams')}
+          className="glass-panel" 
+          style={{ 
+            padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
+            cursor: 'pointer', border: activeTab === 'exams' ? '2px solid #9333ea' : '1px solid var(--color-border)',
+            transition: 'all 0.2s', background: activeTab === 'exams' ? '#faf5ff' : 'var(--color-bg-card)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#faf5ff', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Award size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>الدرجات والنتائج</div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text)' }}>سجل التميز والاختبارات</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}>الدرجات والنتائج</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold' }}>سجل التميز والاختبارات</div>
-          </div>
+          <ChevronLeft size={20} color="#94a3b8" />
         </div>
 
-        <div className="glass-panel" style={{ padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Mail size={24} />
+        <div 
+          onClick={() => setActiveTab('messages')}
+          className="glass-panel" 
+          style={{ 
+            padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
+            cursor: 'pointer', border: activeTab === 'messages' ? '2px solid #d97706' : '1px solid var(--color-border)',
+            transition: 'all 0.2s', background: activeTab === 'messages' ? '#fffbeb' : 'var(--color-bg-card)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Mail size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>التواصل المدرسي</div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text)' }}>التعاميم والرسائل المباشرة</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}>التواصل المدرسي</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold' }}>التعاميم والرسائل المباشرة</div>
-          </div>
+          <ChevronLeft size={20} color="#94a3b8" />
         </div>
+      </div>
+
+      {/* Embedded Active Section */}
+      <div style={{ marginTop: '10px' }}>
+        {activeTab === 'schedule' && (
+          <div>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: 'var(--color-text)' }}>
+              جدول الطالب الأسبوعي ({userData?.studentName || 'الطالب'})
+            </h3>
+            <StudentSchedule />
+          </div>
+        )}
+
+        {activeTab === 'weekly-plan' && (
+          <div>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: 'var(--color-text)' }}>
+              الخطة الأسبوعية والتحاضير للصف ({userData?.studentClass || 'جميع الصفوف'})
+            </h3>
+            <WeeklyPlanView studentClass={userData?.studentClass} schoolId={userData?.schoolId} />
+          </div>
+        )}
+
+        {activeTab === 'exams' && (
+          <div>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: 'var(--color-text)' }}>
+              سجل الاختبارات والنتائج ({userData?.studentName || 'الطالب'})
+            </h3>
+            <StudentExams />
+          </div>
+        )}
+
+        {activeTab === 'messages' && (
+          <div>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: 'var(--color-text)' }}>
+              التعاميم والرسائل الموجهة لولي الأمر
+            </h3>
+            <SchoolMessagingHub />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -114,8 +199,6 @@ function ParentWeeklyPlan() {
 }
 
 export default function ParentDashboard() {
-  const { userData } = useAuth();
-
   return (
     <Layout role="parent">
       <Routes>
@@ -125,7 +208,7 @@ export default function ParentDashboard() {
         <Route path="/exams" element={<StudentExams />} />
         <Route path="/assignments" element={<StudentExams />} />
         <Route path="/portfolio" element={<StudentExams />} />
-        <Route path="/preparations" element={<ParentHome />} />
+        <Route path="/preparations" element={<ParentWeeklyPlan />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>

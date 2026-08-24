@@ -22,16 +22,22 @@ export default function WeeklyPlanView({ studentClass = null, schoolId }) {
   const [selectedSemester, setSelectedSemester] = useState(t('weeklyPlan.semesterOne'));
 
   useEffect(() => {
-    if (!schoolId) return;
-    const q = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+    if (studentClass) {
+      setSelectedClassName(studentClass);
+    }
+    const targetSchoolId = schoolId || 'default_school_1';
+    const q = query(collection(db, 'classes'));
     const unsub = onSnapshot(q, (snap) => {
       const cls = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setClasses(cls);
+      const filteredCls = schoolId && schoolId !== 'ALL' ? cls.filter(c => !c.schoolId || c.schoolId === 'ALL' || c.schoolId === schoolId) : cls;
+      setClasses(filteredCls.length > 0 ? filteredCls : cls);
       if (studentClass) {
         const found = cls.find(c => c.name === studentClass);
         if (found) {
           setSelectedClassId(found.id);
           setSelectedClassName(found.name);
+        } else {
+          setSelectedClassName(studentClass);
         }
       } else if (cls.length > 0 && !selectedClassId) {
         setSelectedClassId(cls[0].id);
@@ -49,20 +55,25 @@ export default function WeeklyPlanView({ studentClass = null, schoolId }) {
   };
 
   useEffect(() => {
-    if (!selectedClassName || !schoolId) return;
+    if (!selectedClassName) return;
     const q = query(
       collection(db, 'preparations'), 
-      where('schoolId', '==', schoolId),
-      where('className', '==', selectedClassName),
-      where('week', '==', selectedWeek)
+      where('className', '==', selectedClassName)
     );
     const unsub = onSnapshot(q, (snapshot) => {
       const data = [];
-      snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+      snapshot.forEach(doc => {
+        const p = doc.data();
+        if (!p.week || p.week === selectedWeek) {
+          if (!schoolId || schoolId === 'ALL' || !p.schoolId || p.schoolId === 'ALL' || p.schoolId === schoolId) {
+            data.push({ id: doc.id, ...p });
+          }
+        }
+      });
       setPlans(data);
     });
     return () => unsub();
-  }, [selectedClassName, selectedWeek]);
+  }, [selectedClassName, selectedWeek, schoolId]);
 
   useEffect(() => {
     if (!schoolId) return;
