@@ -123,12 +123,24 @@ export default function Header({ title, role }) {
         <button 
           className="btn" 
           onClick={toggleLanguage}
-          style={{ background: 'transparent', padding: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}
+          style={{ 
+            background: lang === 'ar' ? 'rgba(14, 116, 144, 0.08)' : 'rgba(16, 185, 129, 0.08)', 
+            border: `1px solid ${lang === 'ar' ? '#0e7490' : '#10b981'}`,
+            borderRadius: '20px',
+            padding: '6px 14px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '13px',
+            color: lang === 'ar' ? '#0e7490' : '#047857',
+            transition: 'all 0.2s ease'
+          }}
+          title={lang === 'ar' ? 'Switch to English' : 'التحويل للغة العربية'}
         >
-          <Globe size={20} color="#0e7490" />
-          <span style={{ fontWeight: 'bold', color: '#0e7490' }}>
-            {lang === 'ar' ? t('header.english') : t('header.arabic')}
-          </span>
+          <Globe size={16} color={lang === 'ar' ? '#0e7490' : '#047857'} />
+          <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
         </button>
 
         {/* Messaging Quick Button */}
