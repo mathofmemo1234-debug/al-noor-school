@@ -28,6 +28,11 @@ export default function Login() {
   const [linkError, setLinkError] = useState('');
   const [linkLoading, setLinkLoading] = useState(false);
 
+  // Parent Direct Signup State
+  const [isSignup, setIsSignup] = useState(false);
+  const [parentName, setParentName] = useState('');
+  const [parentStudentId, setParentStudentId] = useState('');
+
   const getFakeEmail = (id) => {
     if (id.includes('@')) return id;
     return `${id}@school.local`;
@@ -41,7 +46,7 @@ export default function Login() {
     const trimmedId = nationalId.trim();
     const trimmedPassword = password.trim();
 
-    // Helper to find record across users, teachers, students
+    // Helper to find record across users, teachers, students, parents
     const findRecord = async (nid, desiredRole) => {
       // 1. Check users
       try {
@@ -56,7 +61,19 @@ export default function Login() {
         console.warn("Error querying users collection:", err);
       }
 
-      // 2. Check teachers if requested role is teacher
+      // 2. Check parents if requested role is parent
+      if (desiredRole === 'parent') {
+        try {
+          const pSnap = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', nid)));
+          if (!pSnap.empty) {
+            return { ...pSnap.docs[0].data(), role: 'parent' };
+          }
+        } catch (err) {
+          console.warn("Error querying parents collection:", err);
+        }
+      }
+
+      // 3. Check teachers if requested role is teacher
       if (desiredRole === 'teacher') {
         try {
           const tSnap = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
@@ -68,7 +85,7 @@ export default function Login() {
         }
       }
 
-      // 3. Check staff if requested role is staff or supervisor
+      // 4. Check staff if requested role is staff or supervisor
       if (desiredRole === 'staff' || desiredRole === 'supervisor') {
         try {
           const staffSnap = await getDocs(query(collection(db, 'staff'), where('nationalId', '==', nid)));
@@ -84,7 +101,7 @@ export default function Login() {
         }
       }
 
-      // 4. Check students if requested role is student
+      // 5. Check students if requested role is student
       if (desiredRole === 'student') {
         try {
           const sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
@@ -96,8 +113,12 @@ export default function Login() {
         }
       }
 
-      // 5. General check across other collections to detect wrong role choice
+      // 6. General check across other collections to detect wrong role choice
       try {
+        const pSnapAll = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', nid)));
+        if (!pSnapAll.empty) {
+          return { ...pSnapAll.docs[0].data(), role: 'parent' };
+        }
         const tSnapAll = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
         if (!tSnapAll.empty) {
           return { ...tSnapAll.docs[0].data(), role: 'teacher' };
@@ -132,7 +153,7 @@ export default function Login() {
         const record = await findRecord(trimmedId, role);
         if (record && record.role !== role && !(role === 'staff' && (record.role === 'supervisor' || record.role === 'staff'))) {
           await auth.signOut();
-          const roleNames = { teacher: 'معلم', student: 'طالب', staff: 'كادر إداري / وكيل', supervisor: 'مشرف تعليمي', admin: 'مدير' };
+          const roleNames = { parent: 'ولي أمر', teacher: 'معلم', student: 'طالب', staff: 'كادر إداري / وكيل', supervisor: 'مشرف تعليمي', admin: 'مدير' };
           setError(`هذا الرقم مسجل في النظام كـ ${roleNames[record.role] || record.role}، يرجى اختيار الدور الصحيح`);
           setLoading(false);
           return;
@@ -149,6 +170,7 @@ export default function Login() {
         if (role === 'supervisor') navigate('/supervisor');
         if (role === 'teacher') navigate('/teacher');
         if (role === 'student') navigate('/student');
+        if (role === 'parent') navigate('/parent');
       }
     } catch (err) {
       console.error("Login Error:", err);
@@ -159,13 +181,12 @@ export default function Login() {
           try {
             const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, trimmedPassword);
             
-            // Search across users, staff, supervisors, teachers, and students collections
             const record = await findRecord(trimmedId, role);
             
             if (record) {
               if (record.role !== role && !(role === 'staff' && (record.role === 'supervisor' || record.role === 'staff'))) {
                 await deleteUser(userCredential.user);
-                const roleNames = { teacher: 'معلم', student: 'طالب', staff: 'كادر إداري / وكيل', supervisor: 'مشرف تعليمي', admin: 'مدير' };
+                const roleNames = { parent: 'ولي أمر', teacher: 'معلم', student: 'طالب', staff: 'كادر إداري / وكيل', supervisor: 'مشرف تعليمي', admin: 'مدير' };
                 setError(`هذا الرقم مسجل في النظام كـ ${roleNames[record.role] || record.role}، يرجى اختيار الدور الصحيح`);
                 return;
               }
@@ -178,10 +199,7 @@ export default function Login() {
                     nationalId: trimmedId,
                     email: fakeEmail,
                     role: record.role,
-                    name: record.name || (record.role === 'staff' ? (record.roleTitle || 'كادر مدرسي') : record.role === 'supervisor' ? 'مشرف تعليمي' : record.role === 'teacher' ? 'معلم' : 'طالب'),
-                    roleTitle: record.roleTitle || '',
-                    permissions: record.permissions || [],
-                    specialty: record.specialty || '',
+                    name: record.name || 'مستخدم',
                     schoolId: record.schoolId || 'default_school_1'
                   });
                 }
@@ -194,6 +212,7 @@ export default function Login() {
               if (record.role === 'supervisor') { navigate('/supervisor'); }
               if (record.role === 'teacher') { navigate('/teacher'); }
               if (record.role === 'student') { navigate('/student'); }
+              if (record.role === 'parent') { navigate('/parent'); }
               return;
             } else {
               await deleteUser(userCredential.user);
@@ -208,6 +227,76 @@ export default function Login() {
         }
       } else {
         setError('رقم الهوية أو كلمة المرور غير صحيحة');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleParentDirectSignup = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    const trimmedIdOrEmail = nationalId.trim();
+    const trimmedPassword = password.trim();
+    const trimmedStudentId = parentStudentId.trim();
+
+    if (!trimmedIdOrEmail || !trimmedPassword || !trimmedStudentId) {
+      setError('يرجى ملء كافة البيانات بما فيها رقم هوية الطالب المسجل.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Verify student exists in system
+      let sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', trimmedStudentId)));
+      let studentDoc = null;
+      if (!sSnap.empty) {
+        studentDoc = sSnap.docs[0].data();
+      } else {
+        const uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', trimmedStudentId)));
+        if (!uSnap.empty) {
+          const uMatch = uSnap.docs.map(d => d.data()).find(d => d.role === 'student');
+          if (uMatch) studentDoc = uMatch;
+        }
+      }
+
+      if (!studentDoc) {
+        setError(t('login.studentNotFound'));
+        setLoading(false);
+        return;
+      }
+
+      const email = getFakeEmail(trimmedIdOrEmail);
+      // 2. Create Firebase Auth user
+      const userCredential = await createUserWithEmailAndPassword(auth, email, trimmedPassword);
+      const user = userCredential.user;
+
+      const parentRecord = {
+        uid: user.uid,
+        email: email,
+        nationalId: trimmedIdOrEmail,
+        name: parentName.trim() || 'ولي أمر',
+        role: 'parent',
+        studentNationalId: trimmedStudentId,
+        studentName: studentDoc.name || 'طالب',
+        studentClass: studentDoc.class || studentDoc.className || '',
+        schoolId: studentDoc.schoolId || 'default_school_1',
+        createdAt: new Date()
+      };
+
+      await addDoc(collection(db, 'users'), parentRecord);
+      await addDoc(collection(db, 'parents'), parentRecord);
+
+      setLoginRole('parent');
+      navigate('/parent');
+    } catch (createErr) {
+      console.error("Parent Signup Error:", createErr);
+      if (createErr.code === 'auth/email-already-in-use') {
+        setError('هذا الحساب أو رقم الهوية مسجل مسبقاً. يمكنك التبديل لتبويب تسجيل الدخول.');
+      } else {
+        setError('حدث خطأ أثناء إنشاء حساب ولي الأمر. يرجى التأكد من البيانات والمحاولة لاحقاً.');
       }
     } finally {
       setLoading(false);
@@ -250,7 +339,15 @@ export default function Login() {
       }
     } catch (err) {
       console.error("Google Auth Error:", err);
-      setError('حدث خطأ أثناء تسجيل الدخول عبر Google. يرجى المحاولة لاحقاً');
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('تم إغلاق نافذة تسجيل الدخول.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('تم حظر النافذة المنبثقة من قبل المتصفح. يرجى السماح بالنوافذ المنبثقة أو استخدام التسجيل المباشر.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('النطاق المحلي/الحالي غير مصرح له في Firebase Google Auth. يمكنك استخدام التسجيل المباشر برقم الهوية والكلمة السرية.');
+      } else {
+        setError('تعذر تسجيل الدخول عبر Google. يمكنك استخدام نموذج التسجيل/الدخول المباشر أدناه.');
+      }
     } finally {
       setLoading(false);
     }
@@ -376,6 +473,46 @@ export default function Login() {
               >{t('login.roleAdmin')}</button>
             </div>
 
+            {/* Login / Register Toggle Tabs */}
+            <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: '20px' }}>
+              <button 
+                type="button" 
+                onClick={() => { setIsSignup(false); setError(''); }}
+                style={{ 
+                  flex: 1, 
+                  padding: '10px', 
+                  background: 'none', 
+                  border: 'none', 
+                  borderBottom: !isSignup ? '3px solid #2563eb' : '3px solid transparent', 
+                  fontWeight: !isSignup ? 'bold' : 'normal',
+                  color: !isSignup ? '#2563eb' : '#64748b',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {t('login.loginNow')}
+              </button>
+              <button 
+                type="button" 
+                onClick={() => { setIsSignup(true); setError(''); }}
+                style={{ 
+                  flex: 1, 
+                  padding: '10px', 
+                  background: 'none', 
+                  border: 'none', 
+                  borderBottom: isSignup ? '3px solid #2563eb' : '3px solid transparent', 
+                  fontWeight: isSignup ? 'bold' : 'normal',
+                  color: isSignup ? '#2563eb' : '#64748b',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {t('login.createAccount')}
+              </button>
+            </div>
+
             {error && (
               <div className="error-message" style={{ marginBottom: '15px' }}>
                 <AlertCircle size={16} />
@@ -383,11 +520,9 @@ export default function Login() {
               </div>
             )}
 
+            {/* PARENT ROLE VIEW */}
             {role === 'parent' ? (
-              <div style={{ marginTop: '10px', textAlign: 'center' }}>
-                <p style={{ marginBottom: '16px', fontSize: '13px', color: '#64748b', lineHeight: '1.6' }}>
-                  {t('parent.welcomeSubtitle')}
-                </p>
+              <div style={{ marginTop: '5px' }}>
                 <button 
                   type="button" 
                   className="btn btn-google btn-block" 
@@ -408,7 +543,7 @@ export default function Login() {
                     cursor: 'pointer', 
                     boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
                     width: '100%',
-                    marginBottom: '15px',
+                    marginBottom: '18px',
                     transition: 'all 0.2s ease'
                   }}
                 >
@@ -418,10 +553,106 @@ export default function Login() {
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
                   </svg>
-                  {t('login.googleSignIn')}
+                  {isSignup ? 'إنشاء حساب عبر Google' : t('login.googleSignIn')}
                 </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', margin: '15px 0', gap: '10px' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
+                  <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>{t('login.orDivider')}</span>
+                  <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
+                </div>
+
+                {!isSignup ? (
+                  /* PARENT DIRECT LOGIN FORM */
+                  <form className="login-form" onSubmit={handleLogin}>
+                    <div className="form-group">
+                      <label>{t('login.nationalId')}</label>
+                      <input 
+                        type="text" 
+                        placeholder={t('login.nationalIdPlaceholder')} 
+                        required 
+                        dir="ltr"
+                        value={nationalId}
+                        onChange={(e) => setNationalId(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>{t('login.password')} <span style={{fontSize:'12px', color:'#666'}}>(الافتراضية هي رقم الهوية)</span></label>
+                      <input 
+                        type="password" 
+                        placeholder={t('login.passwordPlaceholder')} 
+                        required 
+                        dir="ltr"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ marginBottom: '15px' }}>
+                      {loading ? t('login.loading') : (
+                        <><LogIn size={18} /> {t('login.loginButton')}</>
+                      )}
+                    </button>
+                  </form>
+                ) : (
+                  /* PARENT DIRECT SIGNUP FORM */
+                  <form className="login-form" onSubmit={handleParentDirectSignup}>
+                    <div className="form-group">
+                      <label>{t('login.parentName')}</label>
+                      <input 
+                        type="text" 
+                        placeholder={t('login.parentNamePlaceholder')} 
+                        required 
+                        value={parentName}
+                        onChange={(e) => setParentName(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>{t('login.nationalId')}</label>
+                      <input 
+                        type="text" 
+                        placeholder={t('login.nationalIdPlaceholder')} 
+                        required 
+                        dir="ltr"
+                        value={nationalId}
+                        onChange={(e) => setNationalId(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>{t('login.password')}</label>
+                      <input 
+                        type="password" 
+                        placeholder={t('login.passwordPlaceholder')} 
+                        required 
+                        dir="ltr"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label style={{ color: '#2563eb', fontWeight: 'bold' }}>رقم هوية/إقامة الطالب المسجل بالنظام</label>
+                      <input 
+                        type="text" 
+                        placeholder={t('login.studentIdPlaceholder')} 
+                        required 
+                        dir="ltr"
+                        value={parentStudentId}
+                        onChange={(e) => setParentStudentId(e.target.value)}
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ marginBottom: '15px' }}>
+                      {loading ? t('login.loading') : t('login.parentDirectSignupButton')}
+                    </button>
+                  </form>
+                )}
               </div>
             ) : (
+              /* NON-PARENT ROLES FORM */
               <form className="login-form" onSubmit={handleLogin}>
                 <div className="form-group">
                   <label>{role === 'admin' ? 'البريد الإلكتروني للإدارة' : t('login.nationalId')}</label>
