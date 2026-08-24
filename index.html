@@ -1,7 +1,9 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" class="notranslate" translate="no">
   <head>
     <meta charset="UTF-8" />
+    <meta name="google" content="notranslate" />
+    <meta name="googlebot" content="notranslate" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="بوابة الدخول الموحدة لنظام إدارة المدارس المتقدمة للتعلم الذكي بجدة - لوحة تحكم الطلاب والمعلمين والإدارة.">
@@ -9,95 +11,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
     <title>School Management System</title>
-    <style>
-      .goog-te-banner-frame,
-      iframe.goog-te-banner-frame,
-      iframe[class*="goog-te-banner-frame"],
-      iframe[src*="translate.google.com"],
-      .goog-te-balloon-frame,
-      #goog-gt-tt,
-      .goog-te-spinner-pos,
-      .VIpgJd-yA0ssb-O2TwJf-WCA25b,
-      .VIpgJd-yA0ssb-a91s7e,
-      .VIpgJd-yA0ssb-ORKL3d {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        height: 0 !important;
-        width: 0 !important;
-      }
-      body {
-        top: 0px !important;
-        position: static !important;
-        margin-top: 0px !important;
-      }
-      .goog-text-highlight {
-        background-color: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-      }
-    </style>
-    <script>
-      (function() {
-        function killGoogleTranslateBanner() {
-          try {
-            var elList = document.querySelectorAll('iframe.goog-te-banner-frame, iframe[src*="translate.google"], iframe[id*="goog-te"], .goog-te-banner-frame, .goog-te-banner, #goog-gt-tt, .VIpgJd-yA0ssb-O2TwJf-WCA25b, .VIpgJd-yA0ssb-a91s7e, .VIpgJd-yA0ssb-ORKL3d');
-            elList.forEach(function(el) {
-              try {
-                el.style.setProperty('display', 'none', 'important');
-                el.style.setProperty('visibility', 'hidden', 'important');
-                el.style.setProperty('height', '0px', 'important');
-                el.style.setProperty('opacity', '0', 'important');
-                if (el.parentNode && (el.tagName === 'IFRAME' || el.classList.contains('goog-te-banner-frame'))) {
-                  el.parentNode.removeChild(el);
-                }
-              } catch(e){}
-            });
-            if (document.body) {
-              document.body.style.setProperty('top', '0px', 'important');
-              document.body.style.setProperty('position', 'static', 'important');
-              document.body.style.setProperty('margin-top', '0px', 'important');
-            }
-          } catch(e){}
-        }
-
-        if (typeof window !== 'undefined') {
-          var observer = new MutationObserver(function() {
-            killGoogleTranslateBanner();
-          });
-          
-          var initKill = function() {
-            killGoogleTranslateBanner();
-            if (document.body) {
-              observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-            }
-            setInterval(killGoogleTranslateBanner, 200);
-          };
-
-          if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            initKill();
-          } else {
-            window.addEventListener('DOMContentLoaded', initKill);
-          }
-        }
-      })();
-    </script>
   </head>
-  <body>
-    <div id="google_translate_element" style="position: absolute; top: -9999px; left: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none;"></div>
-    <script type="text/javascript">
-      window.googleTranslateElementInit = function() {
-        if (window.google && window.google.translate) {
-          new window.google.translate.TranslateElement({
-            pageLanguage: 'ar',
-            includedLanguages: 'ar,en',
-            autoDisplay: false
-          }, 'google_translate_element');
-        }
-      };
-    </script>
-    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+  <body class="notranslate">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
