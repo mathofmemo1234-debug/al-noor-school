@@ -38,6 +38,51 @@
         box-shadow: none !important;
       }
     </style>
+    <script>
+      (function() {
+        function killGoogleTranslateBanner() {
+          try {
+            var elList = document.querySelectorAll('iframe.goog-te-banner-frame, iframe[src*="translate.google"], iframe[id*="goog-te"], .goog-te-banner-frame, .goog-te-banner, #goog-gt-tt, .VIpgJd-yA0ssb-O2TwJf-WCA25b, .VIpgJd-yA0ssb-a91s7e, .VIpgJd-yA0ssb-ORKL3d');
+            elList.forEach(function(el) {
+              try {
+                el.style.setProperty('display', 'none', 'important');
+                el.style.setProperty('visibility', 'hidden', 'important');
+                el.style.setProperty('height', '0px', 'important');
+                el.style.setProperty('opacity', '0', 'important');
+                if (el.parentNode && (el.tagName === 'IFRAME' || el.classList.contains('goog-te-banner-frame'))) {
+                  el.parentNode.removeChild(el);
+                }
+              } catch(e){}
+            });
+            if (document.body) {
+              document.body.style.setProperty('top', '0px', 'important');
+              document.body.style.setProperty('position', 'static', 'important');
+              document.body.style.setProperty('margin-top', '0px', 'important');
+            }
+          } catch(e){}
+        }
+
+        if (typeof window !== 'undefined') {
+          var observer = new MutationObserver(function() {
+            killGoogleTranslateBanner();
+          });
+          
+          var initKill = function() {
+            killGoogleTranslateBanner();
+            if (document.body) {
+              observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+            }
+            setInterval(killGoogleTranslateBanner, 200);
+          };
+
+          if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            initKill();
+          } else {
+            window.addEventListener('DOMContentLoaded', initKill);
+          }
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="google_translate_element" style="position: absolute; top: -9999px; left: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none;"></div>
