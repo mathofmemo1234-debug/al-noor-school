@@ -507,7 +507,7 @@ export default function SchoolExcellenceDashboard() {
           </div>
 
           {/* Accordion Tree */}
-          <div style={{ overflowY: 'auto', flex: 1, paddingLeft: '4px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="custom-sidebar-scrollbar" style={{ flex: 1, paddingLeft: '6px', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '68vh' }}>
             {excellenceData.map(domain => {
               const isDomainExpanded = expandedDomains[domain.id];
               const isDomainAllowed = isAdmin || allowedDomains.length === 0 || allowedDomains.includes(domain.id);
