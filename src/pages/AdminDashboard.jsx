@@ -17,7 +17,7 @@ import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
 import NationalitySelect from '../components/NationalitySelect';
 import SchoolMessagingHub from './SchoolMessagingHub';
-import SchoolExcellenceButton from '../components/SchoolExcellenceButton';
+import SchoolExcellenceDashboard from './SchoolExcellenceDashboard';
 import { useLanguage } from '../contexts/LanguageContext';
 
 function AdminHome({ schoolId }) {
@@ -164,8 +164,7 @@ function AdminHome({ schoolId }) {
 
   return (
     <div>
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <SchoolExcellenceButton variant="gold" />
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
         <button onClick={handleSeedData} className="btn btn-primary">
           {t('adminDashboard.addSeedData')}
         </button>
@@ -1667,7 +1666,7 @@ export default function AdminDashboard() {
         <Route path="/attendance" element={<AttendanceSummaryExport schoolId={userData?.schoolId} />} />
         <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />
         <Route path="/weekly-plan" element={<WeeklyPlanView schoolId={userData?.schoolId} />} />
-        <Route path="/excellence" element={<AdminExcellence schoolId={userData?.schoolId} />} />
+        <Route path="/excellence" element={<SchoolExcellenceDashboard />} />
         <Route path="/noor" element={<NoorIntegrationHub schoolId={userData?.schoolId} />} />
         <Route path="/settings" element={<SchoolSettings schoolId={userData?.schoolId} />} />
         <Route path="*" element={<AdminHome schoolId={userData?.schoolId} />} />

@@ -10,6 +10,7 @@ import AdminPreparations from './AdminPreparations';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import ManageSchedules from './ManageSchedules';
 import AdminExcellence from './AdminExcellence';
+import SchoolExcellenceDashboard from './SchoolExcellenceDashboard';
 import SchoolSettings from './SchoolSettings';
 import TeacherDashboard from './TeacherDashboard';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
@@ -506,7 +507,7 @@ export default function StaffDashboard() {
           <Route path="/attendance" element={<AttendanceSummaryExport schoolId={userData?.schoolId} />} />
         )}
         {userPerms.includes('excellence') && (
-          <Route path="/excellence" element={<AdminExcellence schoolId={userData?.schoolId} />} />
+          <Route path="/excellence" element={<SchoolExcellenceDashboard />} />
         )}
         <Route path="/noor" element={<NoorIntegrationHub schoolId={userData?.schoolId} />} />
         <Route path="/settings" element={<SchoolSettings schoolId={userData?.schoolId} />} />

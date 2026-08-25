@@ -10,6 +10,7 @@ import AdminPreparations from './AdminPreparations';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import ManageSchedules from './ManageSchedules';
 import AdminExcellence from './AdminExcellence';
+import SchoolExcellenceDashboard from './SchoolExcellenceDashboard';
 import SchoolSettings from './SchoolSettings';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
@@ -264,7 +265,7 @@ export default function SupervisorDashboard() {
         <Route path="/weekly-plan" element={<WeeklyPlanView schoolId={userData?.schoolId} />} />
         <Route path="/schedule" element={<ManageSchedules schoolId={userData?.schoolId} />} />
         <Route path="/teachers" element={<SupervisorTeachers schoolId={userData?.schoolId} />} />
-        <Route path="/excellence" element={<AdminExcellence schoolId={userData?.schoolId} />} />
+        <Route path="/excellence" element={<SchoolExcellenceDashboard />} />
         <Route path="/noor" element={<NoorIntegrationHub schoolId={userData?.schoolId} />} />
         <Route path="/settings" element={<SchoolSettings schoolId={userData?.schoolId} />} />
         <Route path="*" element={<SupervisorHome schoolId={userData?.schoolId} />} />
