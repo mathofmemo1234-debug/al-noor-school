@@ -17,6 +17,7 @@ import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
 import NationalitySelect from '../components/NationalitySelect';
 import SchoolMessagingHub from './SchoolMessagingHub';
+import SchoolExcellenceButton from '../components/SchoolExcellenceButton';
 import { useLanguage } from '../contexts/LanguageContext';
 
 function AdminHome({ schoolId }) {
@@ -163,7 +164,8 @@ function AdminHome({ schoolId }) {
 
   return (
     <div>
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <SchoolExcellenceButton variant="gold" />
         <button onClick={handleSeedData} className="btn btn-primary">
           {t('adminDashboard.addSeedData')}
         </button>

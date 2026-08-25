@@ -15,6 +15,7 @@ const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 const Migration = lazy(() => import('./pages/Migration'));
 
 const ParentDashboard = lazy(() => import('./pages/ParentDashboard'));
+const SchoolExcellenceDashboard = lazy(() => import('./pages/SchoolExcellenceDashboard'));
 
 function App() {
   return (
@@ -61,6 +62,7 @@ function App() {
               <ParentDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/school-excellence" element={<SchoolExcellenceDashboard />} />
             </Routes>
           </Suspense>
         </Router>

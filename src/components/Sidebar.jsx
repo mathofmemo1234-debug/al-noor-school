@@ -6,6 +6,8 @@ import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
+import SchoolExcellenceButton from './SchoolExcellenceButton';
+
 export default function Sidebar({ role }) {
   const navigate = useNavigate();
   const { userData } = useAuth();
@@ -148,7 +150,8 @@ export default function Sidebar({ role }) {
         ))}
       </nav>
 
-      <div className="sidebar-footer">
+      <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <SchoolExcellenceButton variant="sidebar" />
         <button className="nav-item" onClick={handleLogout} style={{ width: '100%', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.15)', cursor: 'pointer', color: '#dc2626', borderRadius: '10px' }}>
           <LogOut size={19} />
           <span>{t('sidebar.logout')}</span>

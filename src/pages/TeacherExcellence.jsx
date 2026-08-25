@@ -5,6 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Star, Upload, FileText, Plus, Image as ImageIcon, Download } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
+import SchoolExcellenceButton from '../components/SchoolExcellenceButton';
+
 export default function TeacherExcellence() {
   const { t } = useLanguage();
   const { userData } = useAuth();
@@ -140,15 +142,18 @@ export default function TeacherExcellence() {
 
   return (
     <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Star size={32} color="var(--color-primary-dark)" />
           <h1 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{t('teacherExcellence.excellenceFiles')}</h1>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsAdding(!isAdding)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {isAdding ? <FileText size={18} /> : <Plus size={18} />}
-          {isAdding ? t('teacherExcellence.cancel') : t('teacherExcellence.addExcellenceFile')}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <SchoolExcellenceButton variant="gold" />
+          <button className="btn btn-primary" onClick={() => setIsAdding(!isAdding)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {isAdding ? <FileText size={18} /> : <Plus size={18} />}
+            {isAdding ? t('teacherExcellence.cancel') : t('teacherExcellence.addExcellenceFile')}
+          </button>
+        </div>
       </div>
 
       {isAdding && (
