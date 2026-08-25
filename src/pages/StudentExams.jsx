@@ -114,7 +114,11 @@ export default function StudentExams() {
   // Fetch exams for this class
   useEffect(() => {
     if (!studentClass) return;
-    const q = query(collection(db, 'exams'), where('targetClass', '==', studentClass));
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const q = schoolId === 'ALL'
+      ? query(collection(db, 'exams'), where('targetClass', '==', studentClass))
+      : query(collection(db, 'exams'), where('targetClass', '==', studentClass), where('schoolId', '==', schoolId));
+
     const unsub = onSnapshot(q, snap => {
       const data = [];
       snap.forEach(d => data.push({ id: d.id, ...d.data() }));
@@ -123,7 +127,7 @@ export default function StudentExams() {
       setExams(data);
     });
     return () => unsub();
-  }, [studentClass]);
+  }, [studentClass, userData?.schoolId]);
 
   // Fetch student's past results
   useEffect(() => {
@@ -262,6 +266,7 @@ export default function StudentExams() {
       score: correctCount,
       totalQuestions: activeExam.questions.length,
       answers: answers,
+      schoolId: userData?.schoolId || 'default_school_1',
       timestamp: serverTimestamp()
     };
 

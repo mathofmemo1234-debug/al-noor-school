@@ -90,12 +90,21 @@ export default function LessonPreparation() {
 
   // Fetch available classes for this teacher based on their schedule or classes collection
   useEffect(() => {
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const qClasses = schoolId === 'ALL'
+      ? collection(db, 'classes')
+      : query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+
+    const unsubClasses = onSnapshot(qClasses, (classesSnap) => {
       const allClassNames = classesSnap.docs.map(d => d.data().name).filter(Boolean);
       const classNamesMap = {};
       classesSnap.docs.forEach(d => classNamesMap[d.id] = d.data().name);
       
-      const unsubSchedules = onSnapshot(collection(db, 'schedules'), (schedulesSnap) => {
+      const qSchedules = schoolId === 'ALL'
+        ? collection(db, 'schedules')
+        : query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
+
+      const unsubSchedules = onSnapshot(qSchedules, (schedulesSnap) => {
         const myClassNames = new Set();
         const mySubjects = new Set();
         
@@ -130,7 +139,7 @@ export default function LessonPreparation() {
       return () => unsubSchedules();
     });
     return () => unsubClasses();
-  }, [teacherDocId, userData]);
+  }, [teacherDocId, userData, userData?.schoolId]);
 
   // Fetch available periods based on selected class and subject
   useEffect(() => {
@@ -262,6 +271,7 @@ export default function LessonPreparation() {
         homework,
         fileUrl,
         fileName,
+        schoolId: userData?.schoolId || 'default_school_1',
         updatedAt: new Date().toISOString()
       };
 

@@ -23,11 +23,7 @@ export function AuthProvider({ children }) {
         setUserData({ name: 'حساب الماستر', role: 'superadmin', schoolId: 'ALL' });
         return;
       }
-      if (user.email === 'admin@admin.com' || user.email === 'admin@school.edu.sa') {
-        setUserRole('admin');
-        setUserData({ name: 'مدير المدرسة', role: 'admin', schoolId: 'default_school_1' });
-        return;
-      }
+      // حسابات المدراء تُقرأ من جدول users للحصول على schoolId الفعلي المعيّن من لوحة الماستر
 
       const nid = user.email.replace('@school.local', '');
 

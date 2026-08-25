@@ -71,15 +71,7 @@ export default function SchoolExcellenceDashboard() {
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   
   // Evidences store: { [indicatorId]: { description, targetGroup, linkUrl, fileName, fileData, fileType, docDate, isCompleted, teacherName, teacherId } }
-  const [evidences, setEvidences] = useState(() => {
-    try {
-      const saved = localStorage.getItem('school_excellence_evidences');
-      return saved ? JSON.parse(saved) : {};
-    } catch (e) {
-      console.error('Failed to load saved evidences', e);
-      return {};
-    }
-  });
+  const [evidences, setEvidences] = useState({});
 
   // Current Form state for selected indicator
   const [formData, setFormData] = useState({
@@ -128,7 +120,10 @@ export default function SchoolExcellenceDashboard() {
 
   // Sync with Firestore collection 'excellence_evidences'
   useEffect(() => {
-    if (!schoolId) return;
+    if (!schoolId) {
+      setEvidences({});
+      return;
+    }
 
     let q = query(collection(db, 'excellence_evidences'), where('schoolId', '==', schoolId));
     
@@ -140,17 +135,7 @@ export default function SchoolExcellenceDashboard() {
           remoteData[data.indicatorId] = data;
         }
       });
-      
-      // Merge with local storage
-      setEvidences(prev => {
-        const merged = { ...prev, ...remoteData };
-        try {
-          localStorage.setItem('school_excellence_evidences', JSON.stringify(merged));
-        } catch (e) {
-          console.warn('localStorage save warning', e);
-        }
-        return merged;
-      });
+      setEvidences(remoteData);
     }, (err) => {
       console.warn('Firestore onSnapshot error', err);
     });

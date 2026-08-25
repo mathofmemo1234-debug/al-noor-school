@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, arrayUnion, query, where } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
@@ -99,49 +99,43 @@ export default function SchoolMessagingHub() {
     const unsubAdmins = onSnapshot(collection(db, 'users'), snap => {
       const admins = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(d => (d.role === 'admin' || d.role === 'superadmin' || d.email === 'admin@admin.com') && (schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId))
+        .filter(d => (d.role === 'admin' || d.role === 'superadmin') && (schoolId === 'ALL' || d.schoolId === schoolId))
         .map(d => ({ ...d, role: 'admin', roleTitle: d.roleTitle || 'مدير المدرسة', name: d.name || 'مدير المدرسة' }));
-      
-      if (admins.length === 0) {
-        // Fallback default admin
-        setAdminList([{ id: 'default_admin', nationalId: '1000000001', name: 'مدير المدرسة', role: 'admin', roleTitle: 'مدير المدرسة' }]);
-      } else {
-        setAdminList(admins);
-      }
+      setAdminList(admins);
     });
 
     const unsubTeachers = onSnapshot(collection(db, 'teachers'), snap => {
       const list = snap.docs
         .map(d => ({ id: d.id, ...d.data(), role: 'teacher' }))
-        .filter(d => schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId);
+        .filter(d => schoolId === 'ALL' || d.schoolId === schoolId);
       setTeachersList(list);
     });
 
     const unsubStudents = onSnapshot(collection(db, 'students'), snap => {
       const list = snap.docs
         .map(d => ({ id: d.id, ...d.data(), role: 'student' }))
-        .filter(d => schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId);
+        .filter(d => schoolId === 'ALL' || d.schoolId === schoolId);
       setStudentsList(list);
     });
 
     const unsubStaff = onSnapshot(collection(db, 'staff'), snap => {
       const list = snap.docs
         .map(d => ({ id: d.id, ...d.data(), role: 'staff' }))
-        .filter(d => schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId);
+        .filter(d => schoolId === 'ALL' || d.schoolId === schoolId);
       setStaffList(list);
     });
 
     const unsubSupervisors = onSnapshot(collection(db, 'supervisors'), snap => {
       const list = snap.docs
         .map(d => ({ id: d.id, ...d.data(), role: 'supervisor' }))
-        .filter(d => schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId);
+        .filter(d => schoolId === 'ALL' || d.schoolId === schoolId);
       setSupervisorsList(list);
     });
 
     const unsubClasses = onSnapshot(collection(db, 'classes'), snap => {
       const list = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(d => schoolId === 'ALL' || !d.schoolId || d.schoolId === schoolId);
+        .filter(d => schoolId === 'ALL' || d.schoolId === schoolId);
       setClassesList(list);
       if (list.length > 0 && !targetClassName) {
         setTargetClassName(list[0].name);
@@ -158,9 +152,12 @@ export default function SchoolMessagingHub() {
     };
   }, [schoolId]);
 
-  // 2. Realtime listener to school_messages
+  // 2. Realtime listener to school_messages - filtered by schoolId
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'school_messages'), snap => {
+    const msgQuery = schoolId === 'ALL'
+      ? collection(db, 'school_messages')
+      : query(collection(db, 'school_messages'), where('schoolId', '==', schoolId));
+    const unsub = onSnapshot(msgQuery, snap => {
       const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       // Sort newest first
       msgs.sort((a, b) => {
@@ -180,7 +177,7 @@ export default function SchoolMessagingHub() {
     });
 
     return () => unsub();
-  }, [selectedMessage?.id]);
+  }, [selectedMessage?.id, schoolId]);
 
   // 3. Robust Identity and Delivery Verification: Is this message addressed to the current logged-in user?
   const isMessageForMe = (msg) => {

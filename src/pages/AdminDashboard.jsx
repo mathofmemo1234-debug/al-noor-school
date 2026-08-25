@@ -19,6 +19,8 @@ import NationalitySelect from '../components/NationalitySelect';
 import SchoolMessagingHub from './SchoolMessagingHub';
 import SchoolExcellenceDashboard from './SchoolExcellenceDashboard';
 import { useLanguage } from '../contexts/LanguageContext';
+import GamificationBadge from '../components/GamificationBadge';
+import { calculateTeacherActivity, calculateStudentActivity } from '../utils/gamificationEngine';
 
 function AdminHome({ schoolId }) {
   const { t } = useLanguage();
@@ -238,6 +240,7 @@ function ManageTeachers({ schoolId }) {
   const [subject, setSubject] = useState('');
   const [nationality, setNationality] = useState('سعودي');
   const [isSaving, setIsSaving] = useState(false);
+  const [teacherActivityMap, setTeacherActivityMap] = useState({});
 
   // Bulk Add
   const [bulkData, setBulkData] = useState('');
@@ -277,6 +280,49 @@ function ManageTeachers({ schoolId }) {
     });
     return () => unsub();
   }, [schoolId]);
+
+  // Compute Gamification Points for Teachers
+  useEffect(() => {
+    if (!schoolId || teachers.length === 0) return;
+
+    const qPrep = schoolId === 'ALL' ? collection(db, 'lesson_preparations') : query(collection(db, 'lesson_preparations'), where('schoolId', '==', schoolId));
+    const qPlans = schoolId === 'ALL' ? collection(db, 'weekly_plans') : query(collection(db, 'weekly_plans'), where('schoolId', '==', schoolId));
+    const qAssign = schoolId === 'ALL' ? collection(db, 'assignments') : query(collection(db, 'assignments'), where('schoolId', '==', schoolId));
+    const qExams = schoolId === 'ALL' ? collection(db, 'exams') : query(collection(db, 'exams'), where('schoolId', '==', schoolId));
+    const qMat = schoolId === 'ALL' ? collection(db, 'materials') : query(collection(db, 'materials'), where('schoolId', '==', schoolId));
+    const qAtt = schoolId === 'ALL' ? collection(db, 'attendance') : query(collection(db, 'attendance'), where('schoolId', '==', schoolId));
+
+    Promise.all([
+      getDocs(qPrep),
+      getDocs(qPlans),
+      getDocs(qAssign),
+      getDocs(qExams),
+      getDocs(qMat),
+      getDocs(qAtt)
+    ]).then(([snapPrep, snapPlans, snapAssign, snapExams, snapMat, snapAtt]) => {
+      const preps = snapPrep.docs.map(d => d.data());
+      const plans = snapPlans.docs.map(d => d.data());
+      const assigns = snapAssign.docs.map(d => d.data());
+      const exams = snapExams.docs.map(d => d.data());
+      const mats = snapMat.docs.map(d => d.data());
+      const atts = snapAtt.docs.map(d => d.data());
+
+      const map = {};
+      teachers.forEach(t => {
+        map[t.id] = calculateTeacherActivity({
+          teacherId: t.id,
+          teacherEmail: t.email || `${t.nationalId}@school.local`,
+          preparations: preps,
+          weeklyPlans: plans,
+          assignments: assigns,
+          exams: exams,
+          materials: mats,
+          attendanceLogs: atts
+        });
+      });
+      setTeacherActivityMap(map);
+    });
+  }, [teachers, schoolId]);
 
   const handleSaveSingle = async (e) => {
     e.preventDefault();
@@ -474,6 +520,13 @@ function ManageTeachers({ schoolId }) {
                   }}>
                     🌐 {tData.nationality || 'سعودي'}
                   </span>
+                  <GamificationBadge
+                    points={teacherActivityMap[tData.id]?.totalPoints || 0}
+                    stars={teacherActivityMap[tData.id]?.stars || 1}
+                    isTeacher={true}
+                    size="xs"
+                    breakdown={teacherActivityMap[tData.id]?.breakdown}
+                  />
                 </h3>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>
                   {t('adminDashboard.nationalIdLabel')}{tData.nationalId} {tData.whatsapp ? `• ${t('adminDashboard.whatsappLabel')}${tData.whatsapp}` : ''}
@@ -1106,6 +1159,7 @@ function ManageStudents({ schoolId }) {
   const [studentClass, setStudentClass] = useState('');
   const [nationality, setNationality] = useState('سعودي');
   const [isSaving, setIsSaving] = useState(false);
+  const [studentActivityMap, setStudentActivityMap] = useState({});
 
   // Bulk Add
   const [bulkData, setBulkData] = useState('');
@@ -1154,6 +1208,36 @@ function ManageStudents({ schoolId }) {
     });
     return () => { unsubStudents(); unsubClasses(); };
   }, [schoolId]);
+
+  // Compute Gamification Points for Students
+  useEffect(() => {
+    if (!schoolId || students.length === 0) return;
+
+    const qA = schoolId === 'ALL' ? collection(db, 'assignment_results') : query(collection(db, 'assignment_results'), where('schoolId', '==', schoolId));
+    const qE = schoolId === 'ALL' ? collection(db, 'exam_results') : query(collection(db, 'exam_results'), where('schoolId', '==', schoolId));
+    const qAtt = schoolId === 'ALL' ? collection(db, 'attendance') : query(collection(db, 'attendance'), where('schoolId', '==', schoolId));
+
+    Promise.all([
+      getDocs(qA),
+      getDocs(qE),
+      getDocs(qAtt)
+    ]).then(([snapA, snapE, snapAtt]) => {
+      const aList = snapA.docs.map(d => d.data());
+      const eList = snapE.docs.map(d => d.data());
+      const attList = snapAtt.docs.map(d => d.data());
+
+      const map = {};
+      students.forEach(s => {
+        map[s.id] = calculateStudentActivity({
+          studentId: s.id,
+          assignmentResults: aList,
+          examResults: eList,
+          attendanceDocs: attList
+        });
+      });
+      setStudentActivityMap(map);
+    });
+  }, [students, schoolId]);
 
   const handleSaveSingle = async (e) => {
     e.preventDefault();
@@ -1359,6 +1443,12 @@ function ManageStudents({ schoolId }) {
                   }}>
                     🌐 {s.nationality || 'سعودي'}
                   </span>
+                  <GamificationBadge
+                    points={studentActivityMap[s.id]?.totalPoints || 0}
+                    stars={studentActivityMap[s.id]?.stars || 1}
+                    size="xs"
+                    breakdown={studentActivityMap[s.id]?.breakdown}
+                  />
                 </h3>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-muted)' }}>
                   {t('adminDashboard.nationalIdLabel')}{s.nationalId}

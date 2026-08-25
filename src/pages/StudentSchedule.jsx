@@ -78,7 +78,12 @@ export default function StudentSchedule() {
   }, [userData]);
 
   useEffect(() => {
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const qClasses = schoolId === 'ALL'
+      ? collection(db, 'classes')
+      : query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+
+    const unsubClasses = onSnapshot(qClasses, (classesSnap) => {
       const list = [];
       let foundId = null;
       classesSnap.docs.forEach(doc => {
@@ -92,11 +97,17 @@ export default function StudentSchedule() {
       setClassId(foundId);
     });
     return () => unsubClasses();
-  }, [studentClass]);
+  }, [studentClass, userData?.schoolId]);
 
   useEffect(() => {
-    // Load all teachers for name mapping
-    const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+
+    // Load teachers for name mapping
+    const qTeachers = schoolId === 'ALL'
+      ? collection(db, 'teachers')
+      : query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
+
+    const unsubTeachers = onSnapshot(qTeachers, (snap) => {
       const tMap = {};
       const tList = [];
       snap.docs.forEach(doc => {
@@ -111,7 +122,11 @@ export default function StudentSchedule() {
       setTeachersList(tList);
     });
 
-    const unsubSchedule = onSnapshot(collection(db, 'schedules'), (snap) => {
+    const qSchedules = schoolId === 'ALL'
+      ? collection(db, 'schedules')
+      : query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
+
+    const unsubSchedule = onSnapshot(qSchedules, (snap) => {
       const schedList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setAllSchedules(schedList);
 

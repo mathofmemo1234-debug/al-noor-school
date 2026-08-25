@@ -46,6 +46,9 @@ import {
 import MarkdownInput from '../components/MarkdownInput';
 import { useLanguage } from '../contexts/LanguageContext';
 import PrintExamModal from '../components/PrintExamModal';
+import SharedQuestionBankModal from '../components/SharedQuestionBankModal';
+import GamificationBadge from '../components/GamificationBadge';
+import { calculateStudentActivity } from '../utils/gamificationEngine';
 
 export default function TeacherExams() {
   const { t } = useLanguage();
@@ -63,6 +66,7 @@ export default function TeacherExams() {
   const [title, setTitle] = useState('');
   const [targetClass, setTargetClass] = useState('');
   const [subject, setSubject] = useState('');
+  const [showQuestionBankModal, setShowQuestionBankModal] = useState(false);
   const [examDate, setExamDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [entryDeadline, setEntryDeadline] = useState('');
@@ -84,6 +88,7 @@ export default function TeacherExams() {
   // Common Results & Analytics state
   const [examResults, setExamResults] = useState([]);
   const [studentsCache, setStudentsCache] = useState({});
+  const [studentActivityMap, setStudentActivityMap] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [printingExamData, setPrintingExamData] = useState(null);
   const [printingResultsData, setPrintingResultsData] = useState(null);
@@ -125,11 +130,16 @@ export default function TeacherExams() {
 
   // Fetch classes
   useEffect(() => {
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const qClasses = schoolId === 'ALL'
+      ? collection(db, 'classes')
+      : query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+
+    const unsubClasses = onSnapshot(qClasses, (classesSnap) => {
       setClassesList(classesSnap.docs.map(d => d.data().name));
     });
     return () => unsubClasses();
-  }, []);
+  }, [userData?.schoolId]);
 
   // Fetch exams for this teacher
   useEffect(() => {
@@ -146,7 +156,12 @@ export default function TeacherExams() {
 
   // Fetch students dictionary cache
   useEffect(() => {
-    getDocs(collection(db, 'students')).then(snap => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const qStudents = schoolId === 'ALL'
+      ? collection(db, 'students')
+      : query(collection(db, 'students'), where('schoolId', '==', schoolId));
+
+    getDocs(qStudents).then(snap => {
       const cache = {};
       snap.forEach(d => {
         cache[d.id] = d.data().name;
@@ -154,7 +169,37 @@ export default function TeacherExams() {
       });
       setStudentsCache(cache);
     });
-  }, []);
+  }, [userData?.schoolId]);
+
+  // Compute student activity for exam results view
+  useEffect(() => {
+    if ((activeView === 'results_analytics' || activeView === 'item_analysis') && examResults.length > 0) {
+      const schoolId = userData?.schoolId || 'default_school_1';
+      const qA = schoolId === 'ALL' ? collection(db, 'assignment_results') : query(collection(db, 'assignment_results'), where('schoolId', '==', schoolId));
+      const qE = schoolId === 'ALL' ? collection(db, 'exam_results') : query(collection(db, 'exam_results'), where('schoolId', '==', schoolId));
+      const qAtt = schoolId === 'ALL' ? collection(db, 'attendance') : query(collection(db, 'attendance'), where('schoolId', '==', schoolId));
+
+      Promise.all([getDocs(qA), getDocs(qE), getDocs(qAtt)]).then(([snapA, snapE, snapAtt]) => {
+        const aList = snapA.docs.map(d => d.data());
+        const eList = snapE.docs.map(d => d.data());
+        const attList = snapAtt.docs.map(d => d.data());
+
+        const map = {};
+        examResults.forEach(res => {
+          const sid = res.studentId;
+          if (sid && !map[sid]) {
+            map[sid] = calculateStudentActivity({
+              studentId: sid,
+              assignmentResults: aList,
+              examResults: eList,
+              attendanceDocs: attList
+            });
+          }
+        });
+        setStudentActivityMap(map);
+      });
+    }
+  }, [activeView, examResults, userData?.schoolId]);
 
   // Fetch students for target class when in external exam mode
   useEffect(() => {
@@ -162,7 +207,12 @@ export default function TeacherExams() {
       setExternalStudentsList([]);
       return;
     }
-    const unsub = onSnapshot(collection(db, 'students'), (snap) => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const qStudents = schoolId === 'ALL'
+      ? collection(db, 'students')
+      : query(collection(db, 'students'), where('schoolId', '==', schoolId));
+
+    const unsub = onSnapshot(qStudents, (snap) => {
       const list = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(s => (s.class || s.className || '').trim() === targetClass.trim());
@@ -170,7 +220,7 @@ export default function TeacherExams() {
       setExternalStudentsList(list);
     });
     return () => unsub();
-  }, [targetClass, activeView]);
+  }, [targetClass, activeView, userData?.schoolId]);
 
   // Handle Question numbers synchronization for electronic exams
   useEffect(() => {
@@ -360,6 +410,8 @@ export default function TeacherExams() {
     const finalCutoff = entryDeadline || calculateDefaultCutoff(startTime);
     const examData = {
       teacherId: teacherDocId,
+      teacherName: userData?.name || 'معلم',
+      teacherEmail: userData?.email || '',
       title,
       targetClass,
       subject,
@@ -369,6 +421,8 @@ export default function TeacherExams() {
       duration: parseInt(duration),
       isExternal: false,
       questions,
+      schoolId: userData?.schoolId || 'default_school_1',
+      schoolName: userData?.schoolName || '',
       updatedAt: serverTimestamp()
     };
 
@@ -401,8 +455,11 @@ export default function TeacherExams() {
 
     try {
       let examId = currentExam?.id;
+      const schoolId = userData?.schoolId || 'default_school_1';
       const examPayload = {
         teacherId: teacherDocId,
+        teacherName: userData?.name || 'معلم',
+        teacherEmail: userData?.email || '',
         title: title.trim(),
         targetClass,
         subject,
@@ -413,6 +470,8 @@ export default function TeacherExams() {
         maxScore: totalMax,
         totalQuestions: totalMax,
         questions: [],
+        schoolId,
+        schoolName: userData?.schoolName || '',
         updatedAt: serverTimestamp()
       };
 
@@ -436,7 +495,7 @@ export default function TeacherExams() {
 
       externalStudentsList.forEach(student => {
         const rawScore = manualScores[student.id];
-        const hasScore = rawScore !== undefined && rawScore !== '' && !isNaN(rawScore);
+        const hasScore = rawScore !== undefined && rawScore !== '' && rawScore !== null;
         const numScore = hasScore ? Math.min(totalMax, Math.max(0, parseFloat(rawScore))) : 0;
         const note = manualNotes[student.id] || '';
 
@@ -455,6 +514,7 @@ export default function TeacherExams() {
             percentage: Math.round((numScore / totalMax) * 100),
             note,
             isExternal: true,
+            schoolId,
             timestamp: serverTimestamp()
           };
 
@@ -594,6 +654,18 @@ export default function TeacherExams() {
     const newQs = [...questions];
     newQs[qIndex].options[optIndex] = value;
     setQuestions(newQs);
+  };
+
+  // Import questions from Central Shared Bank
+  const handleImportQuestionsFromBank = (importedList) => {
+    if (!importedList || importedList.length === 0) return;
+
+    setQuestions(prev => {
+      const existingMeaningful = prev.filter(q => q.text && q.text.trim());
+      const combined = [...existingMeaningful, ...importedList];
+      setNumQuestions(combined.length);
+      return combined;
+    });
   };
 
   // ==========================================
@@ -1632,7 +1704,15 @@ export default function TeacherExams() {
                               {student.rank === 1 ? '🥇 1' : student.rank === 2 ? '🥈 2' : student.rank === 3 ? '🥉 3' : student.rank}
                             </td>
                             <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#0f172a' }}>
-                              {student.studentName}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                <span>{student.studentName}</span>
+                                <GamificationBadge
+                                  points={studentActivityMap[student.studentId]?.totalPoints || 0}
+                                  stars={studentActivityMap[student.studentId]?.stars || 1}
+                                  size="xs"
+                                  breakdown={studentActivityMap[student.studentId]?.breakdown}
+                                />
+                              </div>
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 'bold' }}>
                               {student.score} / {student.totalQuestions}
@@ -1996,6 +2076,68 @@ export default function TeacherExams() {
           </div>
         </div>
 
+        {/* Central Question Bank Import Banner */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%)',
+          padding: '16px 20px',
+          borderRadius: '14px',
+          border: '1.5px dashed #0d9488',
+          margin: '10px 0 24px 0',
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              background: '#0d9488',
+              color: '#ffffff',
+              padding: '10px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <BookOpen size={24} />
+            </div>
+            <div>
+              <strong style={{ fontSize: '1.05rem', color: '#0f766e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                بنك الأسئلة المركزي المشترك (كافة المدارس)
+                <span style={{ fontSize: '0.75rem', background: '#ccfbf1', color: '#0f766e', padding: '2px 8px', borderRadius: '12px' }}>
+                  متاح الآن
+                </span>
+              </strong>
+              <span style={{ fontSize: '0.86rem', color: '#475569', display: 'block', marginTop: '3px' }}>
+                ابحث واستورد أسئلة جاهزة من واجبات واختبارات المدارس الأخرى مع إمكانية تعديلها بحرية تامة دون التأثير على الأصل
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowQuestionBankModal(true)}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '10px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
+              color: '#ffffff',
+              fontWeight: 'bold',
+              fontSize: '0.92rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Plus size={18} />
+            تصفح واستيراد من بنك الأسئلة
+          </button>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           {questions.map((q, qIndex) => (
             <div key={q.id || qIndex} style={{ background: 'rgba(255,255,255,0.5)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)' }}>
@@ -2045,6 +2187,15 @@ export default function TeacherExams() {
           </button>
         </div>
       </form>
+
+      {/* Central Shared Question Bank Modal */}
+      <SharedQuestionBankModal
+        isOpen={showQuestionBankModal}
+        onClose={() => setShowQuestionBankModal(false)}
+        onImportQuestions={handleImportQuestionsFromBank}
+        currentSubject={subject}
+        currentClass={targetClass}
+      />
     </div>
   );
 }

@@ -142,7 +142,7 @@ export default function Login() {
     };
 
     try {
-      const loginEmail = role === 'admin' ? trimmedId : getFakeEmail(trimmedId);
+      const loginEmail = getFakeEmail(trimmedId);
       
       // Step 1: Sign in with Firebase Auth
       await signInWithEmailAndPassword(auth, loginEmail, trimmedPassword);

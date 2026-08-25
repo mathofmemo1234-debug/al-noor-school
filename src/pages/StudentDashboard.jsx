@@ -1,21 +1,478 @@
 import Settings from './Settings';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot, doc } from 'firebase/firestore';
 import StudentSchedule from './StudentSchedule';
 import StudentExams from './StudentExams';
 import SchoolMessagingHub from './SchoolMessagingHub';
+import WeeklyPlanView from '../components/WeeklyPlanView';
+import MarkdownViewer from '../components/MarkdownViewer';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import GamificationBadge from '../components/GamificationBadge';
+import { calculateStudentActivity } from '../utils/gamificationEngine';
+import { 
+  Sparkles, 
+  Award, 
+  CheckCircle, 
+  Calendar, 
+  FileText, 
+  BookOpen, 
+  TrendingUp, 
+  Star, 
+  Zap, 
+  ChevronLeft,
+  Download,
+  Link as LinkIcon,
+  Play,
+  CheckCircle2,
+  XCircle,
+  RotateCcw,
+  BarChart2,
+  AlertCircle
+} from 'lucide-react';
 
 function StudentHome() {
   const { t } = useLanguage();
+  const { userData } = useAuth();
+  const studentClass = useStudentClass();
+
+  const [studentDocId, setStudentDocId] = useState(null);
+  const [assignmentResults, setAssignmentResults] = useState([]);
+  const [examResults, setExamResults] = useState([]);
+  const [attendanceDocs, setAttendanceDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // 1. Fetch Student doc id
+  useEffect(() => {
+    const nid = (userData?.nationalId || auth.currentUser?.email?.replace('@school.local', '') || '').trim();
+    if (!nid && !auth.currentUser?.email) return;
+
+    const q = nid 
+      ? query(collection(db, 'students'), where('nationalId', '==', nid))
+      : query(collection(db, 'students'), where('email', '==', auth.currentUser.email));
+
+    const unsub = onSnapshot(q, snap => {
+      if (!snap.empty) {
+        setStudentDocId(snap.docs[0].id);
+      } else {
+        setStudentDocId(auth.currentUser?.uid || nid);
+      }
+    });
+    return () => unsub();
+  }, [userData]);
+
+  // 2. Fetch student results & attendance
+  useEffect(() => {
+    if (!studentDocId) return;
+
+    const schoolId = userData?.schoolId || 'default_school_1';
+
+    // Fetch assignment results
+    const qAssign = schoolId === 'ALL'
+      ? collection(db, 'assignment_results')
+      : query(collection(db, 'assignment_results'), where('schoolId', '==', schoolId));
+
+    const unsubAssign = onSnapshot(qAssign, snap => {
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(r => r.studentId === studentDocId || r.studentDocId === studentDocId || r.nationalId === userData?.nationalId);
+      setAssignmentResults(list);
+    });
+
+    // Fetch exam results
+    const qExams = schoolId === 'ALL'
+      ? collection(db, 'exam_results')
+      : query(collection(db, 'exam_results'), where('schoolId', '==', schoolId));
+
+    const unsubExams = onSnapshot(qExams, snap => {
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(r => r.studentId === studentDocId || r.studentDocId === studentDocId || r.nationalId === userData?.nationalId);
+      setExamResults(list);
+    });
+
+    // Fetch attendance for student class
+    if (studentClass) {
+      const qAtt = schoolId === 'ALL'
+        ? query(collection(db, 'attendance'), where('className', '==', studentClass))
+        : query(collection(db, 'attendance'), where('schoolId', '==', schoolId), where('className', '==', studentClass));
+
+      const unsubAtt = onSnapshot(qAtt, snap => {
+        setAttendanceDocs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      });
+
+      return () => {
+        unsubAssign();
+        unsubExams();
+        unsubAtt();
+      };
+    } else {
+      setLoading(false);
+      return () => {
+        unsubAssign();
+        unsubExams();
+      };
+    }
+  }, [studentDocId, studentClass, userData]);
+
+  // Compute activity & gamification stats
+  const activity = useMemo(() => {
+    return calculateStudentActivity({
+      studentId: studentDocId,
+      assignmentResults,
+      examResults,
+      attendanceDocs
+    });
+  }, [studentDocId, assignmentResults, examResults, attendanceDocs]);
+
   return (
-    <div className="glass-panel" style={{ padding: '24px' }}>
-      <h2>{t('studentDashboard.welcomeTitle')}</h2>
-      <p>{t('studentDashboard.welcomeSubtitle')}</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      
+      {/* Welcome & Gamification Hero Banner */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%)',
+        borderRadius: '20px',
+        padding: '28px 32px',
+        color: '#ffffff',
+        boxShadow: '0 10px 25px -5px rgba(49, 46, 129, 0.4)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Background glow circle */}
+        <div style={{
+          position: 'absolute',
+          top: '-40px',
+          left: '-40px',
+          width: '200px',
+          height: '200px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(234, 179, 8, 0.25) 0%, rgba(234, 179, 8, 0) 70%)',
+          pointerEvents: 'none'
+        }} />
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+              <span style={{ fontSize: '1.4rem' }}>👋</span>
+              <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800 }}>
+                مرحباً بك، {userData?.name || 'عزيزي الطالب'}
+              </h2>
+            </div>
+            <p style={{ margin: 0, opacity: 0.85, fontSize: '0.95rem' }}>
+              {studentClass ? `الصف: ${studentClass}` : 'لوحة الطالب التفاعلية'} • تابع واجباتك واختباراتك واكسب المزيد من النجوم الذهبية!
+            </p>
+          </div>
+
+          {/* Gamification Stars & Points Badge Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.12)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '16px',
+            padding: '12px 20px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px'
+          }}>
+            <div>
+              <div style={{ fontSize: '0.78rem', color: '#e0e7ff', marginBottom: '2px', fontWeight: 600 }}>
+                المستوى والرتبة:
+              </div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fef08a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>{activity.levelBadge}</span>
+                <span>{activity.levelTitle}</span>
+              </div>
+            </div>
+
+            <div style={{ width: '1px', height: '36px', background: 'rgba(255, 255, 255, 0.2)' }} />
+
+            <div>
+              <div style={{ fontSize: '0.78rem', color: '#e0e7ff', marginBottom: '2px', fontWeight: 600 }}>
+                النجوم والنقاط:
+              </div>
+              <GamificationBadge
+                points={activity.totalPoints}
+                stars={activity.stars}
+                size="md"
+                showStars={true}
+                showPoints={true}
+                breakdown={activity.breakdown}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Progress Bar to next Star / Level */}
+        <div style={{
+          background: 'rgba(0, 0, 0, 0.25)',
+          borderRadius: '12px',
+          padding: '14px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', fontWeight: 600 }}>
+            <span style={{ color: '#fef08a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={16} />
+              التقدم نحو النجمة / الرتبة التالية ({activity.nextLevel ? activity.nextLevel.title : 'أعلى رتبة ماسية 👑'})
+            </span>
+            <span style={{ color: '#e0e7ff' }}>
+              {activity.totalPoints} / {activity.nextLevel ? activity.nextLevel.minPoints : activity.totalPoints} نقطة
+            </span>
+          </div>
+
+          <div style={{
+            width: '100%',
+            height: '10px',
+            background: 'rgba(255, 255, 255, 0.15)',
+            borderRadius: '10px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${activity.progressToNext}%`,
+              height: '100%',
+              background: 'linear-gradient(90deg, #eab308 0%, #facc15 100%)',
+              borderRadius: '10px',
+              transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
+            }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Activity Breakdown Cards Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+        
+        {/* Homeworks Card */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '16px',
+          padding: '20px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{
+              background: '#e0f2fe',
+              color: '#0284c7',
+              padding: '10px',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <BookOpen size={22} />
+            </div>
+            <span style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#0284c7', background: '#f0f9ff', padding: '3px 10px', borderRadius: '20px' }}>
+              +{activity.breakdown.assignmentPoints} نقطة
+            </span>
+          </div>
+
+          <div>
+            <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a' }}>الواجبات التفاعلية</h3>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+              تم تسليم <strong>{activity.breakdown.completedAssignmentsCount}</strong> واجب إلكتروني
+            </p>
+          </div>
+
+          <Link
+            to="/assignments"
+            style={{
+              marginTop: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 12px',
+              background: '#f8fafc',
+              borderRadius: '8px',
+              color: '#0284c7',
+              textDecoration: 'none',
+              fontSize: '0.86rem',
+              fontWeight: 600
+            }}
+          >
+            <span>عرض الواجبات</span>
+            <ChevronLeft size={16} />
+          </Link>
+        </div>
+
+        {/* Exams Card */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '16px',
+          padding: '20px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{
+              background: '#ccfbf1',
+              color: '#0f766e',
+              padding: '10px',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <FileText size={22} />
+            </div>
+            <span style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#0f766e', background: '#f0fdfa', padding: '3px 10px', borderRadius: '20px' }}>
+              +{activity.breakdown.examPoints} نقطة
+            </span>
+          </div>
+
+          <div>
+            <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a' }}>الاختبارات والتقييمات</h3>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+              تم إنجاز <strong>{activity.breakdown.completedExamsCount}</strong> اختبار مدرسي
+            </p>
+          </div>
+
+          <Link
+            to="/exams"
+            style={{
+              marginTop: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 12px',
+              background: '#f8fafc',
+              borderRadius: '8px',
+              color: '#0f766e',
+              textDecoration: 'none',
+              fontSize: '0.86rem',
+              fontWeight: 600
+            }}
+          >
+            <span>عرض الاختبارات</span>
+            <ChevronLeft size={16} />
+          </Link>
+        </div>
+
+        {/* Attendance Card */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '16px',
+          padding: '20px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{
+              background: '#fef3c7',
+              color: '#d97706',
+              padding: '10px',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Calendar size={22} />
+            </div>
+            <span style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#d97706', background: '#fffbeb', padding: '3px 10px', borderRadius: '20px' }}>
+              +{activity.breakdown.attendancePoints} نقطة
+            </span>
+          </div>
+
+          <div>
+            <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a' }}>الانضباط والحضور</h3>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+              سجل حضور <strong>{activity.breakdown.presentDaysCount}</strong> يوم دراسي
+            </p>
+          </div>
+
+          <Link
+            to="/schedule"
+            style={{
+              marginTop: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 12px',
+              background: '#f8fafc',
+              borderRadius: '8px',
+              color: '#d97706',
+              textDecoration: 'none',
+              fontSize: '0.86rem',
+              fontWeight: 600
+            }}
+          >
+            <span>عرض الجدول الدراسي</span>
+            <ChevronLeft size={16} />
+          </Link>
+        </div>
+
+      </div>
+
+      {/* Quick Navigation Cards */}
+      <div style={{
+        background: '#ffffff',
+        borderRadius: '16px',
+        padding: '20px 24px',
+        border: '1px solid #e2e8f0',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '16px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ background: '#f1f5f9', padding: '10px', borderRadius: '10px' }}>
+            <TrendingUp size={24} color="#475569" />
+          </div>
+          <div>
+            <h4 style={{ margin: '0 0 2px', fontSize: '1rem', color: '#1e293b' }}>الخطة الأسبوعية والمواد التعليمية</h4>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>تصفح الدروس والواجبات المجدولة للأسبوع الحالي</p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Link
+            to="/weekly-plan"
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              background: '#4f46e5',
+              color: '#ffffff',
+              textDecoration: 'none',
+              fontSize: '0.88rem',
+              fontWeight: 600
+            }}
+          >
+            الخطة الأسبوعية
+          </Link>
+          <Link
+            to="/materials"
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              background: '#f1f5f9',
+              color: '#334155',
+              textDecoration: 'none',
+              fontSize: '0.88rem',
+              fontWeight: 600
+            }}
+          >
+            المواد الإثرائية
+          </Link>
+        </div>
+      </div>
+
     </div>
   );
 }
@@ -63,15 +520,11 @@ function useStudentClass() {
   return studentClass;
 }
 
-import WeeklyPlanView from '../components/WeeklyPlanView';
-
 function StudentWeeklyPlan() {
+  const { userData } = useAuth();
   const studentClass = useStudentClass();
-  return <WeeklyPlanView studentClass={studentClass} />;
+  return <WeeklyPlanView studentClass={studentClass} schoolId={userData?.schoolId} />;
 }
-
-import MarkdownViewer from '../components/MarkdownViewer';
-import { Download, Link as LinkIcon, Award, Play, CheckCircle2, XCircle, RotateCcw, BarChart2, Calendar, FileText, BookOpen, AlertCircle } from 'lucide-react';
 
 function StudentAssignments() {
   const { t } = useLanguage();
@@ -104,9 +557,14 @@ function StudentAssignments() {
     return () => unsub();
   }, [userData]);
 
-  // Fetch Assignments for Student's Class
+  // Fetch Assignments for Student's Class filtered by schoolId
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'assignments'), (snapshot) => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const qAssignments = schoolId === 'ALL'
+      ? collection(db, 'assignments')
+      : query(collection(db, 'assignments'), where('schoolId', '==', schoolId));
+
+    const unsub = onSnapshot(qAssignments, (snapshot) => {
       const norm = (s) => (s || '').replace(/\s+/g, '').replace(/[-_]/g, '/').toLowerCase();
       const sCls = norm(studentClass);
 
@@ -123,7 +581,7 @@ function StudentAssignments() {
       setAssignments(data);
     });
     return () => unsub();
-  }, [studentClass]);
+  }, [studentClass, userData?.schoolId]);
 
   // Fetch Student Submissions
   useEffect(() => {
@@ -208,6 +666,7 @@ function StudentAssignments() {
       answers: currentAnswers,
       isLate,
       attemptNumber,
+      schoolId: userData?.schoolId || 'default_school_1',
       timestamp: new Date().toISOString()
     };
 

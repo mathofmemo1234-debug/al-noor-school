@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import MarkdownViewer from '../components/MarkdownViewer';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Printer } from 'lucide-react';
@@ -15,49 +15,52 @@ export default function AdminPreparations({ schoolId }) {
   const [selectedTeacher, setSelectedTeacher] = useState('');
   const [printingPrep, setPrintingPrep] = useState(null);
 
-  // Fetch classes with fallback
+  const targetSchoolId = schoolId || 'default_school_1';
+
+  // Fetch classes
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
+    const qClasses = schoolId === 'ALL'
+      ? collection(db, 'classes')
+      : query(collection(db, 'classes'), where('schoolId', '==', targetSchoolId));
+
+    const unsub = onSnapshot(qClasses, (snap) => {
       const docs = snap.docs.map(doc => doc.data());
-      const filtered = (!schoolId || schoolId === 'ALL')
-        ? docs
-        : docs.filter(d => !d.schoolId || d.schoolId === schoolId);
-      setClassesList(Array.from(new Set(filtered.map(d => d.name).filter(Boolean))));
+      setClassesList(Array.from(new Set(docs.map(d => d.name).filter(Boolean))));
     });
     return () => unsub();
-  }, [schoolId]);
+  }, [schoolId, targetSchoolId]);
 
   // Fetch teachers for name mapping
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'teachers'), (snap) => {
+    const qTeachers = schoolId === 'ALL'
+      ? collection(db, 'teachers')
+      : query(collection(db, 'teachers'), where('schoolId', '==', targetSchoolId));
+
+    const unsub = onSnapshot(qTeachers, (snap) => {
       const map = {};
       snap.docs.forEach(d => {
         const data = d.data();
-        if (!schoolId || schoolId === 'ALL' || !data.schoolId || data.schoolId === schoolId) {
-          map[d.id] = data.name;
-          if (data.nationalId) map[data.nationalId] = data.name;
-        }
+        map[d.id] = data.name;
+        if (data.nationalId) map[data.nationalId] = data.name;
       });
       setTeachersList(map);
     });
     return () => unsub();
-  }, [schoolId]);
+  }, [schoolId, targetSchoolId]);
 
-  // Fetch all preparations with schoolId fallback
+  // Fetch preparations
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'preparations'), (snap) => {
-      const data = [];
-      snap.docs.forEach(doc => {
-        const item = { id: doc.id, ...doc.data() };
-        if (!schoolId || schoolId === 'ALL' || !item.schoolId || item.schoolId === schoolId) {
-          data.push(item);
-        }
-      });
+    const qPreps = schoolId === 'ALL'
+      ? collection(db, 'preparations')
+      : query(collection(db, 'preparations'), where('schoolId', '==', targetSchoolId));
+
+    const unsub = onSnapshot(qPreps, (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       data.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
       setPreparations(data);
     });
     return () => unsub();
-  }, [schoolId]);
+  }, [schoolId, targetSchoolId]);
 
   let filtered = preparations;
   if (selectedClass) filtered = filtered.filter(p => p.className === selectedClass);

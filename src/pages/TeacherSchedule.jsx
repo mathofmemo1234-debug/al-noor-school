@@ -49,8 +49,13 @@ export default function TeacherSchedule() {
   }, [userData]);
 
   useEffect(() => {
-    // Load all classes for name mapping
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+
+    // Load classes for name mapping
+    const qClasses = schoolId === 'ALL'
+      ? collection(db, 'classes')
+      : query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+    const unsubClasses = onSnapshot(qClasses, (snap) => {
       const clsMap = {};
       const list = [];
       snap.docs.forEach(doc => {
@@ -61,18 +66,24 @@ export default function TeacherSchedule() {
       setClassesList(list);
     });
 
-    // Load all teachers
-    const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
+    // Load teachers
+    const qTeachers = schoolId === 'ALL'
+      ? collection(db, 'teachers')
+      : query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
+    const unsubTeachers = onSnapshot(qTeachers, (snap) => {
       setTeachersList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Load all schedules
-    const unsubSchedules = onSnapshot(collection(db, 'schedules'), (snap) => {
+    // Load schedules
+    const qSchedules = schoolId === 'ALL'
+      ? collection(db, 'schedules')
+      : query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
+    const unsubSchedules = onSnapshot(qSchedules, (snap) => {
       setSchedules(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     return () => { unsubClasses(); unsubTeachers(); unsubSchedules(); };
-  }, []);
+  }, [userData?.schoolId]);
 
   // Filter schedule for this teacher
   const getTeacherCell = (day, period) => {

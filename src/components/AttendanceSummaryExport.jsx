@@ -65,11 +65,13 @@ export default function AttendanceSummaryExport({ schoolId }) {
   const [teachersMap, setTeachersMap] = useState({});
   const [classesMap, setClassesMap] = useState({});
 
-  // 1. Fetch Students
+  // 1. Fetch Students, Schedules, Teachers, Classes filtered by schoolId
   useEffect(() => {
-    const qStudents = schoolId 
-      ? query(collection(db, 'students'), where('schoolId', '==', schoolId))
-      : collection(db, 'students');
+    const targetSchoolId = schoolId || 'default_school_1';
+
+    const qStudents = schoolId === 'ALL' 
+      ? collection(db, 'students')
+      : query(collection(db, 'students'), where('schoolId', '==', targetSchoolId));
 
     const unsubStudents = onSnapshot(qStudents, (snap) => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -91,11 +93,17 @@ export default function AttendanceSummaryExport({ schoolId }) {
       }
     });
 
-    const unsubSchedules = onSnapshot(collection(db, 'schedules'), (snap) => {
+    const qSchedules = schoolId === 'ALL'
+      ? collection(db, 'schedules')
+      : query(collection(db, 'schedules'), where('schoolId', '==', targetSchoolId));
+    const unsubSchedules = onSnapshot(qSchedules, (snap) => {
       setSchedules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
+    const qTeachers = schoolId === 'ALL'
+      ? collection(db, 'teachers')
+      : query(collection(db, 'teachers'), where('schoolId', '==', targetSchoolId));
+    const unsubTeachers = onSnapshot(qTeachers, (snap) => {
       const tMap = {};
       snap.docs.forEach(d => {
         const data = d.data();
@@ -105,7 +113,10 @@ export default function AttendanceSummaryExport({ schoolId }) {
       setTeachersMap(tMap);
     });
 
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+    const qClasses = schoolId === 'ALL'
+      ? collection(db, 'classes')
+      : query(collection(db, 'classes'), where('schoolId', '==', targetSchoolId));
+    const unsubClasses = onSnapshot(qClasses, (snap) => {
       const cMap = {};
       snap.docs.forEach(d => {
         cMap[d.id] = d.data().name;
@@ -121,9 +132,13 @@ export default function AttendanceSummaryExport({ schoolId }) {
     };
   }, [schoolId]);
 
-  // 2. Fetch Attendance Documents
+  // 2. Fetch Attendance Documents filtered by schoolId
   useEffect(() => {
-    const qAttendance = collection(db, 'attendance');
+    const targetSchoolId = schoolId || 'default_school_1';
+    const qAttendance = schoolId === 'ALL'
+      ? collection(db, 'attendance')
+      : query(collection(db, 'attendance'), where('schoolId', '==', targetSchoolId));
+
     const unsubAttendance = onSnapshot(qAttendance, (snap) => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setAttendanceDocs(list);
@@ -131,7 +146,7 @@ export default function AttendanceSummaryExport({ schoolId }) {
     });
 
     return () => unsubAttendance();
-  }, []);
+  }, [schoolId]);
 
   // 3. Sync Students & Current Records when editing attendance
   useEffect(() => {
@@ -426,10 +441,12 @@ export default function AttendanceSummaryExport({ schoolId }) {
     setIsSavingRecord(true);
     setSaveSuccessMsg('');
     try {
-      const docId = `${recordClass.replace(/\//g, '-')}_${recordDate}`;
+      const targetSchoolId = schoolId || 'default_school_1';
+      const docId = `${targetSchoolId}_${recordClass.replace(/\//g, '-')}_${recordDate}`;
       const docRef = doc(db, 'attendance', docId);
 
       await setDoc(docRef, {
+        schoolId: targetSchoolId,
         className: recordClass,
         date: recordDate,
         updatedBy: auth.currentUser?.email || userData?.name || 'admin',

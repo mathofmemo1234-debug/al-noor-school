@@ -11,17 +11,117 @@ import LessonPreparation from './LessonPreparation';
 import MaterialsUpload from './MaterialsUpload';
 import TeacherExams from './TeacherExams';
 import SchoolExcellenceDashboard from './SchoolExcellenceDashboard';
-import TeacherExcellence from './TeacherExcellence';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import SchoolMessagingHub from './SchoolMessagingHub';
 import MarkdownInput from '../components/MarkdownInput';
 import { useLanguage } from '../contexts/LanguageContext';
+import SharedQuestionBankModal from '../components/SharedQuestionBankModal';
+import GamificationBadge from '../components/GamificationBadge';
+import { calculateTeacherActivity, calculateStudentActivity } from '../utils/gamificationEngine';
+import { Sparkles, Star, Zap } from 'lucide-react';
 
 function TeacherTasks() {
   const { t } = useLanguage();
+  const { userData } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+
+  // Teacher activity state for gamification
+  const [preparations, setPreparations] = useState([]);
+  const [weeklyPlans, setWeeklyPlans] = useState([]);
+  const [teacherAssignments, setTeacherAssignments] = useState([]);
+  const [teacherExams, setTeacherExams] = useState([]);
+  const [materials, setMaterials] = useState([]);
+  const [attendanceLogs, setAttendanceLogs] = useState([]);
+  const [teacherDocId, setTeacherDocId] = useState(null);
+
+  // Fetch teacher Doc ID
+  useEffect(() => {
+    if (userData?.nationalId) {
+      const q = query(collection(db, 'teachers'), where('nationalId', '==', userData.nationalId));
+      const unsub = onSnapshot(q, snap => {
+        if (!snap.empty) setTeacherDocId(snap.docs[0].id);
+      });
+      return () => unsub();
+    }
+  }, [userData]);
+
+  // Fetch teacher activity documents for gamification calculation
+  useEffect(() => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+
+    // Preparations
+    const qPrep = schoolId === 'ALL'
+      ? collection(db, 'lesson_preparations')
+      : query(collection(db, 'lesson_preparations'), where('schoolId', '==', schoolId));
+    const unsubPrep = onSnapshot(qPrep, snap => {
+      setPreparations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Weekly Plans
+    const qPlans = schoolId === 'ALL'
+      ? collection(db, 'weekly_plans')
+      : query(collection(db, 'weekly_plans'), where('schoolId', '==', schoolId));
+    const unsubPlans = onSnapshot(qPlans, snap => {
+      setWeeklyPlans(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Assignments
+    const qAssign = schoolId === 'ALL'
+      ? collection(db, 'assignments')
+      : query(collection(db, 'assignments'), where('schoolId', '==', schoolId));
+    const unsubAssign = onSnapshot(qAssign, snap => {
+      setTeacherAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Exams
+    const qExams = schoolId === 'ALL'
+      ? collection(db, 'exams')
+      : query(collection(db, 'exams'), where('schoolId', '==', schoolId));
+    const unsubExams = onSnapshot(qExams, snap => {
+      setTeacherExams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Materials
+    const qMat = schoolId === 'ALL'
+      ? collection(db, 'materials')
+      : query(collection(db, 'materials'), where('schoolId', '==', schoolId));
+    const unsubMat = onSnapshot(qMat, snap => {
+      setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Attendance logs
+    const qAtt = schoolId === 'ALL'
+      ? collection(db, 'attendance')
+      : query(collection(db, 'attendance'), where('schoolId', '==', schoolId));
+    const unsubAtt = onSnapshot(qAtt, snap => {
+      setAttendanceLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => {
+      unsubPrep();
+      unsubPlans();
+      unsubAssign();
+      unsubExams();
+      unsubMat();
+      unsubAtt();
+    };
+  }, [userData?.schoolId]);
+
+  // Compute Teacher activity & gamification points
+  const teacherActivity = useMemo(() => {
+    return calculateTeacherActivity({
+      teacherId: teacherDocId || auth.currentUser?.uid,
+      teacherEmail: auth.currentUser?.email || '',
+      preparations,
+      weeklyPlans,
+      assignments: teacherAssignments,
+      exams: teacherExams,
+      attendanceLogs,
+      materials
+    });
+  }, [teacherDocId, preparations, weeklyPlans, teacherAssignments, teacherExams, attendanceLogs, materials]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -84,23 +184,173 @@ function TeacherTasks() {
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>{t('teacherDashboard.todayTasks')}</h2>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
-      <form onSubmit={handleAddTask} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <input 
-          type="text" 
-          placeholder={t('teacherDashboard.enterNewTask')} 
-          value={newTaskTitle}
-          onChange={(e) => setNewTaskTitle(e.target.value)}
-          style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
-        />
-        <button type="submit" className="btn btn-primary" disabled={isAdding || !newTaskTitle.trim()}>
-          <Plus size={16} /> {t('teacherDashboard.addTask')}
-        </button>
-      </form>
+      {/* Teacher Professional Activity & Gamification Hero Card */}
+      <div style={{
+        background: 'linear-gradient(135deg, #064e3b 0%, #0f766e 50%, #0e7490 100%)',
+        borderRadius: '20px',
+        padding: '24px 28px',
+        color: '#ffffff',
+        boxShadow: '0 10px 25px -5px rgba(15, 118, 110, 0.35)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '18px',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Background ambient light */}
+        <div style={{
+          position: 'absolute',
+          top: '-30px',
+          left: '-30px',
+          width: '180px',
+          height: '180px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(234, 179, 8, 0.25) 0%, rgba(234, 179, 8, 0) 70%)',
+          pointerEvents: 'none'
+        }} />
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '1.4rem' }}>👨‍🏫</span>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#ffffff' }}>
+                مرحباً بك، {userData?.name || 'الأستاذ الفاضل'}
+              </h2>
+            </div>
+            <p style={{ margin: 0, opacity: 0.9, fontSize: '0.92rem' }}>
+              مؤشر النشاط والتميز المهني للمعلم • احتساب تلقائي لنقاط التحاضير، الخطط، الواجبات، الاختبارات ورصد الحضور
+            </p>
+          </div>
+
+          {/* Golden Stars & Points Badge Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '16px',
+            padding: '10px 18px',
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px'
+          }}>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: '#ccfbf1', marginBottom: '2px', fontWeight: 600 }}>
+                رتبة التميز المهني:
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fef08a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span>{teacherActivity.levelBadge}</span>
+                <span>{teacherActivity.levelTitle}</span>
+              </div>
+            </div>
+
+            <div style={{ width: '1px', height: '32px', background: 'rgba(255, 255, 255, 0.25)' }} />
+
+            <div>
+              <div style={{ fontSize: '0.75rem', color: '#ccfbf1', marginBottom: '2px', fontWeight: 600 }}>
+                النجوم والنقاط:
+              </div>
+              <GamificationBadge
+                points={teacherActivity.totalPoints}
+                stars={teacherActivity.stars}
+                size="md"
+                showStars={true}
+                showPoints={true}
+                isTeacher={true}
+                breakdown={teacherActivity.breakdown}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Progress Bar to next Star / Level */}
+        <div style={{
+          background: 'rgba(0, 0, 0, 0.25)',
+          borderRadius: '12px',
+          padding: '12px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', fontWeight: 600 }}>
+            <span style={{ color: '#fef08a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={15} />
+              التقدم نحو النجمة / الرتبة التالية ({teacherActivity.nextLevel ? teacherActivity.nextLevel.title : 'أعلى رتبة قيادية 👑'})
+            </span>
+            <span style={{ color: '#ccfbf1' }}>
+              {teacherActivity.totalPoints} / {teacherActivity.nextLevel ? teacherActivity.nextLevel.minPoints : teacherActivity.totalPoints} نقطة
+            </span>
+          </div>
+
+          <div style={{
+            width: '100%',
+            height: '8px',
+            background: 'rgba(255, 255, 255, 0.2)',
+            borderRadius: '10px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${teacherActivity.progressToNext}%`,
+              height: '100%',
+              background: 'linear-gradient(90deg, #facc15 0%, #fef08a 100%)',
+              borderRadius: '10px',
+              transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
+            }} />
+          </div>
+        </div>
+
+        {/* Activity Breakdown Pills */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
+            <span style={{ color: '#ccfbf1', display: 'block' }}>📖 التحاضير</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.preparationsCount} درس</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.prepPoints} ن)</span>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
+            <span style={{ color: '#ccfbf1', display: 'block' }}>📅 الخطط الأسبوعية</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.weeklyPlansCount} خطة</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.planPoints} ن)</span>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
+            <span style={{ color: '#ccfbf1', display: 'block' }}>📝 الواجبات</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.assignmentsCount} واجب</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.assignmentPoints} ن)</span>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
+            <span style={{ color: '#ccfbf1', display: 'block' }}>📋 الاختبارات</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.examsCount} اختبار</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.examPoints} ن)</span>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
+            <span style={{ color: '#ccfbf1', display: 'block' }}>👥 رصد الحضور</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.attendanceSessionsCount} جلسة</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.attendancePoints} ن)</span>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
+            <span style={{ color: '#ccfbf1', display: 'block' }}>📂 المواد الإثرائية</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.materialsCount} ملف</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.materialPoints} ن)</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-panel" style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2>{t('teacherDashboard.todayTasks')}</h2>
+        </div>
+        
+        <form onSubmit={handleAddTask} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <input 
+            type="text" 
+            placeholder={t('teacherDashboard.enterNewTask')} 
+            value={newTaskTitle}
+            onChange={(e) => setNewTaskTitle(e.target.value)}
+            style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+          />
+          <button type="submit" className="btn btn-primary" disabled={isAdding || !newTaskTitle.trim()}>
+            <Plus size={16} /> {t('teacherDashboard.addTask')}
+          </button>
+        </form>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {tasks.length === 0 ? (
@@ -128,6 +378,7 @@ function TeacherTasks() {
           ))
         )}
       </div>
+    </div>
     </div>
   );
 }
@@ -167,13 +418,22 @@ function WeeklyPlan() {
       return;
     }
     
-    // First fetch all classes to get their names
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
+    // First fetch classes for this school to get their names
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const qClasses = schoolId === 'ALL'
+      ? collection(db, 'classes')
+      : query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+
+    const unsubClasses = onSnapshot(qClasses, (classesSnap) => {
       const classNames = {};
       classesSnap.docs.forEach(d => classNames[d.id] = d.data().name);
       
-      // Then fetch schedules to see which classes this teacher teaches
-      const unsubSchedules = onSnapshot(collection(db, 'schedules'), (schedulesSnap) => {
+      // Then fetch schedules for this school to see which classes this teacher teaches
+      const qSchedules = schoolId === 'ALL'
+        ? collection(db, 'schedules')
+        : query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
+
+      const unsubSchedules = onSnapshot(qSchedules, (schedulesSnap) => {
         const myClassNames = new Set();
         schedulesSnap.docs.forEach(docSnap => {
           const matrix = docSnap.data().matrix || {};
@@ -194,7 +454,7 @@ function WeeklyPlan() {
     });
     
     return () => unsubClasses();
-  }, [teacherDocId]);
+  }, [teacherDocId, userData?.schoolId]);
 
   // Fetch existing plan for selected class
   useEffect(() => {
@@ -351,10 +611,12 @@ function Assignments() {
   const [numQuestions, setNumQuestions] = useState(1);
   const [questions, setQuestions] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [showQuestionBankModal, setShowQuestionBankModal] = useState(false);
 
   // Results State
   const [assignmentResults, setAssignmentResults] = useState([]);
   const [studentsCache, setStudentsCache] = useState({});
+  const [studentActivityMap, setStudentActivityMap] = useState({});
   const [viewingSubmission, setViewingSubmission] = useState(null);
 
   // Fetch teacher ID & subjects
@@ -374,15 +636,24 @@ function Assignments() {
 
   // Fetch classes
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'classes'), (snap) => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const qClasses = schoolId === 'ALL'
+      ? collection(db, 'classes')
+      : query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+    const unsub = onSnapshot(qClasses, (snap) => {
       setClassesList(snap.docs.map(doc => doc.data().name));
     });
     return () => unsub();
-  }, []);
+  }, [userData?.schoolId]);
 
   // Fetch teacher's assignments
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'assignments'), (snapshot) => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const qAssignments = schoolId === 'ALL'
+      ? collection(db, 'assignments')
+      : query(collection(db, 'assignments'), where('schoolId', '==', schoolId));
+
+    const unsub = onSnapshot(qAssignments, (snapshot) => {
       const tid = teacherDocId || auth.currentUser?.uid;
       const tEmail = auth.currentUser?.email;
       const tNat = userData?.nationalId;
@@ -409,18 +680,44 @@ function Assignments() {
     return () => unsub();
   }, [teacherDocId, userData]);
 
-  // Fetch students for results view
+  // Fetch students for results view + compute gamification
   useEffect(() => {
     if (activeView === 'results') {
-      getDocs(collection(db, 'students')).then(snap => {
+      const schoolId = userData?.schoolId || 'default_school_1';
+      const qStudents = schoolId === 'ALL'
+        ? collection(db, 'students')
+        : query(collection(db, 'students'), where('schoolId', '==', schoolId));
+
+      const qA = schoolId === 'ALL' ? collection(db, 'assignment_results') : query(collection(db, 'assignment_results'), where('schoolId', '==', schoolId));
+      const qE = schoolId === 'ALL' ? collection(db, 'exam_results') : query(collection(db, 'exam_results'), where('schoolId', '==', schoolId));
+      const qAtt = schoolId === 'ALL' ? collection(db, 'attendance') : query(collection(db, 'attendance'), where('schoolId', '==', schoolId));
+
+      Promise.all([getDocs(qStudents), getDocs(qA), getDocs(qE), getDocs(qAtt)]).then(([snapS, snapA, snapE, snapAtt]) => {
         const cache = {};
-        snap.forEach(d => {
+        const sList = [];
+        snapS.forEach(d => {
           cache[d.id] = d.data().name;
+          sList.push({ id: d.id, ...d.data() });
         });
         setStudentsCache(cache);
+
+        const aList = snapA.docs.map(d => d.data());
+        const eList = snapE.docs.map(d => d.data());
+        const attList = snapAtt.docs.map(d => d.data());
+
+        const map = {};
+        sList.forEach(s => {
+          map[s.id] = calculateStudentActivity({
+            studentId: s.id,
+            assignmentResults: aList,
+            examResults: eList,
+            attendanceDocs: attList
+          });
+        });
+        setStudentActivityMap(map);
       });
     }
-  }, [activeView]);
+  }, [activeView, userData?.schoolId]);
 
   // Initialize questions
   useEffect(() => {
@@ -509,6 +806,7 @@ function Assignments() {
     setIsSaving(true);
     const payload = {
       teacherId: tid,
+      teacherName: userData?.name || 'معلم',
       teacherEmail: auth.currentUser?.email || '',
       title,
       targetClass,
@@ -518,6 +816,8 @@ function Assignments() {
       allowedAttempts: allowedAttempts === 'unlimited' ? 'unlimited' : parseInt(allowedAttempts),
       isInteractive: true,
       questions,
+      schoolId: userData?.schoolId || 'default_school_1',
+      schoolName: userData?.schoolName || '',
       updatedAt: new Date().toISOString()
     };
 
@@ -536,6 +836,18 @@ function Assignments() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Import questions from Central Shared Bank
+  const handleImportQuestionsFromBank = (importedList) => {
+    if (!importedList || importedList.length === 0) return;
+
+    setQuestions(prev => {
+      const existingMeaningful = prev.filter(q => q.text && q.text.trim());
+      const combined = [...existingMeaningful, ...importedList];
+      setNumQuestions(combined.length);
+      return combined;
+    });
   };
 
   const updateQuestion = (index, field, value) => {
@@ -593,7 +905,15 @@ function Assignments() {
                   return (
                     <tr key={res.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : '#fafafa' }}>
                       <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#0f172a' }}>
-                        {studentsCache[res.studentId] || res.studentName || 'طالب'}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                          <span>{studentsCache[res.studentId] || res.studentName || 'طالب'}</span>
+                          <GamificationBadge
+                            points={studentActivityMap[res.studentId]?.totalPoints || 0}
+                            stars={studentActivityMap[res.studentId]?.stars || 1}
+                            size="xs"
+                            breakdown={studentActivityMap[res.studentId]?.breakdown}
+                          />
+                        </div>
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>
                         {res.score} / {res.totalQuestions}
@@ -823,6 +1143,68 @@ function Assignments() {
           </div>
         </div>
 
+        {/* Central Question Bank Import Banner */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%)',
+          padding: '16px 20px',
+          borderRadius: '14px',
+          border: '1.5px dashed #0d9488',
+          margin: '10px 0 24px 0',
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              background: '#0d9488',
+              color: '#ffffff',
+              padding: '10px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <BookOpen size={24} />
+            </div>
+            <div>
+              <strong style={{ fontSize: '1.05rem', color: '#0f766e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                بنك الأسئلة المركزي المشترك (كافة المدارس)
+                <span style={{ fontSize: '0.75rem', background: '#ccfbf1', color: '#0f766e', padding: '2px 8px', borderRadius: '12px' }}>
+                  متاح الآن
+                </span>
+              </strong>
+              <span style={{ fontSize: '0.86rem', color: '#475569', display: 'block', marginTop: '3px' }}>
+                ابحث واستورد أسئلة جاهزة من واجبات واختبارات المدارس الأخرى مع إمكانية تعديلها بحرية تامة دون التأثير على الأصل
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowQuestionBankModal(true)}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '10px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
+              color: '#ffffff',
+              fontWeight: 'bold',
+              fontSize: '0.92rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Plus size={18} />
+            تصفح واستيراد من بنك الأسئلة
+          </button>
+        </div>
+
         {/* Questions Builder */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
           {questions.map((q, qIndex) => (
@@ -875,6 +1257,15 @@ function Assignments() {
           </button>
         </div>
       </form>
+
+      {/* Central Shared Question Bank Modal */}
+      <SharedQuestionBankModal
+        isOpen={showQuestionBankModal}
+        onClose={() => setShowQuestionBankModal(false)}
+        onImportQuestions={handleImportQuestionsFromBank}
+        currentSubject={subject}
+        currentClass={targetClass}
+      />
     </div>
   );
 }
@@ -886,6 +1277,7 @@ function Attendance() {
   const [classesList, setClassesList] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [students, setStudents] = useState([]);
+  const [studentActivityMap, setStudentActivityMap] = useState({});
   const [attendanceRecords, setAttendanceRecords] = useState({});
   const [attendanceNotes, setAttendanceNotes] = useState({});
   const [isSaving, setIsSaving] = useState(false);
@@ -898,6 +1290,35 @@ function Attendance() {
   const today = new Date().toISOString().split('T')[0];
   const dayNamesArabic = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
   const currentDayArabic = dayNamesArabic[new Date().getDay()];
+
+  // Compute gamification activity for students in selected class
+  useEffect(() => {
+    if (!students || students.length === 0) {
+      setStudentActivityMap({});
+      return;
+    }
+    const schoolId = userData?.schoolId || 'default_school_1';
+    const qA = schoolId === 'ALL' ? collection(db, 'assignment_results') : query(collection(db, 'assignment_results'), where('schoolId', '==', schoolId));
+    const qE = schoolId === 'ALL' ? collection(db, 'exam_results') : query(collection(db, 'exam_results'), where('schoolId', '==', schoolId));
+    const qAtt = schoolId === 'ALL' ? collection(db, 'attendance') : query(collection(db, 'attendance'), where('schoolId', '==', schoolId));
+
+    Promise.all([getDocs(qA), getDocs(qE), getDocs(qAtt)]).then(([snapA, snapE, snapAtt]) => {
+      const aList = snapA.docs.map(d => d.data());
+      const eList = snapE.docs.map(d => d.data());
+      const attList = snapAtt.docs.map(d => d.data());
+
+      const map = {};
+      students.forEach(s => {
+        map[s.id] = calculateStudentActivity({
+          studentId: s.id,
+          assignmentResults: aList,
+          examResults: eList,
+          attendanceDocs: attList
+        });
+      });
+      setStudentActivityMap(map);
+    });
+  }, [students, userData?.schoolId]);
 
   // Fetch teacher Doc ID
   useEffect(() => {
@@ -914,7 +1335,13 @@ function Attendance() {
 
   // Fetch classes, schedules, and teachers
   useEffect(() => {
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+    const schoolId = userData?.schoolId || 'default_school_1';
+
+    const qClasses = schoolId === 'ALL'
+      ? collection(db, 'classes')
+      : query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+
+    const unsubClasses = onSnapshot(qClasses, (snap) => {
       const cMap = {};
       const list = [];
       snap.docs.forEach(d => {
@@ -928,11 +1355,19 @@ function Attendance() {
       }
     });
 
-    const unsubSchedules = onSnapshot(collection(db, 'schedules'), (snap) => {
+    const qSchedules = schoolId === 'ALL'
+      ? collection(db, 'schedules')
+      : query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
+
+    const unsubSchedules = onSnapshot(qSchedules, (snap) => {
       setSchedules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
+    const qTeachers = schoolId === 'ALL'
+      ? collection(db, 'teachers')
+      : query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
+
+    const unsubTeachers = onSnapshot(qTeachers, (snap) => {
       const tMap = {};
       snap.docs.forEach(d => {
         const data = d.data();
@@ -947,7 +1382,7 @@ function Attendance() {
       unsubSchedules();
       unsubTeachers();
     };
-  }, []);
+  }, [userData?.schoolId]);
 
   // Check if teacher has a period with selectedClass on currentDayArabic
   useEffect(() => {
@@ -987,17 +1422,30 @@ function Attendance() {
       return;
     }
 
-    const sq = query(collection(db, 'students'), where('class', '==', selectedClass));
+    const schoolId = userData?.schoolId || 'default_school_1';
+
+    const sq = schoolId === 'ALL'
+      ? query(collection(db, 'students'), where('class', '==', selectedClass))
+      : query(collection(db, 'students'), where('class', '==', selectedClass), where('schoolId', '==', schoolId));
+
     const unsubStudents = onSnapshot(sq, (snap) => {
       const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setStudents(list);
     });
 
-    const aq = query(
-      collection(db, 'attendance'),
-      where('className', '==', selectedClass),
-      where('date', '==', today)
-    );
+    const aq = schoolId === 'ALL'
+      ? query(
+          collection(db, 'attendance'),
+          where('className', '==', selectedClass),
+          where('date', '==', today)
+        )
+      : query(
+          collection(db, 'attendance'),
+          where('schoolId', '==', schoolId),
+          where('className', '==', selectedClass),
+          where('date', '==', today)
+        );
+
     const unsubAttendance = onSnapshot(aq, (snap) => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
@@ -1015,7 +1463,7 @@ function Attendance() {
       unsubStudents();
       unsubAttendance();
     };
-  }, [selectedClass, today]);
+  }, [selectedClass, today, userData?.schoolId]);
 
   const handleStatusChange = (studentId, status) => {
     setAttendanceRecords(prev => ({
@@ -1040,10 +1488,12 @@ function Attendance() {
 
     setIsSaving(true);
     try {
-      const docId = `${selectedClass.replace(/\//g, '-')}_${today}`;
+      const schoolId = userData?.schoolId || 'default_school_1';
+      const docId = `${schoolId}_${selectedClass.replace(/\//g, '-')}_${today}`;
       const docRef = doc(db, 'attendance', docId);
 
       await setDoc(docRef, {
+        schoolId,
         className: selectedClass,
         date: today,
         teacherId: teacherDocId || auth.currentUser.uid,
@@ -1235,10 +1685,20 @@ function Attendance() {
                     <tr key={student.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? 'white' : '#fafafa' }}>
                       <td style={{ padding: '12px 16px', color: '#64748b' }}>{idx + 1}</td>
                       <td style={{ padding: '12px 16px', fontWeight: '500' }}>
-                        {student.name}
-                        <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--color-primary-dark)', background: 'rgba(99, 178, 198, 0.15)', padding: '2px 8px', borderRadius: '10px', marginInlineStart: '8px' }}>
-                          {student.class || student.className || selectedClass}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{student.name}</span>
+                            <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--color-primary-dark)', background: 'rgba(99, 178, 198, 0.15)', padding: '2px 8px', borderRadius: '10px' }}>
+                              {student.class || student.className || selectedClass}
+                            </span>
+                          </div>
+                          <GamificationBadge
+                            points={studentActivityMap[student.id]?.totalPoints || 0}
+                            stars={studentActivityMap[student.id]?.stars || 1}
+                            size="xs"
+                            breakdown={studentActivityMap[student.id]?.breakdown}
+                          />
+                        </div>
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <input 

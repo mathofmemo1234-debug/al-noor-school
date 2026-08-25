@@ -26,11 +26,10 @@ export default function WeeklyPlanView({ studentClass = null, schoolId }) {
       setSelectedClassName(studentClass);
     }
     const targetSchoolId = schoolId || 'default_school_1';
-    const q = query(collection(db, 'classes'));
+    const q = query(collection(db, 'classes'), where('schoolId', '==', targetSchoolId));
     const unsub = onSnapshot(q, (snap) => {
       const cls = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const filteredCls = schoolId && schoolId !== 'ALL' ? cls.filter(c => !c.schoolId || c.schoolId === 'ALL' || c.schoolId === schoolId) : cls;
-      setClasses(filteredCls.length > 0 ? filteredCls : cls);
+      setClasses(cls);
       if (studentClass) {
         const found = cls.find(c => c.name === studentClass);
         if (found) {
@@ -56,7 +55,8 @@ export default function WeeklyPlanView({ studentClass = null, schoolId }) {
 
   useEffect(() => {
     if (!selectedClassName) return;
-    const q = query(collection(db, 'preparations'));
+    const targetSchoolId = schoolId || 'default_school_1';
+    const q = query(collection(db, 'preparations'), where('schoolId', '==', targetSchoolId));
     const unsub = onSnapshot(q, (snapshot) => {
       const data = [];
       const clsName = selectedClassName.trim();
@@ -67,9 +67,7 @@ export default function WeeklyPlanView({ studentClass = null, schoolId }) {
         
         if (matchesClass) {
           if (!p.week || p.week === selectedWeek) {
-            if (!schoolId || schoolId === 'ALL' || !p.schoolId || p.schoolId === 'ALL' || p.schoolId === schoolId) {
-              data.push({ id: doc.id, ...p });
-            }
+            data.push({ id: doc.id, ...p });
           }
         }
       });
@@ -79,7 +77,8 @@ export default function WeeklyPlanView({ studentClass = null, schoolId }) {
   }, [selectedClassName, selectedWeek, schoolId]);
 
   useEffect(() => {
-    const qTeachers = query(collection(db, 'teachers'));
+    const targetSchoolId = schoolId || 'default_school_1';
+    const qTeachers = query(collection(db, 'teachers'), where('schoolId', '==', targetSchoolId));
     const unsubTeachers = onSnapshot(qTeachers, (snap) => {
       const tMap = {};
       snap.docs.forEach(doc => {
@@ -88,7 +87,7 @@ export default function WeeklyPlanView({ studentClass = null, schoolId }) {
       setTeachers(tMap);
     });
 
-    const qSchedules = query(collection(db, 'schedules'));
+    const qSchedules = query(collection(db, 'schedules'), where('schoolId', '==', targetSchoolId));
     const unsubSchedules = onSnapshot(qSchedules, (snap) => {
       if (!snap.empty && (selectedClassId || selectedClassName)) {
         const clsName = selectedClassName ? selectedClassName.trim() : '';

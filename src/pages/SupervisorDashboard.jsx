@@ -29,11 +29,13 @@ function SupervisorHome({ schoolId }) {
       setStats(prev => ({ ...prev, teachers: snap.size }));
     });
 
-    const unsubPrep = onSnapshot(collection(db, 'lesson_preparations'), (snap) => {
+    const qPrep = query(collection(db, 'lesson_preparations'), where('schoolId', '==', schoolId));
+    const unsubPrep = onSnapshot(qPrep, (snap) => {
       setStats(prev => ({ ...prev, preparations: snap.size }));
     });
 
-    const unsubPlans = onSnapshot(collection(db, 'weekly_plans'), (snap) => {
+    const qPlans = query(collection(db, 'weekly_plans'), where('schoolId', '==', schoolId));
+    const unsubPlans = onSnapshot(qPlans, (snap) => {
       setStats(prev => ({ ...prev, weeklyPlans: snap.size }));
     });
 

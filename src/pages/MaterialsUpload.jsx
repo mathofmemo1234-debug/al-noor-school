@@ -4,9 +4,11 @@ import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc } from 'fi
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { UploadCloud, Link as LinkIcon, Trash2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function MaterialsUpload() {
   const { t } = useLanguage();
+  const { userData } = useAuth();
   const [classesList, setClassesList] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [subjects, setSubjects] = useState([]);
@@ -22,30 +24,40 @@ export default function MaterialsUpload() {
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  const schoolId = userData?.schoolId || 'default_school_1';
+
   // Fetch teacher doc ID based on nationalId
   useEffect(() => {
-    if (auth.currentUser?.email) {
-      const unsub = onSnapshot(query(collection(db, 'teachers')), (snap) => {
-        let found = false;
-        snap.docs.forEach(d => {
-          if (d.data().email === auth.currentUser.email || d.data().uid === auth.currentUser.uid) {
-            setTeacherDocId(d.id);
-            found = true;
-          }
-        });
+    if (userData?.nationalId) {
+      const q = schoolId === 'ALL'
+        ? query(collection(db, 'teachers'), where('nationalId', '==', userData.nationalId))
+        : query(collection(db, 'teachers'), where('nationalId', '==', userData.nationalId), where('schoolId', '==', schoolId));
+
+      const unsub = onSnapshot(q, (snap) => {
+        if (!snap.empty) {
+          setTeacherDocId(snap.docs[0].id);
+        }
       });
       return () => unsub();
     }
-  }, []);
+  }, [userData, schoolId]);
 
   // Fetch classes and subjects
   useEffect(() => {
     if (!teacherDocId) return;
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (classesSnap) => {
+    const qClasses = schoolId === 'ALL'
+      ? collection(db, 'classes')
+      : query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+
+    const unsubClasses = onSnapshot(qClasses, (classesSnap) => {
       const classNames = {};
       classesSnap.docs.forEach(d => classNames[d.id] = d.data().name);
       
-      const unsubSchedules = onSnapshot(collection(db, 'schedules'), (schedulesSnap) => {
+      const qSchedules = schoolId === 'ALL'
+        ? collection(db, 'schedules')
+        : query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
+
+      const unsubSchedules = onSnapshot(qSchedules, (schedulesSnap) => {
         const myClassNames = new Set();
         const mySubjects = new Set();
         
@@ -68,7 +80,7 @@ export default function MaterialsUpload() {
       return () => unsubSchedules();
     });
     return () => unsubClasses();
-  }, [teacherDocId]);
+  }, [teacherDocId, schoolId]);
 
   // Fetch materials for selected class & subject
   useEffect(() => {
@@ -76,19 +88,27 @@ export default function MaterialsUpload() {
       setMaterials([]);
       return;
     }
-    const q = query(
-      collection(db, 'materials'),
-      where('teacherId', '==', teacherDocId),
-      where('className', '==', selectedClass),
-      where('subject', '==', selectedSubject)
-    );
+    const q = schoolId === 'ALL'
+      ? query(
+          collection(db, 'materials'),
+          where('teacherId', '==', teacherDocId),
+          where('className', '==', selectedClass),
+          where('subject', '==', selectedSubject)
+        )
+      : query(
+          collection(db, 'materials'),
+          where('schoolId', '==', schoolId),
+          where('teacherId', '==', teacherDocId),
+          where('className', '==', selectedClass),
+          where('subject', '==', selectedSubject)
+        );
     const unsub = onSnapshot(q, (snapshot) => {
       const data = [];
       snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
       setMaterials(data);
     });
     return () => unsub();
-  }, [selectedClass, selectedSubject, teacherDocId]);
+  }, [selectedClass, selectedSubject, teacherDocId, schoolId]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -132,6 +152,7 @@ export default function MaterialsUpload() {
         url: finalUrl,
         type: uploadType,
         fileName: file ? file.name : null,
+        schoolId,
         createdAt: new Date().toISOString()
       });
 

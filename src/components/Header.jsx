@@ -49,13 +49,17 @@ export default function Header({ title, role }) {
       cleanName
     ].filter(Boolean).map(s => String(s).trim().toLowerCase()));
 
-    const unsub = onSnapshot(collection(db, 'school_messages'), (snap) => {
+    const msgQuery = schoolId === 'ALL' 
+      ? collection(db, 'school_messages') 
+      : query(collection(db, 'school_messages'), where('schoolId', '==', schoolId));
+
+    const unsub = onSnapshot(msgQuery, (snap) => {
       let count = 0;
       snap.docs.forEach(docSnap => {
         const msg = docSnap.data();
 
         // Multi-school strict isolation
-        if (msg.schoolId && msg.schoolId !== 'ALL' && msg.schoolId !== schoolId) return;
+        if (schoolId !== 'ALL' && msg.schoolId !== schoolId) return;
 
         const readBy = msg.readBy || [];
         const hasRead = Array.isArray(readBy) && readBy.some(id => myIdentities.has(String(id).trim().toLowerCase()));

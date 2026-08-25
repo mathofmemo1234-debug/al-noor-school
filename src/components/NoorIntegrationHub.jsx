@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ExternalLink, Download, UploadCloud, CheckCircle2, ShieldCheck, Globe, BookOpen, Users, Award, AlertCircle, Sparkles } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function NoorIntegrationHub({ schoolId }) {
@@ -10,6 +10,8 @@ export default function NoorIntegrationHub({ schoolId }) {
   const [importText, setImportText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
+
+  const effectiveSchoolId = schoolId || userData?.schoolId || 'default_school_1';
 
   const noorPlatforms = [
     {
@@ -53,7 +55,10 @@ export default function NoorIntegrationHub({ schoolId }) {
   // Export current students to Noor-compliant CSV template
   const handleExportNoorStudents = async () => {
     try {
-      const snap = await getDocs(collection(db, 'students'));
+      const q = effectiveSchoolId === 'ALL'
+        ? collection(db, 'students')
+        : query(collection(db, 'students'), where('schoolId', '==', effectiveSchoolId));
+      const snap = await getDocs(q);
       const list = snap.docs.map(d => d.data());
       
       const headers = ['رقم السجل المدني / الإقامة', 'اسم الطالب الرباعي', 'الصف الدراسي', 'رقم الهاتف / الجوال', 'حالة القيد'];
