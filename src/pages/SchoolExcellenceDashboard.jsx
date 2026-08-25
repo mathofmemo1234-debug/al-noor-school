@@ -47,9 +47,22 @@ export default function SchoolExcellenceDashboard() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'completed', 'pending'
-  const [expandedDomains, setExpandedDomains] = useState({ 'domain-1': true });
-  const [expandedCriteria, setExpandedCriteria] = useState({ 'c1-1': true });
-  
+
+  // Expand all 4 domains and 11 criteria by default so all 54 indicators show up
+  const [expandedDomains, setExpandedDomains] = useState(() => {
+    const map = {};
+    excellenceData.forEach(d => { map[d.id] = true; });
+    return map;
+  });
+
+  const [expandedCriteria, setExpandedCriteria] = useState(() => {
+    const map = {};
+    excellenceData.forEach(d => {
+      d.criteria.forEach(c => { map[c.id] = true; });
+    });
+    return map;
+  });
+
   // Selected indicator (default to first indicator)
   const [selectedIndicator, setSelectedIndicator] = useState(
     excellenceData[0].criteria[0].indicators[0]
@@ -187,6 +200,17 @@ export default function SchoolExcellenceDashboard() {
       ...prev,
       [criteriaId]: !prev[criteriaId]
     }));
+  };
+
+  const toggleAllExpand = (expand) => {
+    const dMap = {};
+    const cMap = {};
+    excellenceData.forEach(d => {
+      dMap[d.id] = expand;
+      d.criteria.forEach(c => { cMap[c.id] = expand; });
+    });
+    setExpandedDomains(dMap);
+    setExpandedCriteria(cMap);
   };
 
   // Calculate overall stats
@@ -504,6 +528,28 @@ export default function SchoolExcellenceDashboard() {
             >
               المتبقية ({totalIndicatorsCount - completedCount})
             </button>
+          </div>
+
+          {/* Quick Expand / Collapse */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+            <span>عرض القائمة:</span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => toggleAllExpand(true)}
+                style={{ background: 'none', border: 'none', color: 'var(--color-primary-dark)', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline' }}
+              >
+                توسيع الكل
+              </button>
+              <span>|</span>
+              <button
+                type="button"
+                onClick={() => toggleAllExpand(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                طي الكل
+              </button>
+            </div>
           </div>
 
           {/* Accordion Tree */}
