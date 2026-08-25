@@ -7,75 +7,109 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
-    body { font-family: 'Tajawal', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+    body { font-family: 'Tajawal', sans-serif; background-color: #020617; }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(217, 119, 6, 0.4); border-radius: 3px; }
+    .gold-gradient { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #d97706 100%); }
+    .gold-text { background: linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
 
-  <!-- Header -->
-  <header class="bg-slate-950 border-b border-slate-800 sticky top-0 z-30 px-4 py-3 shadow-xl">
+  <!-- Header Navbar -->
+  <header class="bg-slate-900/90 border-b border-slate-800/80 backdrop-blur-xl sticky top-0 z-40 px-4 md:px-8 py-3.5 shadow-2xl">
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-amber-500/20">
-          <i class="fa-solid fa-award text-2xl"></i>
+      
+      <!-- Brand -->
+      <div class="flex items-center gap-3.5">
+        <div class="relative">
+          <div class="w-12 h-12 rounded-2xl gold-gradient flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/25 ring-2 ring-amber-400/30">
+            <i class="fa-solid fa-award text-2xl"></i>
+          </div>
+          <span class="absolute -bottom-1 -right-1 flex h-3.5 w-3.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+          </span>
         </div>
         <div>
-          <h1 class="text-xl md:text-2xl font-bold tracking-tight text-amber-400 flex items-center gap-2">
+          <h1 class="text-xl md:text-2xl font-black tracking-tight gold-text">
             ملف التميز المدرسي
-            <span class="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-normal">SPA</span>
           </h1>
-          <p class="text-xs md:text-sm text-slate-400 font-medium">المدارس المتقدمة للتعلم الذكي بجدة</p>
+          <p class="text-xs text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
+            <i class="fa-solid fa-sparkles text-amber-400"></i>
+            المدارس المتقدمة للتعلم الذكي بجدة
+          </p>
         </div>
       </div>
 
-      <div class="flex items-center gap-4 bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2 text-xs md:text-sm">
-        <div class="flex flex-col items-center border-l border-slate-800 pl-4">
-          <span class="text-slate-400">إجمالي المؤشرات</span>
-          <span class="font-bold text-amber-400 text-base">54</span>
+      <!-- KPI Summary -->
+      <div class="grid grid-cols-3 gap-3 md:gap-6 bg-slate-950/80 border border-slate-800/80 rounded-2xl px-5 py-2.5 text-xs">
+        <div class="flex items-center gap-3 border-l border-slate-800/80 pl-3 md:pl-5">
+          <div class="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[11px]">المؤشرات</span>
+            <span class="font-bold text-amber-400 text-base">54</span>
+          </div>
         </div>
-        <div class="flex flex-col items-center border-l border-slate-800 pl-4">
-          <span class="text-slate-400">المكـتملة</span>
-          <span id="stat-completed" class="font-bold text-emerald-400 text-base">0</span>
+
+        <div class="flex items-center gap-3 border-l border-slate-800/80 pl-3 md:pl-5">
+          <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[11px]">المكـتملة</span>
+            <span id="stat-completed" class="font-bold text-emerald-400 text-base">0</span>
+          </div>
         </div>
-        <div class="flex flex-col items-center">
-          <span class="text-slate-400">نسبة التميز</span>
-          <span id="stat-percent" class="font-bold text-sky-400 text-base">0%</span>
+
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+            <i class="fa-solid fa-chart-pie"></i>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[11px]">نسبة التميز</span>
+            <span id="stat-percent" class="font-bold text-sky-400 text-base">0%</span>
+          </div>
         </div>
       </div>
 
-      <button onclick="window.print()" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs md:text-sm font-medium border border-slate-700">
+      <!-- Actions -->
+      <button onclick="window.print()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs md:text-sm font-semibold border border-slate-700 shadow-md">
         <i class="fa-solid fa-print text-amber-400"></i>
         <span class="hidden sm:inline">طباعة التقرير</span>
       </button>
     </div>
 
-    <div class="w-full bg-slate-800 h-1.5 mt-3 rounded-full overflow-hidden">
-      <div id="progress-bar" class="bg-gradient-to-r from-amber-500 to-emerald-400 h-full transition-all duration-500" style="width: 0%"></div>
+    <!-- Progress Bar -->
+    <div class="w-full bg-slate-800/80 h-1.5 mt-3 rounded-full overflow-hidden p-0.5">
+      <div id="progress-bar" class="bg-gradient-to-r from-amber-500 via-emerald-400 to-sky-400 h-full rounded-full transition-all duration-700" style="width: 0%"></div>
     </div>
   </header>
 
-  <!-- Body -->
+  <!-- Workspace Container -->
   <div class="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 md:p-6 gap-6">
     
     <!-- Sidebar -->
-    <aside class="w-full md:w-96 flex-shrink-0 bg-slate-950/70 border border-slate-800 rounded-3xl p-4 flex flex-col gap-4 shadow-xl max-h-[85vh] overflow-hidden">
-      <div class="relative">
-        <input id="search-input" type="text" placeholder="ابحث عن مؤشر أو معيار..." class="w-full bg-slate-900 border border-slate-800 rounded-xl pr-10 pl-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/60" />
-        <i class="fa-solid fa-magnifying-glass text-slate-400 absolute right-3.5 top-3.5 text-sm"></i>
+    <aside class="w-full md:w-96 flex-shrink-0 bg-slate-900/70 border border-slate-800/90 rounded-3xl p-4 flex flex-col gap-4 shadow-2xl backdrop-blur-xl max-h-[85vh] overflow-hidden">
+      <div class="space-y-3">
+        <div class="relative">
+          <input id="search-input" type="text" placeholder="ابحث عن مؤشر أو معيار تخصصي..." class="w-full bg-slate-950/90 border border-slate-800 rounded-2xl pr-10 pl-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/70 shadow-inner" />
+          <i class="fa-solid fa-magnifying-glass text-slate-400 absolute right-3.5 top-3.5 text-sm"></i>
+        </div>
       </div>
 
       <div id="accordion-container" class="flex-1 overflow-y-auto pr-1 space-y-3 custom-scrollbar">
-        <!-- JS rendered accordion -->
+        <!-- JS Accordion -->
       </div>
     </aside>
 
     <!-- Main Workspace -->
-    <main class="flex-1 bg-slate-950/70 border border-slate-800 rounded-3xl p-5 md:p-7 flex flex-col gap-6 shadow-xl" id="main-content">
-      <!-- JS rendered main details -->
+    <main class="flex-1 bg-slate-900/70 border border-slate-800/90 rounded-3xl p-5 md:p-8 flex flex-col gap-6 shadow-2xl backdrop-blur-xl" id="main-content">
+      <!-- JS Content -->
     </main>
   </div>
 
@@ -89,41 +123,41 @@
             id: "c1-1",
             title: "المعيار 1: التخطيط الاستراتيجي والتشغيلي",
             indicators: [
-              { id: 1, title: "مؤشر 1: وجود رؤية ورسالة معلنة ومشاركة مع المجتمع المدرسي." },
-              { id: 2, title: "مؤشر 2: بناء خطة تشغيلية مبنية على نتائج التقويم الذاتي." },
-              { id: 3, title: "مؤشر 3: وضوح الأهداف التشغيلية وقابليتها للقياس." },
-              { id: 4, title: "مؤشر 4: إشراك الكادر التعليمي وأولياء الأمور في بناء الخطة." },
-              { id: 5, title: "مؤشر 5: متابعة تنفيذ الخطة التشغيلية وتحديثها دورياً." }
+              { id: 1, title: "مؤشر 1: وجود رؤية ورسالة معلنة ومشاركة مع المجتمع المدرسي.", description: "صياغة رؤية ورسالة المدرسة بوضوح وإعلانها للجميع وإشراك كافة الفئات في استيعابها." },
+              { id: 2, title: "مؤشر 2: بناء خطة تشغيلية مبنية على نتائج التقويم الذاتي.", description: "إعداد خطة تشغيلية واقعية ومستندة على مخرجات ونقاط قوة وتقويم المدرسة الذاتي." },
+              { id: 3, title: "مؤشر 3: وضوح الأهداف التشغيلية وقابليتها للقياس.", description: "صياغة أهداف تشغيلية محددة وقابلة للتحقيق والقياس بملشرات أداء SMART." },
+              { id: 4, title: "مؤشر 4: إشراك الكادر التعليمي وأولياء الأمور في بناء الخطة.", description: "تنسيق ورش عمل ولقاءات لتشاور ومشاركة الهيئة التعليمية وأولياء الأمور." },
+              { id: 5, title: "مؤشر 5: متابعة تنفيذ الخطة التشغيلية وتحديثها دورياً.", description: "مراجعة نسب إنجاز الخطة التشغيلية وتحديثها طبقاً للمتغيرات والمستجدات." }
             ]
           },
           {
             id: "c1-2",
             title: "المعيار 2: قيادة الأداء والعمليات",
             indicators: [
-              { id: 6, title: "مؤشر 6: توفر أدلة تنظيمية وإجرائية واضحة للعمل المدرسي." },
-              { id: 7, title: "مؤشر 7: تفعيل التقنية في إدارة العمليات المدرسية وتوثيقها." },
-              { id: 8, title: "مؤشر 8: متابعة أداء الكادر الإداري والتعليمي وتقويمه بشكل مستمر." },
-              { id: 9, title: "مؤشر 9: وجود آليات واضحة لتحفيز المتميزين ومساءلة المقصرين." },
-              { id: 10, title: "مؤشر 10: إدارة الموارد المالية والمادية وتوظيفها بكفاءة." }
+              { id: 6, title: "مؤشر 6: توفر أدلة تنظيمية وإجرائية واضحة للعمل المدرسي.", description: "توثيق الأدلة الإجرائية والتنظيمية وتعميمها على جميع العاملين في المدرسة." },
+              { id: 7, title: "مؤشر 7: تفعيل التقنية في إدارة العمليات المدرسية وتوثيقها.", description: "استخدام الأنظمة البرمجية والتقنية لتسهيل وأرشفة العمليات الإدارية والتعليمية." },
+              { id: 8, title: "مؤشر 8: متابعة أداء الكادر الإداري والتعليمي وتقويمه بشكل مستمر.", description: "متابعة وتقويم أداء العاملين بشكل دوري وموضوعي لضمان جودة الأداء." },
+              { id: 9, title: "مؤشر 9: وجود آليات واضحة لتحفيز المتميزين ومساءلة المقصرين.", description: "تطبيق لائحة تكريم وتحفيز المتميزين وضوابط المحاسبية والمتابعة." },
+              { id: 10, title: "مؤشر 10: إدارة الموارد المالية والمادية وتوظيفها بكفاءة.", description: "استغلال الميزانيات التقديرية والمعدات والموارد المادية بما يحقق أهداف المدرسة." }
             ]
           },
           {
             id: "c1-3",
             title: "المعيار 3: التطوير المهني",
             indicators: [
-              { id: 11, title: "مؤشر 11: تحديد الاحتياجات التدريبية للمعلمين بدقة." },
-              { id: 12, title: "مؤشر 12: تنفيذ برامج تطوير مهني داخلية ومجتمعات تعلم مهنية." },
-              { id: 13, title: "مؤشر 13: قياس أثر التدريب على أداء المعلمين داخل الصف." },
-              { id: 14, title: "مؤشر 14: تشجيع المعلمين على البحث الإجرائي والابتكار في التعليم." }
+              { id: 11, title: "مؤشر 11: تحديد الاحتياجات التدريبية للمعلمين بدقة.", description: "حصر وتحديد الاحتياجات المهنية للتخصصات التعليمية بناءً على الملاحظات الصفية." },
+              { id: 12, title: "مؤشر 12: تنفيذ برامج تطوير مهني داخلية ومجتمعات تعلم مهنية.", description: "عقد ورش عمل ودورات تدريبية وتفعيل مجتمعات التعلم المهنية التفاعلية." },
+              { id: 13, title: "مؤشر 13: قياس أثر التدريب على أداء المعلمين داخل الصف.", description: "متابعة تطور أداء المعلم داخل الفصل بعد التنمية المهنية وقياس الأثر التعليمي." },
+              { id: 14, title: "مؤشر 14: تشجيع المعلمين على البحث الإجرائي والابتكار في التعليم.", description: "دعم المبادرات والبحوث الإجرائية التي تقدم حلولاً علمية للتحديات التعليمية." }
             ]
           },
           {
             id: "c1-4",
             title: "المعيار 4: الشراكة المجتمعية",
             indicators: [
-              { id: 15, title: "مؤشر 15: تفعيل مجالس أولياء الأمور وإشراكهم في قرارات المدرسة." },
-              { id: 16, title: "مؤشر 16: بناء شراكات فاعلة مع مؤسسات المجتمع المحلي." },
-              { id: 17, title: "مؤشر 17: تنظيم برامج تطوعية ومجتمعية يشارك فيها الطلاب." }
+              { id: 15, title: "مؤشر 15: تفعيل مجالس أولياء الأمور وإشراكهم في قرارات المدرسة.", description: "عقد اجتماعات مجالس أولياء الأمور والاستفادة من مرئياتهم في تطوير المدرسة." },
+              { id: 16, title: "مؤشر 16: بناء شراكات فاعلة مع مؤسسات المجتمع المحلي.", description: "توقيع مذكرات تفاهم وشراكات مع القطاع العام والخاص لخدمة البيئة التعليمية." },
+              { id: 17, title: "مؤشر 17: تنظيم برامج تطوعية ومجتمعية يشارك فيها الطلاب.", description: "إطلاق المبادرات والفعاليات التطوعية التي تعزز قيم المواطنة والخدمة لدى الطلاب." }
             ]
           }
         ]
@@ -136,34 +170,34 @@
             id: "c2-1",
             title: "المعيار 1: التخطيط للتدريس",
             indicators: [
-              { id: 18, title: "مؤشر 18: تحليل المقررات الدراسية وتحديد نواتج التعلم المستهدفة." },
-              { id: 19, title: "مؤشر 19: إعداد خطط تدريس يومية وفصلية مكتملة العناصر." },
-              { id: 20, title: "مؤشر 20: مراعاة الفروق الفردية وخصائص المتعلمين في التخطيط." },
-              { id: 21, title: "مؤشر 21: دمج المهارات الحياتية والقيم الوطنية في خطط الدروس." }
+              { id: 18, title: "مؤشر 18: تحليل المقررات الدراسية وتحديد نواتج التعلم المستهدفة.", description: "تحليل محتوى المناج وتصنيف مخرجات ونواتج التعلم لكل وحدة دراسية." },
+              { id: 19, title: "مؤشر 19: إعداد خطط تدريس يومية وفصلية مكتملة العناصر.", description: "صياغة التحضيرات والخطط الفصلية واليومية مع الأهداف والاستراتيجيات والتقويم." },
+              { id: 20, title: "مؤشر 20: مراعاة الفروق الفردية وخصائص المتعلمين في التخطيط.", description: "تضمين أنشطة متدرجة تراعي القدرات الفردية وذوي الاحتياجات أو الفائقين." },
+              { id: 21, title: "مؤشر 21: دمج المهارات الحياتية والقيم الوطنية في خطط الدروس.", description: "ربط أهداف الدروس بالقيم الوطنية والمهارات الحياتية والتفكير الناقد." }
             ]
           },
           {
             id: "c2-2",
             title: "المعيار 2: استراتيجيات التدريس",
             indicators: [
-              { id: 22, title: "مؤشر 22: توظيف استراتيجيات التعلم النشط المتمركزة حول الطالب." },
-              { id: 23, title: "مؤشر 23: ربط التعلم بواقع الحياة والتطبيقات العملية." },
-              { id: 24, title: "مؤشر 24: استخدام الوسائل والتقنيات التعليمية الحديثة بفاعلية." },
-              { id: 25, title: "مؤشر 25: توفير بيئة صفية محفزة وآمنة وداعمة للتعلم." },
-              { id: 26, title: "مؤشر 26: إدارة الوقت الصفي بكفاءة عالية تخدم أهداف الدرس." },
-              { id: 27, title: "مؤشر 27: تشجيع مهارات التفكير العليا (الناقد والإبداعي)." },
-              { id: 28, title: "مؤشر 28: تفعيل التعلم التعاوني والمشاريع الجماعية بين الطلاب." }
+              { id: 22, title: "مؤشر 22: توظيف استراتيجيات التعلم النشط المتمركزة حول الطالب.", description: "استخدام طرائق تدريسية مثل التعلم المكتشف، حل المشكلات، والصف المقلوب." },
+              { id: 23, title: "مؤشر 23: ربط التعلم بواقع الحياة والتطبيقات العملية.", description: "توفير أمثلة ومشاريع تربط المعارف النظريّة بالتطبيقات اليومية في الحياة." },
+              { id: 24, title: "مؤشر 24: استخدام الوسائل والتقنيات التعليمية الحديثة بفاعلية.", description: "استعمال الشاشات التفاعلية والبرامج التعليمية الرقمية لإثراء الحصص الدراسية." },
+              { id: 25, title: "مؤشر 25: توفير بيئة صفية محفزة وآمنة وداعمة للتعلم.", description: "تهيئة المناخ الصفي بالاحترام والتشجيع والافتخار بمحاولات وإنجازات الطلاب." },
+              { id: 26, title: "مؤشر 26: إدارة الوقت الصفي بكفاءة عالية تخدم أهداف الدرس.", description: "استثمار زمن الحصة المدرسية بدقة بين التمهيد والشرح والأنشطة والتقويم." },
+              { id: 27, title: "مؤشر 27: تشجيع مهارات التفكير العليا (الناقد والإبداعي).", description: "تطوير أسئلة مفتوحة ومهمات تتطلب التحليل والتركيب والتقويم الإبداعي." },
+              { id: 28, title: "مؤشر 28: تفعيل التعلم التعاوني والمشاريع الجماعية بين الطلاب.", description: "تنفيذ الأنشطة الجماعية والمجموعات الثنائية لترسيخ مهارات العمل الجماعي." }
             ]
           },
           {
             id: "c2-3",
             title: "المعيار 3: التقويم والتغذية الراجعة",
             indicators: [
-              { id: 29, title: "مؤشر 29: استخدام أساليب تقويم متنوعة (شفهي، كتابي، عملي)." },
-              { id: 30, title: "مؤشر 30: توظيف التقويم التكويني (البنائي) لتوجيه وتحسين التعلم." },
-              { id: 31, title: "مؤشر 31: بناء أدوات تقويم تتسم بالصدق والثبات ومطابقة لجدول المواصفات." },
-              { id: 32, title: "مؤشر 32: تحليل نتائج التقويم لبناء خطط علاجية وإثرائية." },
-              { id: 33, title: "مؤشر 33: تقديم تغذية راجعة فورية ومكتوبة للطلاب لدعم تعلمهم." }
+              { id: 29, title: "مؤشر 29: استخدام أساليب تقويم متنوعة (شفهي، كتابي، عملي).", description: "تنويع أدوات التقييم لتشمل الاختبارات والملاحظات والعروض والمشاريع." },
+              { id: 30, title: "مؤشر 30: توظيف التقويم التكويني (البنائي) لتوجيه وتحسين التعلم.", description: "متابعة استجابات الطلاب أثناء الحصة ومعالجة الأخطاء المفاهيمية فوراً." },
+              { id: 31, title: "مؤشر 31: بناء أدوات تقويم تتسم بالصدق والثبات ومطابقة لجدول المواصفات.", description: "إعداد اختبارات وأسئلة علمية دقيقة تتوافق مع الأهداف والمستويات المعرفية." },
+              { id: 32, title: "مؤشر 32: تحليل نتائج التقويم لبناء خطط علاجية وإثرائية.", description: "استخراج نسب التحصيل ودراستها لتنظيم دروس علاجية للمتعثرين برامج إثرائية." },
+              { id: 33, title: "مؤشر 33: تقديم تغذية راجعة فورية ومكتوبة للطلاب لدعم تعلمهم.", description: "تزويد المتعلم بملاحظات توضيحية بناءة على واجباته واختباراته لتصحيح المسار." }
             ]
           }
         ]
@@ -176,22 +210,22 @@
             id: "c3-1",
             title: "المعيار 1: التحصيل العلمي",
             indicators: [
-              { id: 34, title: "مؤشر 34: تحقيق الطلاب لنسب نجاح مرتفعة في الاختبارات المدرسية." },
-              { id: 35, title: "مؤشر 35: حصول الطلاب على درجات متقدمة في الاختبارات الوطنية والمركزية." },
-              { id: 36, title: "مؤشر 36: انخفاض نسبة الرسوب والتسرب المدرسي." },
-              { id: 37, title: "مؤشر 37: إتقان الطلاب للمهارات الأساسية في القراءة والكتابة والعمليات الحسابية." }
+              { id: 34, title: "مؤشر 34: تحقيق الطلاب لنسب نجاح مرتفعة في الاختبارات المدرسية.", description: "ارتفاع معدلات إتقان الطلاب وتفوقهم في الاختبارات الدورية والفصلية." },
+              { id: 35, title: "مؤشر 35: حصول الطلاب على درجات متقدمة في الاختبارات الوطنية والمركزية.", description: "تحقيق نتائج ممتازة في اختبارات نافس والاختبارات الوطنية والمركزية." },
+              { id: 36, title: "مؤشر 36: انخفاض نسبة الرسوب والتسرب المدرسي.", description: "المحافظة على معدلات استبقاء عالية وضمان عدم انقطاع أو رسوب الطلاب." },
+              { id: 37, title: "مؤشر 37: إتقان الطلاب للمهارات الأساسية في القراءة والكتابة والعمليات الحسابية.", description: "التمكن الكامل من المهارات القرائية والحسابية لجميع المراحل الدراسية." }
             ]
           },
           {
             id: "c3-2",
             title: "المعيار 2: التطور الشخصي والاجتماعي",
             indicators: [
-              { id: 38, title: "مؤشر 38: تمثل الطلاب للقيم الإسلامية والهوية الوطنية في سلوكهم." },
-              { id: 39, title: "مؤشر 39: ممارسة الطلاب لمهارات القيادة وتحمل المسؤولية." },
-              { id: 40, title: "مؤشر 40: مشاركة الطلاب بفاعلية في الأنشطة اللاصفية والأندية المدرسية." },
-              { id: 41, title: "مؤشر 41: التزام الطلاب بقواعد السلوك والمواظبة والانضباط المدرسي." },
-              { id: 42, title: "مؤشر 42: قدرة الطلاب على التعبير عن آرائهم باحترام وثقة تامة." },
-              { id: 43, title: "مؤشر 43: تحقيق إنجازات ومراكز متقدمة في المسابقات المحلية أو الدولية." }
+              { id: 38, title: "مؤشر 38: تمثل الطلاب للقيم الإسلامية والهوية الوطنية في سلوكهم.", description: "نعكس الأخلاق الإسلامية السامية والاعتزاز بالحضارة والهوية الوطنية." },
+              { id: 39, title: "مؤشر 39: ممارسة الطلاب لمهارات القيادة وتحمل المسؤولية.", description: "تولّي الطلاب أدواراً قيادية وتنظيم المبادرات المدرسية باستقلالية." },
+              { id: 40, title: "مؤشر 40: مشاركة الطلاب بفاعلية في الأنشطة اللاصفية والأندية المدرسية.", description: "تفاعل الطلاب الكبير في الأندية العلمية، الثقافية، والرياضية." },
+              { id: 41, title: "مؤشر 41: التزام الطلاب بقواعد السلوك والمواظبة والانضباط المدرسي.", description: "انضباط السلوك المدرسي والانتظام الحثيث في الحضور اليومي دون غياب." },
+              { id: 42, title: "مؤشر 42: قدرة الطلاب على التعبير عن آرائهم باحترام وثقة تامة.", description: "تمتع الطلاب بمهارات الحوار والإقناع وحرية التعبير الإيجابي." },
+              { id: 43, title: "مؤشر 43: تحقيق إنجازات ومراكز متقدمة في المسابقات المحلية أو الدولية.", description: "حصد الجوائز والمراكز في الأولمبياد والمسابقات العلمية والابتكارية." }
             ]
           }
         ]
@@ -204,23 +238,23 @@
             id: "c4-1",
             title: "المعيار 1: المبنى والمرافق",
             indicators: [
-              { id: 44, title: "مؤشر 44: توفر مساحات كافية وآمنة للطلاب في الفصول والساحات." },
-              { id: 45, title: "مؤشر 45: جاهزية المعامل والمختبرات ومصادر التعلم وتوفر أجهزتها." },
-              { id: 46, title: "مؤشر 46: توفر متطلبات الأمن والسلامة (مخارج طوارئ، طفايات حريق)." },
-              { id: 47, title: "مؤشر 47: ملاءمة المبنى والمرافق للطلاب ذوي الاحتياجات الخاصة." },
-              { id: 48, title: "مؤشر 48: النظافة العامة والتهوية والإضاءة الجيدة في جميع المرافق." }
+              { id: 44, title: "مؤشر 44: توفر مساحات كافية وآمنة للطلاب في الفصول والساحات.", description: "استيفاء الفصول والملاعب للنسب المعيارية للمساحة المخصصة لكل طالب." },
+              { id: 45, title: "مؤشر 45: جاهزية المعامل والمختبرات ومصادر التعلم وتوفر أجهزتها.", description: "تحديث المعامل التقنية والعلمية والمكتبة بأحدث الموارد والوسائل." },
+              { id: 46, title: "مؤشر 46: توفر متطلبات الأمن والسلامة (مخارج طوارئ، طفايات حريق).", description: "فحص أجهزة السلامة، إنذار الحريق، ومخارج الإخلاء بشكل دوري." },
+              { id: 47, title: "مؤشر 47: ملاءمة المبنى والمرافق للطلاب ذوي الاحتياجات الخاصة.", description: "تهيأة المنحدرات والمصاعد ودورات المياه وسهولة الوصول الشامل." },
+              { id: 48, title: "مؤشر 48: النظافة العامة والتهوية والإضاءة الجيدة في جميع المرافق.", description: "الاهتمام بنظافة وتطهير المدرسة والتهوية الجيدة والإضاءة المريحة." }
             ]
           },
           {
             id: "c4-2",
             title: "المعيار 2: المناخ المدرسي والإرشاد",
             indicators: [
-              { id: 49, title: "مؤشر 49: وجود علاقات إنسانية إيجابية يسودها الاحترام بين المنسوبين." },
-              { id: 50, title: "مؤشر 50: تقديم برامج توجيه وإرشاد نفسي واجتماعي فاعلة وموثقة." },
-              { id: 51, title: "مؤشر 51: وجود آليات واضحة وفعالة للتعامل مع المشكلات السلوكية." },
-              { id: 52, title: "مؤشر 52: تقديم الدعم الأكاديمي والمهني للطلاب وتوجيههم للمستقبل." },
-              { id: 53, title: "مؤشر 53: توفير بيئة صحية عبر المقصف المدرسي وبرامج التوعية." },
-              { id: 54, title: "مؤشر 54: تنفيذ برامج تعزز الانتماء والولاء للمدرسة والوطن." }
+              { id: 49, title: "مؤشر 49: وجود علاقات إنسانية إيجابية يسودها الاحترام بين المنسوبين.", description: "شيوع روح الفريق والتعاون والتوافق بين الإدارة والمعلمين والطلاب." },
+              { id: 50, title: "مؤشر 50: تقديم برامج توجيه وإرشاد نفسي واجتماعي فاعلة وموثقة.", description: "تفعيل جلسات الإرشاد الفردي والجمعي وتقديم الرعاية النفسية للطلاب." },
+              { id: 51, title: "مؤشر 51: وجود آليات واضحة وفعالة للتعامل مع المشكلات السلوكية.", description: "معالجة المخالفات السلوكية وفق قواعد قواعد السلوك والمواظبة المعتمدة." },
+              { id: 52, title: "مؤشر 52: تقديم الدعم الأكاديمي والمهني للطلاب وتوجيههم للمستقبل.", description: "إعداد خطط توجيه مهني وأكاديمي لمساعدة الطلاب في اختيار مساراتهم." },
+              { id: 53, title: "مؤشر 53: توفير بيئة صحية عبر المقصف المدرسي وبرامج التوعية.", description: "رقابة الاشتراطات الصحية في المقصف وتنظيم محاضرات التوعية الصحية." },
+              { id: 54, title: "مؤشر 54: تنفيذ برامج تعزز الانتماء والولاء للمدرسة والوطن.", description: "إقامة الاحتفالات باليوم الوطني والأيام العالمية وترسيخ قيم الولاء." }
             ]
           }
         ]
@@ -245,11 +279,11 @@
 
       excellenceData.forEach(domain => {
         const domainEl = document.createElement('div');
-        domainEl.className = 'border border-slate-800/80 rounded-2xl overflow-hidden bg-slate-900/60 mb-2';
+        domainEl.className = 'border border-slate-800/80 rounded-2xl overflow-hidden bg-slate-950/60 mb-2';
         
         let domainContent = `
           <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex items-center justify-between p-3.5 bg-slate-900 hover:bg-slate-800 text-right transition border-b border-slate-800/50">
-            <span class="text-sm font-bold text-amber-300">${domain.title}</span>
+            <span class="text-xs font-bold text-amber-300">${domain.title}</span>
             <i class="fa-solid fa-chevron-down text-slate-400 text-xs"></i>
           </button>
           <div class="p-2 space-y-2 bg-slate-950/40">
@@ -271,7 +305,7 @@
             const isSel = selectedIndicatorId === ind.id;
             
             domainContent += `
-              <button onclick="selectIndicator(${ind.id})" class="w-full text-right p-2 rounded-lg text-xs flex items-center justify-between transition ${isSel ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40 font-bold' : 'hover:bg-slate-800 text-slate-300'}">
+              <button onclick="selectIndicator(${ind.id})" class="w-full text-right p-2.5 rounded-xl text-xs flex items-center justify-between transition ${isSel ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40 font-bold' : 'hover:bg-slate-800 text-slate-300'}">
                 <span class="truncate pl-2">${ind.title}</span>
                 ${isDone ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>' : '<i class="fa-regular fa-clock text-slate-500"></i>'}
               </button>
@@ -312,32 +346,39 @@
       const ev = evidences[selectedIndicatorId] || {};
 
       main.innerHTML = `
-        <div class="border-b border-slate-800 pb-4 space-y-2">
-          <span class="text-xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">${ctx.dom.title}</span>
-          <h2 class="text-xl font-bold text-slate-100">${ctx.ind.title}</h2>
-          <p class="text-xs text-slate-400">${ctx.crit.title}</p>
+        <div class="border-b border-slate-800 pb-4 space-y-3">
+          <div class="flex items-center gap-2 text-xs text-amber-400">
+            <span class="bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20">${ctx.dom.title}</span>
+            <span>/</span>
+            <span class="text-slate-400">${ctx.crit.title}</span>
+          </div>
+          <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <span class="text-amber-400 bg-amber-500/10 text-xs px-2 py-1 rounded">IND-${ctx.ind.id}</span>
+            <span>${ctx.ind.title}</span>
+          </h2>
+          <p class="text-xs text-slate-400 bg-slate-950 p-3 rounded-xl border border-slate-800">${ctx.ind.description}</p>
         </div>
 
-        <form onsubmit="saveForm(event)" class="space-y-4">
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">وصف الإنجاز والشواهد المرفقة *</label>
-            <textarea id="desc" rows="4" required class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500">${ev.description || ''}</textarea>
+        <form onsubmit="saveForm(event)" class="space-y-5 flex-1 flex flex-col">
+          <div class="space-y-1.5">
+            <label class="block text-xs font-bold text-slate-300">وصف الإنجاز والشواهد المرفقة *</label>
+            <textarea id="desc" rows="4" required class="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500">${ev.description || ''}</textarea>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">الفئة المستهدفة / الجهة</label>
-              <input id="target" type="text" value="${ev.targetGroup || ''}" placeholder="مثال: المعلمون والطلاب" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100" />
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <label class="block text-xs font-bold text-slate-300">الفئة المستهدفة / الجهة</label>
+              <input id="target" type="text" value="${ev.targetGroup || ''}" placeholder="مثال: المعلمون والطلاب" class="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm text-slate-100" />
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">رابط خارجي (Google Drive / Cloud)</label>
-              <input id="link" type="url" value="${ev.linkUrl || ''}" placeholder="https://..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 ltr text-left" />
+            <div class="space-y-1.5">
+              <label class="block text-xs font-bold text-slate-300">رابط خارجي (Google Drive / Cloud)</label>
+              <input id="link" type="url" value="${ev.linkUrl || ''}" placeholder="https://..." class="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm text-slate-100 ltr text-left" />
             </div>
           </div>
 
-          <div class="pt-4 flex justify-between">
-            <button type="submit" class="bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold px-6 py-2.5 rounded-xl text-sm shadow">
-              <i class="fa-solid fa-floppy-disk ml-1"></i> حفظ الشاهد
+          <div class="pt-4 mt-auto flex justify-between">
+            <button type="submit" class="gold-gradient text-slate-950 font-bold px-8 py-3 rounded-2xl text-sm shadow-xl active:scale-95 transition">
+              <i class="fa-solid fa-floppy-disk ml-1.5"></i> حفظ ومصادقة الشاهد
             </button>
           </div>
         </form>
@@ -354,13 +395,14 @@
         description: desc,
         targetGroup: target,
         linkUrl: link,
-        isCompleted: true
+        isCompleted: true,
+        updatedAt: new Date().toISOString()
       };
 
       localStorage.setItem('school_excellence_evidences', JSON.stringify(evidences));
       updateStats();
       renderSidebar();
-      alert('تم حفظ البيانات بنجاح!');
+      alert('تم حفظ ومصادقة الشاهد بنجاح!');
     }
 
     document.getElementById('search-input').addEventListener('input', renderSidebar);
