@@ -54,7 +54,7 @@ body {
 
 /* Custom Sidebar Scrollbar */
 .custom-sidebar-scrollbar {
-  overflow-y: scroll !important;
+  overflow-y: auto !important;
   scrollbar-width: thin;
   scrollbar-color: #63B2C6 rgba(99, 178, 198, 0.15);
 }

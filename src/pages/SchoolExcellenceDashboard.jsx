@@ -452,10 +452,10 @@ export default function SchoolExcellenceDashboard() {
       </div>
 
       {/* Main Grid Workspace */}
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px', alignItems: 'start' }}>
         
         {/* Sidebar Accordion Panel */}
-        <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '82vh', overflow: 'hidden' }}>
+        <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', height: 'calc(100vh - 200px)', minHeight: '620px' }}>
           
           {/* Search Box */}
           <div style={{ position: 'relative' }}>
@@ -553,7 +553,7 @@ export default function SchoolExcellenceDashboard() {
           </div>
 
           {/* Accordion Tree */}
-          <div className="custom-sidebar-scrollbar" style={{ flex: 1, paddingLeft: '6px', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '68vh' }}>
+          <div className="custom-sidebar-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingLeft: '6px', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '32px' }}>
             {excellenceData.map(domain => {
               const isDomainExpanded = expandedDomains[domain.id];
               const isDomainAllowed = isAdmin || allowedDomains.length === 0 || allowedDomains.includes(domain.id);
