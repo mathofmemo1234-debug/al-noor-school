@@ -24,7 +24,30 @@ function App() {
       <LanguageProvider>
         <AuthProvider>
           <Router>
-            <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}>
+            <Suspense fallback={
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '100vh',
+                background: 'var(--color-bg, #F4F8F9)',
+                fontFamily: 'Cairo, sans-serif',
+                direction: 'rtl'
+              }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  border: '4px solid rgba(99, 178, 198, 0.2)',
+                  borderTopColor: '#63B2C6',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                <p style={{ marginTop: '16px', color: '#4A93A6', fontWeight: 700, fontSize: '1rem' }}>
+                  جاري تحميل الصفحة...
+                </p>
+              </div>
+            }>
             <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />

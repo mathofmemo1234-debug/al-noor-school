@@ -10,17 +10,27 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole] = useState(null);
-  const [userData, setUserData] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => auth.currentUser || null);
+  const [userRole, setUserRole] = useState(() => localStorage.getItem('userRole') || null);
+  const [userData, setUserData] = useState(() => {
+    try {
+      const cached = localStorage.getItem('userData');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
-  const [selectedRole, setSelectedRole] = useState(null);
+  const [selectedRole, setSelectedRole] = useState(() => localStorage.getItem('userRole') || null);
 
   const resolveRole = useCallback(async (user, roleHint) => {
     try {
       if (user.email === 'super@admin.com') {
+        const superData = { name: 'حساب الماستر', role: 'superadmin', schoolId: 'ALL' };
         setUserRole('superadmin');
-        setUserData({ name: 'حساب الماستر', role: 'superadmin', schoolId: 'ALL' });
+        setUserData(superData);
+        localStorage.setItem('userRole', 'superadmin');
+        localStorage.setItem('userData', JSON.stringify(superData));
         return;
       }
       // حسابات المدراء تُقرأ من جدول users للحصول على schoolId الفعلي المعيّن من لوحة الماستر
@@ -307,14 +317,14 @@ export function AuthProvider({ children }) {
 
         setUserRole(data.role);
         setUserData(data);
+        localStorage.setItem('userRole', data.role);
+        localStorage.setItem('userData', JSON.stringify(data));
       } else {
         setUserRole(null);
         setUserData(null);
       }
     } catch (error) {
       console.error("Error fetching role:", error);
-      setUserRole(null);
-      setUserData(null);
     }
   }, []);
 
@@ -326,6 +336,8 @@ export function AuthProvider({ children }) {
       } else {
         setUserRole(null);
         setUserData(null);
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('userData');
       }
       setLoading(false);
     });
@@ -335,6 +347,8 @@ export function AuthProvider({ children }) {
 
   const setLoginRole = useCallback((role) => {
     setSelectedRole(role);
+    setUserRole(role);
+    localStorage.setItem('userRole', role);
   }, []);
 
   const value = {
@@ -346,7 +360,30 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {loading && !currentUser && !userRole ? (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          background: 'var(--color-bg, #F4F8F9)',
+          fontFamily: 'Cairo, sans-serif',
+          direction: 'rtl'
+        }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid rgba(99, 178, 198, 0.2)',
+            borderTopColor: '#63B2C6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <p style={{ marginTop: '16px', color: '#4A93A6', fontWeight: 700, fontSize: '1rem' }}>
+            جاري تحميل النظام...
+          </p>
+        </div>
+      ) : children}
     </AuthContext.Provider>
   );
 }
