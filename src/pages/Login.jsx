@@ -47,6 +47,9 @@ export default function Login() {
         if (uSnap.empty && !isNaN(nid)) {
           uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', Number(nid))));
         }
+        if (uSnap.empty) {
+          uSnap = await getDocs(query(collection(db, 'users'), where('email', '==', getFakeEmail(nid))));
+        }
         if (!uSnap.empty) {
           const docs = uSnap.docs.map(d => d.data());
           const match = docs.find(d => d.role === desiredRole);
@@ -64,6 +67,9 @@ export default function Login() {
           if (pSnap.empty && !isNaN(nid)) {
             pSnap = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', Number(nid))));
           }
+          if (pSnap.empty) {
+            pSnap = await getDocs(query(collection(db, 'parents'), where('email', '==', getFakeEmail(nid))));
+          }
           if (!pSnap.empty) {
             return { ...pSnap.docs[0].data(), role: 'parent' };
           }
@@ -75,7 +81,13 @@ export default function Login() {
       // 3. Check teachers if requested role is teacher
       if (desiredRole === 'teacher') {
         try {
-          const tSnap = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
+          let tSnap = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
+          if (tSnap.empty && !isNaN(nid)) {
+            tSnap = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', Number(nid))));
+          }
+          if (tSnap.empty) {
+            tSnap = await getDocs(query(collection(db, 'teachers'), where('email', '==', getFakeEmail(nid))));
+          }
           if (!tSnap.empty) {
             return { ...tSnap.docs[0].data(), role: 'teacher' };
           }
@@ -87,11 +99,23 @@ export default function Login() {
       // 4. Check staff if requested role is staff or supervisor
       if (desiredRole === 'staff' || desiredRole === 'supervisor') {
         try {
-          const staffSnap = await getDocs(query(collection(db, 'staff'), where('nationalId', '==', nid)));
+          let staffSnap = await getDocs(query(collection(db, 'staff'), where('nationalId', '==', nid)));
+          if (staffSnap.empty && !isNaN(nid)) {
+            staffSnap = await getDocs(query(collection(db, 'staff'), where('nationalId', '==', Number(nid))));
+          }
+          if (staffSnap.empty) {
+            staffSnap = await getDocs(query(collection(db, 'staff'), where('email', '==', getFakeEmail(nid))));
+          }
           if (!staffSnap.empty) {
             return { ...staffSnap.docs[0].data(), role: 'staff' };
           }
-          const supSnap = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', nid)));
+          let supSnap = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', nid)));
+          if (supSnap.empty && !isNaN(nid)) {
+            supSnap = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', Number(nid))));
+          }
+          if (supSnap.empty) {
+            supSnap = await getDocs(query(collection(db, 'supervisors'), where('email', '==', getFakeEmail(nid))));
+          }
           if (!supSnap.empty) {
             return { ...supSnap.docs[0].data(), role: 'supervisor' };
           }
@@ -103,7 +127,13 @@ export default function Login() {
       // 5. Check students if requested role is student
       if (desiredRole === 'student') {
         try {
-          const sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
+          let sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
+          if (sSnap.empty && !isNaN(nid)) {
+            sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', Number(nid))));
+          }
+          if (sSnap.empty) {
+            sSnap = await getDocs(query(collection(db, 'students'), where('email', '==', getFakeEmail(nid))));
+          }
           if (!sSnap.empty) {
             return { ...sSnap.docs[0].data(), role: 'student' };
           }
@@ -114,26 +144,25 @@ export default function Login() {
 
       // 6. General check across other collections to detect wrong role choice
       try {
-        const pSnapAll = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', nid)));
-        if (!pSnapAll.empty) {
-          return { ...pSnapAll.docs[0].data(), role: 'parent' };
-        }
-        const tSnapAll = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
-        if (!tSnapAll.empty) {
-          return { ...tSnapAll.docs[0].data(), role: 'teacher' };
-        }
-        const staffSnapAll = await getDocs(query(collection(db, 'staff'), where('nationalId', '==', nid)));
-        if (!staffSnapAll.empty) {
-          return { ...staffSnapAll.docs[0].data(), role: 'staff' };
-        }
-        const supSnapAll = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', nid)));
-        if (!supSnapAll.empty) {
-          return { ...supSnapAll.docs[0].data(), role: 'supervisor' };
-        }
-        const sSnapAll = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
-        if (!sSnapAll.empty) {
-          return { ...sSnapAll.docs[0].data(), role: 'student' };
-        }
+        let pSnapAll = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', nid)));
+        if (pSnapAll.empty && !isNaN(nid)) pSnapAll = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', Number(nid))));
+        if (!pSnapAll.empty) return { ...pSnapAll.docs[0].data(), role: 'parent' };
+
+        let tSnapAll = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
+        if (tSnapAll.empty && !isNaN(nid)) tSnapAll = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', Number(nid))));
+        if (!tSnapAll.empty) return { ...tSnapAll.docs[0].data(), role: 'teacher' };
+
+        let staffSnapAll = await getDocs(query(collection(db, 'staff'), where('nationalId', '==', nid)));
+        if (staffSnapAll.empty && !isNaN(nid)) staffSnapAll = await getDocs(query(collection(db, 'staff'), where('nationalId', '==', Number(nid))));
+        if (!staffSnapAll.empty) return { ...staffSnapAll.docs[0].data(), role: 'staff' };
+
+        let supSnapAll = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', nid)));
+        if (supSnapAll.empty && !isNaN(nid)) supSnapAll = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', Number(nid))));
+        if (!supSnapAll.empty) return { ...supSnapAll.docs[0].data(), role: 'supervisor' };
+
+        let sSnapAll = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
+        if (sSnapAll.empty && !isNaN(nid)) sSnapAll = await getDocs(query(collection(db, 'students'), where('nationalId', '==', Number(nid))));
+        if (!sSnapAll.empty) return { ...sSnapAll.docs[0].data(), role: 'student' };
       } catch (err) {
         console.warn("General collection check error:", err);
       }
@@ -396,61 +425,60 @@ export default function Login() {
   return (
     <main role="main">
       <div className="login-container relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Background elements */}
-        <div className="absolute inset-0 z-0">
-          <div className="login-card glass-panel" style={{ maxWidth: '480px' }}>
-            <div className="login-header">
-              <div className="logo-container" style={{ width: '100px', height: '100px', background: 'transparent', boxShadow: 'none' }}>
-                <img 
-                  src={`${import.meta.env.BASE_URL}logo.webp`} 
-                  alt="شعار المدارس" 
-                  width="100"
-                  height="100"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
-                  }}
-                  style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} 
-                />
-              </div>
-              <h1>{t('login.title')}</h1>
-              <p>{t('login.loginSubtitle')}</p>
+        <div className="login-card glass-panel" style={{ maxWidth: '480px', width: '100%', position: 'relative', zIndex: 10 }}>
+          <div className="login-header">
+            <div className="logo-container" style={{ width: '100px', height: '100px', background: 'transparent', boxShadow: 'none' }}>
+              <img 
+                src={`${import.meta.env.BASE_URL}logo.webp`} 
+                alt="شعار المدارس" 
+                width="100"
+                height="100"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                }}
+                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} 
+              />
             </div>
+            <h1>{t('login.title')}</h1>
+            <p>{t('login.loginSubtitle')}</p>
+          </div>
 
-            <div className="role-selector" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', marginBottom: '20px' }}>
-              <button 
-                type="button"
-                className={`role-btn ${role === 'student' ? 'active' : ''}`}
-                onClick={() => { setRole('student'); setError(''); }}
-                style={{ padding: '8px 2px', fontSize: '12px' }}
-              >{t('login.roleStudent')}</button>
-              <button 
-                type="button"
-                className={`role-btn ${role === 'teacher' ? 'active' : ''}`}
-                onClick={() => { setRole('teacher'); setError(''); }}
-                style={{ padding: '8px 2px', fontSize: '12px' }}
-              >{t('login.roleTeacher')}</button>
-              <button 
-                type="button"
-                className={`role-btn ${role === 'parent' ? 'active' : ''}`}
-                onClick={() => { setRole('parent'); setError(''); }}
-                style={{ padding: '8px 2px', fontSize: '12px' }}
-              >{t('login.roleParent')}</button>
-              <button 
-                type="button"
-                className={`role-btn ${(role === 'staff' || role === 'supervisor') ? 'active' : ''}`}
-                onClick={() => { setRole('staff'); setError(''); }}
-                style={{ fontSize: '11px', padding: '8px 2px' }}
-              >وكيل / كادر</button>
-              <button 
-                type="button"
-                className={`role-btn ${role === 'admin' ? 'active' : ''}`}
-                onClick={() => { setRole('admin'); setError(''); }}
-                style={{ padding: '8px 2px', fontSize: '12px' }}
-              >{t('login.roleAdmin')}</button>
-            </div>
+          <div className="role-selector" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', marginBottom: '20px' }}>
+            <button 
+              type="button"
+              className={`role-btn ${role === 'student' ? 'active' : ''}`}
+              onClick={() => { setRole('student'); setIsSignup(false); setError(''); }}
+              style={{ padding: '8px 2px', fontSize: '12px' }}
+            >{t('login.roleStudent')}</button>
+            <button 
+              type="button"
+              className={`role-btn ${role === 'teacher' ? 'active' : ''}`}
+              onClick={() => { setRole('teacher'); setIsSignup(false); setError(''); }}
+              style={{ padding: '8px 2px', fontSize: '12px' }}
+            >{t('login.roleTeacher')}</button>
+            <button 
+              type="button"
+              className={`role-btn ${role === 'parent' ? 'active' : ''}`}
+              onClick={() => { setRole('parent'); setError(''); }}
+              style={{ padding: '8px 2px', fontSize: '12px' }}
+            >{t('login.roleParent')}</button>
+            <button 
+              type="button"
+              className={`role-btn ${(role === 'staff' || role === 'supervisor') ? 'active' : ''}`}
+              onClick={() => { setRole('staff'); setIsSignup(false); setError(''); }}
+              style={{ fontSize: '11px', padding: '8px 2px' }}
+            >وكيل / كادر</button>
+            <button 
+              type="button"
+              className={`role-btn ${role === 'admin' ? 'active' : ''}`}
+              onClick={() => { setRole('admin'); setIsSignup(false); setError(''); }}
+              style={{ padding: '8px 2px', fontSize: '12px' }}
+            >{t('login.roleAdmin')}</button>
+          </div>
 
-            {/* Login / Register Toggle Tabs */}
+          {/* Login / Register Toggle Tabs ONLY for Parent Role */}
+          {role === 'parent' && (
             <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: '20px' }}>
               <button 
                 type="button" 
@@ -489,6 +517,7 @@ export default function Login() {
                 {t('login.createAccount')}
               </button>
             </div>
+          )}
 
             {error && (
               <div className="error-message" style={{ marginBottom: '15px' }}>
@@ -624,7 +653,6 @@ export default function Login() {
             )}
           </div>
         </div>
-      </div>
     </main>
   );
 }

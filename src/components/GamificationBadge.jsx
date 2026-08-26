@@ -1,6 +1,33 @@
 import React, { useState } from 'react';
 import { Star, Award, Zap, Sparkles } from 'lucide-react';
 
+const SIZE_CONFIGS = {
+  xs: {
+    starSize: 11,
+    fontSize: '0.72rem',
+    padding: '1px 6px',
+    gap: '3px'
+  },
+  sm: {
+    starSize: 13,
+    fontSize: '0.78rem',
+    padding: '2px 8px',
+    gap: '4px'
+  },
+  md: {
+    starSize: 16,
+    fontSize: '0.88rem',
+    padding: '4px 12px',
+    gap: '6px'
+  },
+  lg: {
+    starSize: 22,
+    fontSize: '1.05rem',
+    padding: '8px 18px',
+    gap: '8px'
+  }
+};
+
 export default function GamificationBadge({
   points = 0,
   stars = 1,
@@ -21,32 +48,7 @@ export default function GamificationBadge({
   const starsArray = Array.from({ length: 5 }, (_, i) => i < starCount);
 
   // Size configurations
-  const config = {
-    xs: {
-      starSize: 11,
-      fontSize: '0.72rem',
-      padding: '1px 6px',
-      gap: '3px'
-    },
-    sm: {
-      starSize: 13,
-      fontSize: '0.78rem',
-      padding: '2px 8px',
-      gap: '4px'
-    },
-    md: {
-      starSize: 16,
-      fontSize: '0.88rem',
-      padding: '4px 12px',
-      gap: '6px'
-    },
-    lg: {
-      starSize: 22,
-      fontSize: '1.05rem',
-      padding: '8px 18px',
-      gap: '8px'
-    }
-  }[size] || config.sm;
+  const config = SIZE_CONFIGS[size] || SIZE_CONFIGS.sm;
 
   return (
     <div

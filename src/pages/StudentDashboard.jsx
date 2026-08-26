@@ -186,8 +186,8 @@ function StudentHome() {
                 المستوى والرتبة:
               </div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fef08a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>{activity.levelBadge}</span>
-                <span>{activity.levelTitle}</span>
+                <span>{activity?.levelBadge || '🥉'}</span>
+                <span>{activity?.levelTitle || 'طالب منطلق'}</span>
               </div>
             </div>
 
@@ -198,12 +198,12 @@ function StudentHome() {
                 النجوم والنقاط:
               </div>
               <GamificationBadge
-                points={activity.totalPoints}
-                stars={activity.stars}
+                points={activity?.totalPoints || 0}
+                stars={activity?.stars || 1}
                 size="md"
                 showStars={true}
                 showPoints={true}
-                breakdown={activity.breakdown}
+                breakdown={activity?.breakdown}
               />
             </div>
           </div>
@@ -221,10 +221,10 @@ function StudentHome() {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', fontWeight: 600 }}>
             <span style={{ color: '#fef08a', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Sparkles size={16} />
-              التقدم نحو النجمة / الرتبة التالية ({activity.nextLevel ? activity.nextLevel.title : 'أعلى رتبة ماسية 👑'})
+              التقدم نحو النجمة / الرتبة التالية ({activity?.nextLevel ? activity.nextLevel.title : 'أعلى رتبة ماسية 👑'})
             </span>
             <span style={{ color: '#e0e7ff' }}>
-              {activity.totalPoints} / {activity.nextLevel ? activity.nextLevel.minPoints : activity.totalPoints} نقطة
+              {activity?.totalPoints || 0} / {activity?.nextLevel ? activity.nextLevel.minPoints : (activity?.totalPoints || 0)} نقطة
             </span>
           </div>
 
@@ -236,7 +236,7 @@ function StudentHome() {
             overflow: 'hidden'
           }}>
             <div style={{
-              width: `${activity.progressToNext}%`,
+              width: `${activity?.progressToNext || 0}%`,
               height: '100%',
               background: 'linear-gradient(90deg, #eab308 0%, #facc15 100%)',
               borderRadius: '10px',

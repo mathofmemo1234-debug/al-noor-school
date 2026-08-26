@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
@@ -19,10 +20,11 @@ const SchoolExcellenceDashboard = lazy(() => import('./pages/SchoolExcellenceDas
 
 function App() {
   return (
-    <LanguageProvider>
-      <AuthProvider>
-        <Router>
-          <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <AuthProvider>
+          <Router>
+            <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}>
             <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
@@ -68,6 +70,7 @@ function App() {
         </Router>
       </AuthProvider>
     </LanguageProvider>
+  </ErrorBoundary>
   );
 }
 

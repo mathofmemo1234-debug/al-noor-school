@@ -1,5 +1,5 @@
 import Settings from './Settings';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Calendar, FileText, Users, X, Edit, Trash2, CheckSquare, Square, Plus, Save, Award, AlertCircle, CheckCircle, BarChart2, Clock, BookOpen, Eye, RotateCcw, Check } from 'lucide-react';
@@ -41,7 +41,14 @@ function TeacherTasks() {
     if (userData?.nationalId) {
       const q = query(collection(db, 'teachers'), where('nationalId', '==', userData.nationalId));
       const unsub = onSnapshot(q, snap => {
-        if (!snap.empty) setTeacherDocId(snap.docs[0].id);
+        if (!snap.empty) {
+          setTeacherDocId(snap.docs[0].id);
+        } else if (!isNaN(userData.nationalId)) {
+          const numQ = query(collection(db, 'teachers'), where('nationalId', '==', Number(userData.nationalId)));
+          getDocs(numQ).then(numSnap => {
+            if (!numSnap.empty) setTeacherDocId(numSnap.docs[0].id);
+          });
+        }
       });
       return () => unsub();
     }
@@ -53,8 +60,8 @@ function TeacherTasks() {
 
     // Preparations
     const qPrep = schoolId === 'ALL'
-      ? collection(db, 'lesson_preparations')
-      : query(collection(db, 'lesson_preparations'), where('schoolId', '==', schoolId));
+      ? collection(db, 'preparations')
+      : query(collection(db, 'preparations'), where('schoolId', '==', schoolId));
     const unsubPrep = onSnapshot(qPrep, snap => {
       setPreparations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -142,7 +149,7 @@ function TeacherTasks() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [userData]);
 
   const handleAddTask = async (e) => {
     e.preventDefault();
@@ -240,8 +247,8 @@ function TeacherTasks() {
                 رتبة التميز المهني:
               </div>
               <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fef08a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span>{teacherActivity.levelBadge}</span>
-                <span>{teacherActivity.levelTitle}</span>
+                <span>{teacherActivity?.levelBadge || '🌱'}</span>
+                <span>{teacherActivity?.levelTitle || 'معلم مبادر'}</span>
               </div>
             </div>
 
@@ -252,13 +259,13 @@ function TeacherTasks() {
                 النجوم والنقاط:
               </div>
               <GamificationBadge
-                points={teacherActivity.totalPoints}
-                stars={teacherActivity.stars}
+                points={teacherActivity?.totalPoints || 0}
+                stars={teacherActivity?.stars || 1}
                 size="md"
                 showStars={true}
                 showPoints={true}
                 isTeacher={true}
-                breakdown={teacherActivity.breakdown}
+                breakdown={teacherActivity?.breakdown}
               />
             </div>
           </div>
@@ -276,10 +283,10 @@ function TeacherTasks() {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', fontWeight: 600 }}>
             <span style={{ color: '#fef08a', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Sparkles size={15} />
-              التقدم نحو النجمة / الرتبة التالية ({teacherActivity.nextLevel ? teacherActivity.nextLevel.title : 'أعلى رتبة قيادية 👑'})
+              التقدم نحو النجمة / الرتبة التالية ({teacherActivity?.nextLevel ? teacherActivity.nextLevel.title : 'أعلى رتبة قيادية 👑'})
             </span>
             <span style={{ color: '#ccfbf1' }}>
-              {teacherActivity.totalPoints} / {teacherActivity.nextLevel ? teacherActivity.nextLevel.minPoints : teacherActivity.totalPoints} نقطة
+              {teacherActivity?.totalPoints || 0} / {teacherActivity?.nextLevel ? teacherActivity.nextLevel.minPoints : (teacherActivity?.totalPoints || 0)} نقطة
             </span>
           </div>
 
@@ -291,7 +298,7 @@ function TeacherTasks() {
             overflow: 'hidden'
           }}>
             <div style={{
-              width: `${teacherActivity.progressToNext}%`,
+              width: `${teacherActivity?.progressToNext || 0}%`,
               height: '100%',
               background: 'linear-gradient(90deg, #facc15 0%, #fef08a 100%)',
               borderRadius: '10px',
@@ -304,32 +311,32 @@ function TeacherTasks() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
           <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
             <span style={{ color: '#ccfbf1', display: 'block' }}>📖 التحاضير</span>
-            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.preparationsCount} درس</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.prepPoints} ن)</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity?.breakdown?.preparationsCount || 0} درس</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity?.breakdown?.prepPoints || 0} ن)</span>
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
             <span style={{ color: '#ccfbf1', display: 'block' }}>📅 الخطط الأسبوعية</span>
-            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.weeklyPlansCount} خطة</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.planPoints} ن)</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity?.breakdown?.weeklyPlansCount || 0} خطة</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity?.breakdown?.planPoints || 0} ن)</span>
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
             <span style={{ color: '#ccfbf1', display: 'block' }}>📝 الواجبات</span>
-            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.assignmentsCount} واجب</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.assignmentPoints} ن)</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity?.breakdown?.assignmentsCount || 0} واجب</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity?.breakdown?.assignmentPoints || 0} ن)</span>
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
             <span style={{ color: '#ccfbf1', display: 'block' }}>📋 الاختبارات</span>
-            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.examsCount} اختبار</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.examPoints} ن)</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity?.breakdown?.examsCount || 0} اختبار</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity?.breakdown?.examPoints || 0} ن)</span>
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
             <span style={{ color: '#ccfbf1', display: 'block' }}>👥 رصد الحضور</span>
-            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.attendanceSessionsCount} جلسة</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.attendancePoints} ن)</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity?.breakdown?.attendanceSessionsCount || 0} جلسة</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity?.breakdown?.attendancePoints || 0} ن)</span>
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.8rem' }}>
             <span style={{ color: '#ccfbf1', display: 'block' }}>📂 المواد الإثرائية</span>
-            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity.breakdown.materialsCount} ملف</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity.breakdown.materialPoints} ن)</span>
+            <strong style={{ fontSize: '0.95rem' }}>{teacherActivity?.breakdown?.materialsCount || 0} ملف</strong> <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>(+{teacherActivity?.breakdown?.materialPoints || 0} ن)</span>
           </div>
         </div>
       </div>
@@ -403,6 +410,12 @@ function WeeklyPlan() {
       const unsub = onSnapshot(query(collection(db, 'teachers'), where('nationalId', '==', userData.nationalId)), (snap) => {
         if (!snap.empty) {
           setTeacherDocId(snap.docs[0].id);
+        } else if (!isNaN(userData.nationalId)) {
+          const numQ = query(collection(db, 'teachers'), where('nationalId', '==', Number(userData.nationalId)));
+          getDocs(numQ).then(numSnap => {
+            if (!numSnap.empty) setTeacherDocId(numSnap.docs[0].id);
+            else setTeacherDocId(null);
+          });
         } else {
           setTeacherDocId(null);
         }
@@ -458,7 +471,7 @@ function WeeklyPlan() {
 
   // Fetch existing plan for selected class
   useEffect(() => {
-    if (!auth.currentUser || !selectedClass) {
+    if (!auth.currentUser || !selectedClass || !teacherDocId) {
       setPlan({});
       setPlanDocId(null);
       return;
@@ -479,7 +492,7 @@ function WeeklyPlan() {
       }
     });
     return () => unsub();
-  }, [selectedClass, selectedWeek]);
+  }, [selectedClass, selectedWeek, teacherDocId]);
 
   const handleChange = (day, field, value) => {
     setPlan(prev => ({
@@ -628,6 +641,15 @@ function Assignments() {
           setTeacherDocId(snap.docs[0].id);
           const subjStr = snap.docs[0].data().subject || '';
           setSubjectsList(subjStr.split('،').map(s => s.trim()).filter(Boolean));
+        } else if (!isNaN(userData.nationalId)) {
+          const numQ = query(collection(db, 'teachers'), where('nationalId', '==', Number(userData.nationalId)));
+          getDocs(numQ).then(numSnap => {
+            if (!numSnap.empty) {
+              setTeacherDocId(numSnap.docs[0].id);
+              const subjStr = numSnap.docs[0].data().subject || '';
+              setSubjectsList(subjStr.split('،').map(s => s.trim()).filter(Boolean));
+            }
+          });
         }
       });
       return () => unsub();
@@ -1327,6 +1349,11 @@ function Attendance() {
       const unsub = onSnapshot(q, snap => {
         if (!snap.empty) {
           setTeacherDocId(snap.docs[0].id);
+        } else if (!isNaN(userData.nationalId)) {
+          const numQ = query(collection(db, 'teachers'), where('nationalId', '==', Number(userData.nationalId)));
+          getDocs(numQ).then(numSnap => {
+            if (!numSnap.empty) setTeacherDocId(numSnap.docs[0].id);
+          });
         }
       });
       return () => unsub();

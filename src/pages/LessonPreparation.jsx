@@ -66,6 +66,12 @@ export default function LessonPreparation() {
       const unsub = onSnapshot(query(collection(db, 'teachers'), where('nationalId', '==', userData.nationalId)), (snap) => {
         if (!snap.empty) {
           setTeacherDocId(snap.docs[0].id);
+        } else if (!isNaN(userData.nationalId)) {
+          const numQ = query(collection(db, 'teachers'), where('nationalId', '==', Number(userData.nationalId)));
+          getDocs(numQ).then(numSnap => {
+            if (!numSnap.empty) setTeacherDocId(numSnap.docs[0].id);
+            else setTeacherDocId(null);
+          });
         } else {
           setTeacherDocId(null);
         }

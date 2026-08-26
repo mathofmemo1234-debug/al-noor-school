@@ -122,6 +122,15 @@ export default function TeacherExams() {
           setTeacherDocId(snap.docs[0].id);
           const subjStr = snap.docs[0].data().subject || '';
           setSubjectsList(subjStr.split('،').map(s => s.trim()).filter(Boolean));
+        } else if (!isNaN(userData.nationalId)) {
+          const numQ = query(collection(db, 'teachers'), where('nationalId', '==', Number(userData.nationalId)));
+          getDocs(numQ).then(numSnap => {
+            if (!numSnap.empty) {
+              setTeacherDocId(numSnap.docs[0].id);
+              const subjStr = numSnap.docs[0].data().subject || '';
+              setSubjectsList(subjStr.split('،').map(s => s.trim()).filter(Boolean));
+            }
+          });
         }
       });
       return () => unsub();

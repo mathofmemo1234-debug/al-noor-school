@@ -36,6 +36,13 @@ export default function MaterialsUpload() {
       const unsub = onSnapshot(q, (snap) => {
         if (!snap.empty) {
           setTeacherDocId(snap.docs[0].id);
+        } else if (!isNaN(userData.nationalId)) {
+          const numQ = schoolId === 'ALL'
+            ? query(collection(db, 'teachers'), where('nationalId', '==', Number(userData.nationalId)))
+            : query(collection(db, 'teachers'), where('nationalId', '==', Number(userData.nationalId)), where('schoolId', '==', schoolId));
+          getDocs(numQ).then(numSnap => {
+            if (!numSnap.empty) setTeacherDocId(numSnap.docs[0].id);
+          });
         }
       });
       return () => unsub();

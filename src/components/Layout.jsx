@@ -10,7 +10,7 @@ export default function Layout({ role, title, children }) {
     <div className="layout-container" style={{ position: 'relative' }}>
       <Sidebar role={role} />
       <div className="main-content">
-        <Header title={title} />
+        <Header title={title} role={role} />
         <div className="page-container">
           {children}
         </div>
