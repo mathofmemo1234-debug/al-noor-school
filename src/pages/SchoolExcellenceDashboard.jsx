@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 
 import ExcellencePermissionsModal from '../components/ExcellencePermissionsModal';
+import PrintExcellenceModal from '../components/PrintExcellenceModal';
 
 export default function SchoolExcellenceDashboard() {
   const { userData, userRole } = useAuth();
@@ -69,6 +70,7 @@ export default function SchoolExcellenceDashboard() {
   );
 
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   
   // Evidences store: { [indicatorId]: { description, targetGroup, linkUrl, fileName, fileData, fileType, docDate, isCompleted, teacherName, teacherId } }
   const [evidences, setEvidences] = useState({});
@@ -441,12 +443,12 @@ export default function SchoolExcellenceDashboard() {
             )}
 
             <button 
-              onClick={() => window.print()}
+              onClick={() => setShowPrintModal(true)}
               className="btn btn-primary"
               style={{ borderRadius: '12px', fontSize: '0.85rem' }}
             >
               <Printer size={18} />
-              <span>طباعة التقرير</span>
+              <span>معاينة وطباعة التقرير</span>
             </button>
           </div>
 
@@ -1008,6 +1010,17 @@ export default function SchoolExcellenceDashboard() {
         <ExcellencePermissionsModal
           schoolId={schoolId}
           onClose={() => setShowPermissionsModal(false)}
+        />
+      )}
+
+      {/* Print & Preview Modal */}
+      {showPrintModal && (
+        <PrintExcellenceModal
+          excellenceData={excellenceData}
+          evidences={evidences}
+          schoolName={SCHOOL_NAME}
+          userData={userData}
+          onClose={() => setShowPrintModal(false)}
         />
       )}
     </div>
