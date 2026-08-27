@@ -21,8 +21,8 @@ const SchoolExcellenceDashboard = lazy(() => import('./pages/SchoolExcellenceDas
 function App() {
   return (
     <ErrorBoundary>
-      <LanguageProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <LanguageProvider>
           <Router>
             <Suspense fallback={
               <div style={{
@@ -91,9 +91,9 @@ function App() {
             </Routes>
           </Suspense>
         </Router>
+        </LanguageProvider>
       </AuthProvider>
-    </LanguageProvider>
-  </ErrorBoundary>
+    </ErrorBoundary>
   );
 }
 

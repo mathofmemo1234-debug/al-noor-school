@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { Save, Upload, Image as ImageIcon, Mail, ShieldCheck, CheckSquare, Square, Users, FileText, Bell, Sparkles } from 'lucide-react';
+import { Save, Upload, Image as ImageIcon, Mail, ShieldCheck, CheckSquare, Square, Users, FileText, Bell, Sparkles, BookOpen, Globe } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ChangePassword from '../components/ChangePassword';
 import { useLanguage } from '../contexts/LanguageContext';
+import { detectCurriculumType, CURRICULUM_TYPES } from '../data/curriculumService';
 
 export default function SchoolSettings({ schoolId }) {
   const { t } = useLanguage();
@@ -12,7 +13,12 @@ export default function SchoolSettings({ schoolId }) {
   const [logoBase64, setLogoBase64] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingMsgSettings, setIsSavingMsgSettings] = useState(false);
+  const [isSavingCurriculum, setIsSavingCurriculum] = useState(false);
+  const [isSavingLang, setIsSavingLang] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [curriculumType, setCurriculumType] = useState(CURRICULUM_TYPES.SAUDI);
+  const [defaultLanguage, setDefaultLanguage] = useState('ar');
+  const [schoolName, setSchoolName] = useState('');
 
   // Messaging Permissions State (All enabled by default for open communication)
   const [msgSettings, setMsgSettings] = useState({
@@ -37,16 +43,41 @@ export default function SchoolSettings({ schoolId }) {
         if (d.exists()) {
           const data = d.data();
           if (data.logoUrl) setPreview(data.logoUrl);
+          if (data.name) setSchoolName(data.name);
           if (data.messagingSettings) {
             setMsgSettings(prev => ({ ...prev, ...data.messagingSettings }));
           }
+          if (data.curriculumType) {
+            setCurriculumType(data.curriculumType);
+          } else {
+            // Auto detect from school name
+            const detected = detectCurriculumType(data.name || userData?.schoolName);
+            setCurriculumType(detected);
+          }
+
+          if (data.defaultLanguage) {
+            setDefaultLanguage(data.defaultLanguage);
+          } else {
+            // Auto-detect: if contains 'عالمي' or 'international' -> 'en'
+            const isIntl = (data.name || userData?.schoolName || '').toLowerCase().includes('عالمي') ||
+              (data.name || userData?.schoolName || '').toLowerCase().includes('عالمية') ||
+              (data.name || userData?.schoolName || '').toLowerCase().includes('international') ||
+              (data.name || userData?.schoolName || '').toLowerCase().includes('american');
+            setDefaultLanguage(isIntl ? 'en' : 'ar');
+          }
+        } else {
+          const detected = detectCurriculumType(userData?.schoolName || '');
+          setCurriculumType(detected);
+          const isIntl = (userData?.schoolName || '').toLowerCase().includes('عالمي') ||
+            (userData?.schoolName || '').toLowerCase().includes('international');
+          setDefaultLanguage(isIntl ? 'en' : 'ar');
         }
       } catch (err) {
         console.error('Error fetching school settings:', err);
       }
     };
     fetchSchool();
-  }, [effectiveSchoolId]);
+  }, [effectiveSchoolId, userData]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -83,6 +114,38 @@ export default function SchoolSettings({ schoolId }) {
     }
   };
 
+  const handleSaveCurriculum = async () => {
+    if (!effectiveSchoolId) return;
+    setIsSavingCurriculum(true);
+    try {
+      await setDoc(doc(db, 'schools', effectiveSchoolId), {
+        curriculumType: curriculumType
+      }, { merge: true });
+      alert('✓ تم حفظ واعتماد نوع المنهج الدراسي للمجمع التعليمي بنجاح.');
+    } catch (error) {
+      console.error('Error saving curriculum settings:', error);
+      alert('حدث خطأ أثناء حفظ نوع المنهج، يرجى المحاولة مرة أخرى.');
+    } finally {
+      setIsSavingCurriculum(false);
+    }
+  };
+
+  const handleSaveLanguage = async () => {
+    if (!effectiveSchoolId) return;
+    setIsSavingLang(true);
+    try {
+      await setDoc(doc(db, 'schools', effectiveSchoolId), {
+        defaultLanguage: defaultLanguage
+      }, { merge: true });
+      alert('✓ تم حفظ واعتماد لغة واجهة النظام الافتراضية للمجمع بنجاح.');
+    } catch (error) {
+      console.error('Error saving language settings:', error);
+      alert('حدث خطأ أثناء حفظ إعدادات اللغة، يرجى المحاولة مرة أخرى.');
+    } finally {
+      setIsSavingLang(false);
+    }
+  };
+
   const handleSaveMessagingSettings = async () => {
     if (!effectiveSchoolId) return;
     setIsSavingMsgSettings(true);
@@ -105,6 +168,11 @@ export default function SchoolSettings({ schoolId }) {
       [key]: !prev[key]
     }));
   };
+
+  const isAutoDetectedInternational = (schoolName || userData?.schoolName || '').toLowerCase().includes('عالمي') ||
+    (schoolName || userData?.schoolName || '').toLowerCase().includes('عالمية') ||
+    (schoolName || userData?.schoolName || '').toLowerCase().includes('international') ||
+    (schoolName || userData?.schoolName || '').toLowerCase().includes('american');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '750px', margin: '0 auto' }}>
@@ -155,7 +223,251 @@ export default function SchoolSettings({ schoolId }) {
         </div>
       </div>
 
-      {/* 2. Messaging & Communication Policies (Admin / Director Level) */}
+      {/* 2. School Curriculum System Settings (Admin / Principal Level) */}
+      {isAdmin && (
+        <div className="glass-panel" style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white'
+              }}>
+                <BookOpen size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 2px 0', color: 'var(--color-primary-dark)', fontSize: '18px' }}>
+                  نظام ونوع المنهج الدراسي للمجمع (School Curriculum)
+                </h3>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                  تحديد المنهج المعتمد لتحضير الدروس، المقررات، والخطط الأسبوعية
+                </p>
+              </div>
+            </div>
+
+            {isAutoDetectedInternational && (
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 'bold',
+                color: '#0e7490',
+                background: 'rgba(14, 116, 144, 0.12)',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <Globe size={13} /> مجمع عالمي (منهج أمريكي معتمد)
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+            
+            {/* Option 1: Saudi National / Ahli */}
+            <div 
+              onClick={() => setCurriculumType(CURRICULUM_TYPES.SAUDI)}
+              style={{
+                border: curriculumType === CURRICULUM_TYPES.SAUDI ? '2px solid #0e7490' : '1px solid #e2e8f0',
+                background: curriculumType === CURRICULUM_TYPES.SAUDI ? '#f0fdfa' : 'white',
+                borderRadius: '12px',
+                padding: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '14px' }}>🇸🇦 المنهج الوطني والأهلي</span>
+                {curriculumType === CURRICULUM_TYPES.SAUDI ? <CheckSquare size={18} color="#0e7490" /> : <Square size={18} color="#94a3b8" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: '1.5' }}>
+                مناهج وزارة التعليم بالمملكة العربية السعودية المطورة (الابتدائي، المتوسط، مسارات الثانوي)
+              </p>
+            </div>
+
+            {/* Option 2: American International */}
+            <div 
+              onClick={() => setCurriculumType(CURRICULUM_TYPES.AMERICAN)}
+              style={{
+                border: curriculumType === CURRICULUM_TYPES.AMERICAN ? '2px solid #0e7490' : '1px solid #e2e8f0',
+                background: curriculumType === CURRICULUM_TYPES.AMERICAN ? '#f0fdfa' : 'white',
+                borderRadius: '12px',
+                padding: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '14px' }}>🇺🇸 المنهج الأمريكي (العالمي)</span>
+                {curriculumType === CURRICULUM_TYPES.AMERICAN ? <CheckSquare size={18} color="#0e7490" /> : <Square size={18} color="#94a3b8" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: '1.5' }}>
+                معايير المدارس العالمية (American Curriculum - CCSS & NGSS) لجميع المواد بالإنجليزية والعربية
+              </p>
+            </div>
+
+            {/* Option 3: Dual Track */}
+            <div 
+              onClick={() => setCurriculumType(CURRICULUM_TYPES.DUAL)}
+              style={{
+                border: curriculumType === CURRICULUM_TYPES.DUAL ? '2px solid #0e7490' : '1px solid #e2e8f0',
+                background: curriculumType === CURRICULUM_TYPES.DUAL ? '#f0fdfa' : 'white',
+                borderRadius: '12px',
+                padding: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '14px' }}>🌐 مسار ثنائي (وطني وعالمي)</span>
+                {curriculumType === CURRICULUM_TYPES.DUAL ? <CheckSquare size={18} color="#0e7490" /> : <Square size={18} color="#94a3b8" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: '1.5' }}>
+                إتاحة كلا المنهجين للمعلمين لاختيار المناسب حسب القسم والمسار المسند إليهم
+              </p>
+            </div>
+
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+            <button 
+              className="btn btn-primary" 
+              onClick={handleSaveCurriculum} 
+              disabled={isSavingCurriculum} 
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #0e7490, #63B2C6)', fontSize: '13px', fontWeight: 'bold' }}
+            >
+              <Save size={16} />
+              {isSavingCurriculum ? 'جاري الحفظ...' : 'حفظ واعتماد نوع المنهج'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. School Default Language Settings (Admin / Director Level) */}
+      {isAdmin && (
+        <div className="glass-panel" style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #0e7490, #63B2C6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white'
+              }}>
+                <Globe size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 2px 0', color: 'var(--color-primary-dark)', fontSize: '18px' }}>
+                  لغة واجهة النظام الافتراضية للمجمع (Default Complex Language)
+                </h3>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                  تحديد اللغة الرسمية الأساسية لواجهات النظام لكافة المعلمين والطلاب ومنسوبي المدرسة
+                </p>
+              </div>
+            </div>
+
+            {isAutoDetectedInternational && (
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 'bold',
+                color: '#0e7490',
+                background: 'rgba(14, 116, 144, 0.12)',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                ✨ مجمع عالمي ➔ الإنجليزية افتراضياً
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+            
+            {/* Arabic Language */}
+            <div 
+              onClick={() => setDefaultLanguage('ar')}
+              style={{
+                border: defaultLanguage === 'ar' ? '2px solid #0e7490' : '1px solid #e2e8f0',
+                background: defaultLanguage === 'ar' ? '#f0fdfa' : 'white',
+                borderRadius: '12px',
+                padding: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '14px' }}>🇸🇦 اللغة العربية (Arabic - RTL)</span>
+                {defaultLanguage === 'ar' ? <CheckSquare size={18} color="#0e7490" /> : <Square size={18} color="#94a3b8" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: '1.5' }}>
+                واجهة عربية متكاملة من اليمين لليسار، مثالية للمدارس الأهلية والوطنية
+              </p>
+            </div>
+
+            {/* English Language */}
+            <div 
+              onClick={() => setDefaultLanguage('en')}
+              style={{
+                border: defaultLanguage === 'en' ? '2px solid #0e7490' : '1px solid #e2e8f0',
+                background: defaultLanguage === 'en' ? '#f0fdfa' : 'white',
+                borderRadius: '12px',
+                padding: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '14px' }}>🇺🇸 English (الإنجليزية - LTR)</span>
+                {defaultLanguage === 'en' ? <CheckSquare size={18} color="#0e7490" /> : <Square size={18} color="#94a3b8" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: '1.5' }}>
+                Full English interface (Left-to-Right), optimal for International & American Curriculum Schools
+              </p>
+            </div>
+
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+            <button 
+              className="btn btn-primary" 
+              onClick={handleSaveLanguage} 
+              disabled={isSavingLang} 
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #0e7490, #63B2C6)', fontSize: '13px', fontWeight: 'bold' }}
+            >
+              <Save size={16} />
+              {isSavingLang ? 'جاري الحفظ...' : 'حفظ واعتماد لغة المجمع'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Messaging & Communication Policies (Admin / Director Level) */}
       {isAdmin && (
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>

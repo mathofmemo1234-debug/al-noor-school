@@ -113,10 +113,17 @@ export default function AdminPreparations({ schoolId }) {
               <div style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>
-                    {t('adminPreparations.classPrefix')} {p.className} - {t('adminPreparations.subjectPrefix')} {p.subject}
+                    {p.lessonTitle ? `${p.lessonTitle} - ` : ''}{t('adminPreparations.classPrefix')} {p.className} - {t('adminPreparations.subjectPrefix')} {p.subject}
                   </h3>
-                  <div style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '8px' }}>
-                    {t('adminPreparations.teacherPrefix')} {p.teacherName || teachersList[p.teacherId] || teachersList[p.teacherNationalId] || p.teacherEmail}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
+                    {p.semester && (
+                      <span style={{ background: '#f1f5f9', color: '#0e7490', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                        {p.semester}
+                      </span>
+                    )}
+                    <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                      {t('adminPreparations.teacherPrefix')} {p.teacherName || teachersList[p.teacherId] || teachersList[p.teacherNationalId] || p.teacherEmail}
+                    </span>
                   </div>
                 </div>
                 <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>

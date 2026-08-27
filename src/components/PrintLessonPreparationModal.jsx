@@ -184,6 +184,12 @@ export default function PrintLessonPreparationModal({ prep, onClose }) {
             marginBottom: '24px',
             fontSize: '13px'
           }}>
+            {prep.lessonTitle && (
+              <div style={{ gridColumn: '1 / -1', borderBottom: '1px dashed #cbd5e1', paddingBottom: '8px', marginBottom: '4px' }}>
+                <span style={{ color: '#64748b' }}>عنوان وموضوع الدرس:</span>
+                <div style={{ fontWeight: 'bold', color: '#0e7490', fontSize: '16px' }}>{prep.lessonTitle}</div>
+              </div>
+            )}
             <div>
               <span style={{ color: '#64748b' }}>المادة الدراسية:</span>
               <div style={{ fontWeight: 'bold', color: '#0e7490', fontSize: '15px' }}>{prep.subject}</div>
@@ -191,6 +197,10 @@ export default function PrintLessonPreparationModal({ prep, onClose }) {
             <div>
               <span style={{ color: '#64748b' }}>الصف / الفصل:</span>
               <div style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '15px' }}>{prep.className}</div>
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>الفصل الدراسي:</span>
+              <div style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '14px' }}>{prep.semester || 'الفصل الدراسي الأول'}</div>
             </div>
             <div>
               <span style={{ color: '#64748b' }}>اسم المعلم:</span>
