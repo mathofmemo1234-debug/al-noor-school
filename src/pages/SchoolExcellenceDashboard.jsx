@@ -199,12 +199,24 @@ export default function SchoolExcellenceDashboard() {
   };
 
   // Calculate overall stats
-  const totalIndicatorsCount = 54;
+  const totalIndicatorsCount = useMemo(() => {
+    return excellenceData.reduce((acc, d) => acc + d.criteria.reduce((cAcc, c) => cAcc + c.indicators.length, 0), 0);
+  }, []);
+  const officialCount = useMemo(() => {
+    let cnt = 0;
+    excellenceData.forEach(d => d.criteria.forEach(c => c.indicators.forEach(i => { if (i.isOfficial) cnt++; })));
+    return cnt;
+  }, []);
+  const reserveCount = useMemo(() => {
+    let cnt = 0;
+    excellenceData.forEach(d => d.criteria.forEach(c => c.indicators.forEach(i => { if (i.isReserve) cnt++; })));
+    return cnt;
+  }, []);
   const completedCount = useMemo(() => {
     return Object.values(evidences).filter(item => item && item.isCompleted).length;
   }, [evidences]);
   
-  const completionPercentage = Math.round((completedCount / totalIndicatorsCount) * 100);
+  const completionPercentage = totalIndicatorsCount > 0 ? Math.round((completedCount / totalIndicatorsCount) * 100) : 0;
 
   // Handle search & expansion
   useEffect(() => {
@@ -222,6 +234,7 @@ export default function SchoolExcellenceDashboard() {
           if (
             ind.title.toLowerCase().includes(queryStr) ||
             ind.description.toLowerCase().includes(queryStr) ||
+            (ind.code && ind.code.toLowerCase().includes(queryStr)) ||
             `مؤشر ${ind.id}`.includes(queryStr)
           ) {
             criteriaMatches = true;
@@ -380,20 +393,36 @@ export default function SchoolExcellenceDashboard() {
           </div>
 
           {/* Quick Stat Badges */}
-          <div style={{ display: 'flex', itemsCenter: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ background: 'rgba(99, 178, 198, 0.1)', border: '1px solid rgba(99, 178, 198, 0.25)', borderRadius: '14px', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Layers size={20} color="var(--color-primary-dark)" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ background: 'rgba(99, 178, 198, 0.1)', border: '1px solid rgba(99, 178, 198, 0.25)', borderRadius: '14px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Layers size={18} color="var(--color-primary-dark)" />
               <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block' }}>إجمالي المؤشرات</span>
-                <strong style={{ fontSize: '1.1rem', color: 'var(--color-primary-dark)' }}>{totalIndicatorsCount}</strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', display: 'block' }}>إجمالي المؤشرات</span>
+                <strong style={{ fontSize: '1rem', color: 'var(--color-primary-dark)' }}>{totalIndicatorsCount}</strong>
               </div>
             </div>
 
-            <div style={{ background: 'rgba(180, 211, 150, 0.2)', border: '1px solid rgba(154, 191, 120, 0.4)', borderRadius: '14px', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <CheckCircle2 size={20} color="var(--color-secondary-dark)" />
+            <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '14px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Award size={18} color="#2563eb" />
               <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block' }}>المؤشرات المكتملة</span>
-                <strong style={{ fontSize: '1.1rem', color: 'var(--color-secondary-dark)' }}>{completedCount} ({completionPercentage}%)</strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', display: 'block' }}>المعتمدة الرسمية</span>
+                <strong style={{ fontSize: '1rem', color: '#2563eb' }}>{officialCount}</strong>
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '14px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={18} color="#d97706" />
+              <div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', display: 'block' }}>المساندة الاحتياطية</span>
+                <strong style={{ fontSize: '1rem', color: '#d97706' }}>{reserveCount}</strong>
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(180, 211, 150, 0.2)', border: '1px solid rgba(154, 191, 120, 0.4)', borderRadius: '14px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={18} color="var(--color-secondary-dark)" />
+              <div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', display: 'block' }}>المكتملة</span>
+                <strong style={{ fontSize: '1rem', color: 'var(--color-secondary-dark)' }}>{completedCount} ({completionPercentage}%)</strong>
               </div>
             </div>
           </div>
@@ -470,11 +499,11 @@ export default function SchoolExcellenceDashboard() {
           </div>
 
           {/* Filter Status Tabs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: 'rgba(0,0,0,0.04)', padding: '4px', borderRadius: '12px', fontSize: '0.8rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', background: 'rgba(0,0,0,0.04)', padding: '4px', borderRadius: '12px', fontSize: '0.75rem' }}>
             <button
               onClick={() => setFilterStatus('all')}
               style={{
-                padding: '6px',
+                padding: '6px 2px',
                 borderRadius: '8px',
                 border: 'none',
                 background: filterStatus === 'all' ? 'var(--color-primary)' : 'transparent',
@@ -486,9 +515,37 @@ export default function SchoolExcellenceDashboard() {
               الكل ({totalIndicatorsCount})
             </button>
             <button
+              onClick={() => setFilterStatus('official')}
+              style={{
+                padding: '6px 2px',
+                borderRadius: '8px',
+                border: 'none',
+                background: filterStatus === 'official' ? '#2563eb' : 'transparent',
+                color: filterStatus === 'official' ? '#fff' : 'var(--color-text-muted)',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              المعتمدة ({officialCount})
+            </button>
+            <button
+              onClick={() => setFilterStatus('reserve')}
+              style={{
+                padding: '6px 2px',
+                borderRadius: '8px',
+                border: 'none',
+                background: filterStatus === 'reserve' ? '#d97706' : 'transparent',
+                color: filterStatus === 'reserve' ? '#fff' : 'var(--color-text-muted)',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              الاحتياطية ({reserveCount})
+            </button>
+            <button
               onClick={() => setFilterStatus('completed')}
               style={{
-                padding: '6px',
+                padding: '6px 2px',
                 borderRadius: '8px',
                 border: 'none',
                 background: filterStatus === 'completed' ? 'var(--color-secondary-dark)' : 'transparent',
@@ -502,7 +559,8 @@ export default function SchoolExcellenceDashboard() {
             <button
               onClick={() => setFilterStatus('pending')}
               style={{
-                padding: '6px',
+                padding: '6px 2px',
+                gridColumn: 'span 2',
                 borderRadius: '8px',
                 border: 'none',
                 background: filterStatus === 'pending' ? 'rgba(99, 178, 198, 0.2)' : 'transparent',
@@ -630,11 +688,14 @@ export default function SchoolExcellenceDashboard() {
                                     const isDone = evidences[ind.id]?.isCompleted;
                                     if (filterStatus === 'completed') return isDone;
                                     if (filterStatus === 'pending') return !isDone;
+                                    if (filterStatus === 'official') return ind.isOfficial;
+                                    if (filterStatus === 'reserve') return ind.isReserve;
                                     if (searchQuery.trim()) {
                                       const q = searchQuery.toLowerCase();
                                       return (
                                         ind.title.toLowerCase().includes(q) ||
                                         ind.description.toLowerCase().includes(q) ||
+                                        (ind.code && ind.code.toLowerCase().includes(q)) ||
                                         `مؤشر ${ind.id}`.includes(q)
                                       );
                                     }
@@ -671,7 +732,14 @@ export default function SchoolExcellenceDashboard() {
                                             <Clock size={14} color="#94a3b8" />
                                           )}
                                         </div>
-                                        <span style={{ flex: 1, lineHeight: '1.4' }}>{ind.title}</span>
+                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                          <span style={{ lineHeight: '1.4' }}>{ind.title}</span>
+                                          {ind.isReserve && (
+                                            <span style={{ alignSelf: 'flex-start', fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                              احتياطي مساند
+                                            </span>
+                                          )}
+                                        </div>
                                       </button>
                                     );
                                   })}
@@ -708,7 +776,17 @@ export default function SchoolExcellenceDashboard() {
                     {selectedIndicator.title}
                   </h2>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {selectedIndicator.isReserve ? (
+                      <span style={{ fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', border: '1px solid rgba(245, 158, 11, 0.4)', padding: '3px 10px', borderRadius: '12px', fontWeight: 'bold' }}>
+                        مؤشر مساند احتياطي ⭐
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', background: 'rgba(99, 178, 198, 0.15)', color: 'var(--color-primary-dark)', border: '1px solid rgba(99, 178, 198, 0.4)', padding: '3px 10px', borderRadius: '12px', fontWeight: 'bold' }}>
+                        مؤشر رسمي معتمد (56) 🎖️
+                      </span>
+                    )}
+
                     {canEditSelectedIndicator ? (
                       <span style={{ fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '3px 10px', borderRadius: '12px', fontWeight: 'bold' }}>
                         مسموح بالتحرير ✍️
