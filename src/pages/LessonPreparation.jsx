@@ -6,7 +6,7 @@ import MarkdownViewer from '../components/MarkdownViewer';
 import { 
   Save, UploadCloud, Eye, Edit, Trash2, X, Image as ImageIcon, Loader, 
   Printer, BookOpen, Target, Sparkles, CheckSquare, Square, Plus, 
-  Layers, CheckCircle2, Globe, HelpCircle, Compass
+  Layers, CheckCircle2, Globe, HelpCircle, Compass, GraduationCap
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import MarkdownInput from '../components/MarkdownInput';
@@ -15,6 +15,9 @@ import PrintLessonPreparationModal from '../components/PrintLessonPreparationMod
 import { 
   SEMESTERS, 
   CURRICULUM_TYPES, 
+  SAUDI_STAGES,
+  AMERICAN_STAGES,
+  detectStageFromClassName,
   detectCurriculumType, 
   getCurriculumData, 
   getAvailableCurriculumSubjects,
@@ -53,32 +56,34 @@ export default function LessonPreparation() {
   // Step 1: Semester (2 Semesters only)
   const [selectedSemester, setSelectedSemester] = useState(SEMESTERS[0]);
 
-  // Step 2: Class & Subject
+  // Step 2: Educational Stage (Strict Separation)
+  const [selectedStage, setSelectedStage] = useState(SAUDI_STAGES.SECONDARY);
+
+  // Step 3: Class & Subject
   const [classesList, setClassesList] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [subjects, setSubjects] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState('');
   const [teacherDocId, setTeacherDocId] = useState(null);
 
-  // Step 3: Lesson Selection
+  // Step 4: Lesson Selection (Strictly segregated by stage and grade)
   const [availableLessons, setAvailableLessons] = useState([]);
   const [selectedLesson, setSelectedLesson] = useState('');
   const [isCustomLesson, setIsCustomLesson] = useState(false);
   const [customLessonTitle, setCustomLessonTitle] = useState('');
 
-  // Step 4: Objectives (Curriculum auto-loaded + Custom manual additions)
+  // Step 5: Objectives (Curriculum auto-loaded + Custom manual additions)
   const [lessonObjectives, setLessonObjectives] = useState([]);
   const [selectedObjectives, setSelectedObjectives] = useState([]);
   const [customObjectives, setCustomObjectives] = useState([]);
   const [newGoalInput, setNewGoalInput] = useState('');
 
-  // Step 5: Teaching Strategies (Popular list + Custom manual additions)
+  // Step 6: Teaching Strategies (Popular list + Custom manual additions)
   const [selectedStrategies, setSelectedStrategies] = useState([]);
   const [customStrategies, setCustomStrategies] = useState([]);
   const [newStrategyInput, setNewStrategyInput] = useState('');
-  const [strategyCategoryFilter, setStrategyCategoryFilter] = useState('ALL');
 
-  // Step 6: Dates, Period, Weeks
+  // Step 7: Dates, Period, Weeks
   const [weeks] = useState(Array.from({length: 18}, (_, i) => `الأسبوع ${i + 1}`));
   const [selectedWeek, setSelectedWeek] = useState('الأسبوع 1');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -119,10 +124,12 @@ export default function LessonPreparation() {
           const detected = detectCurriculumType(sData.name || userData?.schoolName, sData.curriculumType);
           setCurriculumType(detected);
           setIsInternationalSchool(detected === CURRICULUM_TYPES.AMERICAN || (sData.name || '').includes('عالمي'));
+          setSelectedStage(detected === CURRICULUM_TYPES.AMERICAN ? AMERICAN_STAGES.HIGH : SAUDI_STAGES.SECONDARY);
         } else {
           const detected = detectCurriculumType(userData?.schoolName || '');
           setCurriculumType(detected);
           setIsInternationalSchool(detected === CURRICULUM_TYPES.AMERICAN);
+          setSelectedStage(detected === CURRICULUM_TYPES.AMERICAN ? AMERICAN_STAGES.HIGH : SAUDI_STAGES.SECONDARY);
         }
       } catch (err) {
         console.error('Error fetching school:', err);
@@ -165,7 +172,15 @@ export default function LessonPreparation() {
     return () => unsub();
   }, [teacherDocId, userData]);
 
-  // 4. Fetch available classes and subjects for this teacher
+  // 4. Detect Stage when Class changes
+  useEffect(() => {
+    if (selectedClass) {
+      const detected = detectStageFromClassName(selectedClass, curriculumType);
+      setSelectedStage(detected);
+    }
+  }, [selectedClass, curriculumType]);
+
+  // 5. Fetch available classes and subjects for this teacher strictly for the stage
   useEffect(() => {
     const schoolId = userData?.schoolId || 'default_school_1';
     const qClasses = schoolId === 'ALL'
@@ -200,12 +215,12 @@ export default function LessonPreparation() {
           userData.subject.split(/[,،]/).map(s => s.trim()).filter(Boolean).forEach(s => mySubjects.add(s));
         }
 
-        // Also add curriculum standard subjects for this semester
-        const currSubjects = getAvailableCurriculumSubjects(curriculumType, selectedSemester);
+        // Add curriculum standard subjects STRICTLY for this stage and semester
+        const currSubjects = getAvailableCurriculumSubjects(curriculumType, selectedSemester, selectedClass, selectedStage);
         currSubjects.forEach(s => mySubjects.add(s));
 
         const finalClasses = myClassNames.size > 0 ? Array.from(myClassNames) : allClassNames;
-        const finalSubjects = mySubjects.size > 0 ? Array.from(mySubjects) : currSubjects;
+        const finalSubjects = Array.from(mySubjects);
 
         setClassesList(finalClasses);
         setSubjects(finalSubjects);
@@ -213,16 +228,16 @@ export default function LessonPreparation() {
         if (finalClasses.length > 0 && !selectedClass) {
           setSelectedClass(finalClasses[0]);
         }
-        if (finalSubjects.length > 0 && !selectedSubject) {
+        if (finalSubjects.length > 0 && (!selectedSubject || !finalSubjects.includes(selectedSubject))) {
           setSelectedSubject(finalSubjects[0]);
         }
       });
       return () => unsubSchedules();
     });
     return () => unsubClasses();
-  }, [teacherDocId, userData, userData?.schoolId, curriculumType, selectedSemester, selectedClass, selectedSubject]);
+  }, [teacherDocId, userData, userData?.schoolId, curriculumType, selectedSemester, selectedClass, selectedStage, selectedSubject]);
 
-  // 5. Fetch available periods based on selected class and subject
+  // 6. Fetch available periods based on selected class and subject
   useEffect(() => {
     if (!selectedClass || !selectedSubject) {
       setAvailablePeriods(DEFAULT_PERIODS);
@@ -267,7 +282,7 @@ export default function LessonPreparation() {
     return () => unsubClasses();
   }, [teacherDocId, selectedClass, selectedSubject]);
 
-  // 6. Update Available Lessons when Semester, Subject, or Curriculum changes
+  // 7. Update Available Lessons STRICTLY filtered by Stage, Grade, Semester, and Subject
   useEffect(() => {
     if (!selectedSubject) {
       setAvailableLessons([]);
@@ -276,25 +291,24 @@ export default function LessonPreparation() {
       return;
     }
 
-    const lessons = getLessonsForSubject(curriculumType, selectedSemester, selectedSubject, selectedClass);
+    const lessons = getLessonsForSubject(curriculumType, selectedSemester, selectedSubject, selectedClass, selectedStage);
     setAvailableLessons(lessons);
 
     if (lessons.length > 0) {
-      // Pick first lesson by default if none selected or not in list
       const matched = lessons.find(l => l.lesson === selectedLesson || l.displayTitle === selectedLesson);
       if (!matched && !isCustomLesson) {
         setSelectedLesson(lessons[0].displayTitle);
         setLessonObjectives(lessons[0].objectives);
-        setSelectedObjectives(lessons[0].objectives); // Select all by default
+        setSelectedObjectives(lessons[0].objectives);
       } else if (matched) {
         setLessonObjectives(matched.objectives);
       }
     } else {
       setLessonObjectives([]);
     }
-  }, [curriculumType, selectedSemester, selectedSubject, selectedClass, isCustomLesson, selectedLesson]);
+  }, [curriculumType, selectedSemester, selectedSubject, selectedClass, selectedStage, isCustomLesson, selectedLesson]);
 
-  // 7. Handle Lesson Selection Change
+  // 8. Handle Lesson Selection Change
   const handleLessonChange = (e) => {
     const val = e.target.value;
     if (val === '__CUSTOM__') {
@@ -308,7 +322,7 @@ export default function LessonPreparation() {
       const found = availableLessons.find(l => l.displayTitle === val || l.lesson === val);
       if (found) {
         setLessonObjectives(found.objectives);
-        setSelectedObjectives(found.objectives); // auto-select objectives for this lesson
+        setSelectedObjectives(found.objectives);
       } else {
         setLessonObjectives([]);
         setSelectedObjectives([]);
@@ -316,7 +330,7 @@ export default function LessonPreparation() {
     }
   };
 
-  // 8. Auto-Sync Goals Markdown whenever selectedObjectives or customObjectives change
+  // 9. Auto-Sync Goals Markdown whenever selectedObjectives or customObjectives change
   useEffect(() => {
     const md = formatGoalsToMarkdown(selectedObjectives, customObjectives);
     if (md) {
@@ -324,7 +338,7 @@ export default function LessonPreparation() {
     }
   }, [selectedObjectives, customObjectives]);
 
-  // 9. Auto-Sync Strategies Markdown whenever selectedStrategies or customStrategies change
+  // 10. Auto-Sync Strategies Markdown whenever selectedStrategies or customStrategies change
   useEffect(() => {
     const md = formatStrategiesToMarkdown(selectedStrategies, customStrategies);
     if (md) {
@@ -374,7 +388,7 @@ export default function LessonPreparation() {
     setCustomStrategies(prev => prev.filter((_, i) => i !== index));
   };
 
-  // 10. Fetch existing prep if matching class, subject, week, and period
+  // 11. Fetch existing prep if matching class, subject, week, and period
   useEffect(() => {
     if (!teacherDocId || !selectedClass || !selectedSubject || !selectedWeek || !selectedPeriod) {
       return;
@@ -391,6 +405,7 @@ export default function LessonPreparation() {
       if (!snapshot.empty) {
         const data = snapshot.docs[0].data();
         if (data.semester) setSelectedSemester(data.semester);
+        if (data.stage) setSelectedStage(data.stage);
         if (data.lessonTitle) {
           setSelectedLesson(data.lessonTitle);
           setCustomLessonTitle(data.lessonTitle);
@@ -431,10 +446,10 @@ export default function LessonPreparation() {
       const url = await getDownloadURL(storageRef);
       setFileUrl(url);
       setFileName(file.name);
-      alert(t('lessonPreparation.uploadSuccess') || 'تم رفع المرفق بنجاح!');
+      alert('✓ تم رفع المرفق بنجاح!');
     } catch (error) {
       console.error('Upload Error:', error);
-      alert(t('lessonPreparation.uploadFail') || 'حدث خطأ أثناء رفع الملف');
+      alert('حدث خطأ أثناء رفع الملف');
     } finally {
       setIsUploading(false);
     }
@@ -442,9 +457,9 @@ export default function LessonPreparation() {
 
   // Handle Save Preparation
   const handleSave = async () => {
-    if (!auth.currentUser) return alert(t('lessonPreparation.mustLogin') || 'يرجى تسجيل الدخول');
-    if (!selectedClass || !selectedSubject) return alert(t('lessonPreparation.mustSelectClassSubj') || 'يرجى اختيار الفصل والمادة');
-    if (!selectedPeriod) return alert(t('lessonPreparation.mustSelectPeriod') || 'يرجى اختيار الحصة');
+    if (!auth.currentUser) return alert('يرجى تسجيل الدخول');
+    if (!selectedClass || !selectedSubject) return alert('يرجى اختيار الفصل والمادة');
+    if (!selectedPeriod) return alert('يرجى اختيار الحصة');
     
     setIsSaving(true);
     try {
@@ -459,6 +474,7 @@ export default function LessonPreparation() {
         teacherEmail: auth.currentUser.email,
         schoolId: userData?.schoolId || 'default_school_1',
         curriculumType: curriculumType,
+        stage: selectedStage,
         semester: selectedSemester,
         className: selectedClass,
         subject: selectedSubject,
@@ -490,10 +506,10 @@ export default function LessonPreparation() {
         const docRef = await addDoc(collection(db, 'preparations'), payload);
         setPrepDocId(docRef.id);
       }
-      alert('✓ تم حفظ واعتماد بطاقة تحضير الدرس بنجاح!');
+      alert('✓ تم حفظ واعتماد بطاقة تحضير الدرس بدقة بنجاح!');
     } catch (error) {
       console.error("Error saving prep:", error);
-      alert(t('lessonPreparation.saveFail') || 'حدث خطأ أثناء حفظ التحضير');
+      alert('حدث خطأ أثناء حفظ التحضير');
     } finally {
       setIsSaving(false);
     }
@@ -501,13 +517,13 @@ export default function LessonPreparation() {
 
   // Handle Delete
   const handleDelete = async (id) => {
-    if (window.confirm(t('lessonPreparation.confirmDelete') || 'هل أنت متأكد من حذف هذا التحضير؟')) {
+    if (window.confirm('هل أنت متأكد من حذف هذا التحضير نهائياً؟')) {
       try {
         await deleteDoc(doc(db, 'preparations', id));
-        alert(t('lessonPreparation.deleteSuccess') || 'تم حذف التحضير بنجاح');
+        alert('تم حذف التحضير بنجاح');
       } catch (err) {
         console.error(err);
-        alert(t('lessonPreparation.deleteFail') || 'حدث خطأ أثناء الحذف');
+        alert('حدث خطأ أثناء الحذف');
       }
     }
   };
@@ -515,6 +531,7 @@ export default function LessonPreparation() {
   // Handle Edit from List
   const handleEdit = (prep) => {
     if (prep.semester) setSelectedSemester(prep.semester);
+    if (prep.stage) setSelectedStage(prep.stage);
     setSelectedClass(prep.className);
     setSelectedSubject(prep.subject);
     setSelectedWeek(prep.week);
@@ -547,6 +564,10 @@ export default function LessonPreparation() {
     setActiveTab('form');
   };
 
+  const availableStages = curriculumType === CURRICULUM_TYPES.AMERICAN
+    ? [AMERICAN_STAGES.ELEMENTARY, AMERICAN_STAGES.MIDDLE, AMERICAN_STAGES.HIGH]
+    : [SAUDI_STAGES.PRIMARY, SAUDI_STAGES.INTERMEDIATE, SAUDI_STAGES.SECONDARY];
+
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
       
@@ -565,7 +586,7 @@ export default function LessonPreparation() {
             }}
             onClick={() => setActiveTab('form')}
           >
-            <Edit size={17} /> {t('lessonPreparation.addEditPrep') || 'إعداد وتعديل التحضير'}
+            <Edit size={17} /> إعداد وتعديل التحضير
           </button>
           <button 
             className={`btn ${activeTab === 'list' ? 'btn-primary' : ''}`}
@@ -579,7 +600,7 @@ export default function LessonPreparation() {
             }}
             onClick={() => setActiveTab('list')}
           >
-            <BookOpen size={17} /> {t('lessonPreparation.prepRecord') || 'سجل التحاضير السابقة'} ({allPreparations.length})
+            <BookOpen size={17} /> سجل التحاضير السابقة ({allPreparations.length})
           </button>
         </div>
 
@@ -630,51 +651,91 @@ export default function LessonPreparation() {
       </div>
 
       {activeTab === 'form' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* STEP 1: Semester Selection (2 Semesters only) */}
+          {/* STEP 1: Semester & Stage Selection */}
           <div style={{
             background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
             border: '1px solid #cbd5e1',
             borderRadius: '14px',
             padding: '18px 24px',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
+            flexDirection: 'column',
             gap: '16px'
           }}>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0e7490', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <Compass size={18} /> الخطوة 1: تحديد الفصل الدراسي (فصلين دراسيين معتمدين)
+            {/* 1.1 Semester Selection (2 Semesters only) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0e7490', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                  <Compass size={18} /> الخطوة 1: الفصل الدراسي (نظام الفصلين الدراسيين المعتمد)
+                </div>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                  اختر الفصل الدراسي الأول أو الثاني
+                </p>
               </div>
-              <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
-                اختر الفصل الدراسي لتحميل المناهج والدروس والأهداف المعتمدة المناسبة
-              </p>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {SEMESTERS.map(sem => (
+                  <button
+                    key={sem}
+                    type="button"
+                    onClick={() => setSelectedSemester(sem)}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '8px',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      border: selectedSemester === sem ? '2px solid #0e7490' : '1px solid #cbd5e1',
+                      background: selectedSemester === sem ? 'linear-gradient(135deg, #0e7490, #63B2C6)' : 'white',
+                      color: selectedSemester === sem ? 'white' : '#334155',
+                      boxShadow: selectedSemester === sem ? '0 4px 12px rgba(14, 116, 144, 0.25)' : 'none'
+                    }}
+                  >
+                    {sem}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {SEMESTERS.map(sem => (
-                <button
-                  key={sem}
-                  type="button"
-                  onClick={() => setSelectedSemester(sem)}
-                  style={{
-                    padding: '8px 20px',
-                    borderRadius: '8px',
-                    fontWeight: 'bold',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    border: selectedSemester === sem ? '2px solid #0e7490' : '1px solid #cbd5e1',
-                    background: selectedSemester === sem ? 'linear-gradient(135deg, #0e7490, #63B2C6)' : 'white',
-                    color: selectedSemester === sem ? 'white' : '#334155',
-                    boxShadow: selectedSemester === sem ? '0 4px 12px rgba(14, 116, 144, 0.25)' : 'none'
-                  }}
-                >
-                  {sem}
-                </button>
-              ))}
+            {/* 1.2 Stage Selection (Strict Separation) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                  <GraduationCap size={18} color="#0e7490" /> المرحلة التعليمية (فصل تام للمناهج والدروس)
+                </div>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                  تُحدد تلقائياً بحسب الصف أو يمكنك اختيارها لعرض الدروس المتطابقة تماماً مع مرحلتك
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {availableStages.map(stg => {
+                  const isSelected = selectedStage === stg;
+                  return (
+                    <button
+                      key={stg}
+                      type="button"
+                      onClick={() => setSelectedStage(stg)}
+                      style={{
+                        padding: '6px 16px',
+                        borderRadius: '20px',
+                        fontWeight: 'bold',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        border: isSelected ? '2px solid #0e7490' : '1px solid #cbd5e1',
+                        background: isSelected ? '#0e7490' : 'white',
+                        color: isSelected ? 'white' : '#475569',
+                        boxShadow: isSelected ? '0 2px 8px rgba(14, 116, 144, 0.25)' : 'none'
+                      }}
+                    >
+                      {isSelected ? '✓ ' : ''}{stg}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -703,7 +764,7 @@ export default function LessonPreparation() {
                   value={selectedClass} 
                   onChange={(e) => setSelectedClass(e.target.value)}
                 >
-                  <option value="">{t('lessonPreparation.selectClass') || 'اختر الفصل...'}</option>
+                  <option value="">اختر الفصل...</option>
                   {classesList.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
@@ -719,7 +780,7 @@ export default function LessonPreparation() {
                   value={selectedSubject} 
                   onChange={(e) => setSelectedSubject(e.target.value)}
                 >
-                  <option value="">{t('lessonPreparation.selectSubject') || 'اختر المادة...'}</option>
+                  <option value="">اختر المادة...</option>
                   {subjects.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
@@ -735,7 +796,7 @@ export default function LessonPreparation() {
                   value={selectedWeek} 
                   onChange={(e) => setSelectedWeek(e.target.value)}
                 >
-                  {weeks.map(w => <option key={w} value={w}>{w.replace('الأسبوع', t('lessonPreparation.weekPrefix') || 'الأسبوع')}</option>)}
+                  {weeks.map(w => <option key={w} value={w}>{w}</option>)}
                 </select>
               </div>
 
@@ -764,7 +825,7 @@ export default function LessonPreparation() {
                   value={selectedPeriod} 
                   onChange={(e) => setSelectedPeriod(e.target.value)}
                 >
-                  <option value="">{t('lessonPreparation.selectPeriod') || 'اختر الحصة...'}</option>
+                  <option value="">اختر الحصة...</option>
                   {availablePeriods.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
@@ -787,7 +848,7 @@ export default function LessonPreparation() {
                     boxShadow: '0 4px 12px rgba(14, 116, 144, 0.25)'
                   }}
                 >
-                  <Save size={18} /> {isSaving ? (t('lessonPreparation.saving') || 'جاري الحفظ...') : (t('lessonPreparation.savePrep') || 'حفظ واعتماد التحضير')}
+                  <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'حفظ واعتماد التحضير'}
                 </button>
               </div>
 
@@ -798,12 +859,12 @@ export default function LessonPreparation() {
             <div style={{ textAlign: 'center', padding: '50px 20px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
               <BookOpen size={40} color="#94a3b8" style={{ marginBottom: '12px' }} />
               <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', margin: 0 }}>
-                {t('lessonPreparation.pleaseSelectClassSubj') || 'يرجى اختيار الصف والمادة للبدء في استعراض الدروس وتحضير الحصة'}
+                يرجى اختيار الصف والمادة للبدء في استعراض الدروس وتحضير الحصة
               </p>
             </div>
           ) : (
             <>
-              {/* STEP 3: Lesson Selection from Official Curriculum */}
+              {/* STEP 3: Strict Lesson Selection */}
               <div style={{
                 background: 'white',
                 border: '1px solid #e2e8f0',
@@ -813,7 +874,7 @@ export default function LessonPreparation() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <BookOpen size={18} color="#0e7490" /> الخطوة 3: اختيار الدرس من المنهج المعتمد ({selectedSemester})
+                    <BookOpen size={18} color="#0e7490" /> الخطوة 3: اختيار الدرس المعتمد لـ ({selectedStage} • {selectedSemester})
                   </div>
                   
                   <button
@@ -841,19 +902,21 @@ export default function LessonPreparation() {
                   <div>
                     <select
                       className="input-field"
-                      style={{ width: '100%', marginBottom: '8px', fontWeight: 'bold', color: '#0e7490' }}
+                      style={{ width: '100%', marginBottom: '8px', fontWeight: 'bold', color: '#0e7490', fontSize: '13px' }}
                       value={selectedLesson}
                       onChange={handleLessonChange}
                     >
-                      <option value="">-- اختر الدرس من قائمة دروس المنهج المعتمد --</option>
+                      <option value="">-- اختر الدرس من قائمة الدروس المعتمدة لـ {selectedStage} --</option>
                       {availableLessons.map((l, i) => (
-                        <option key={i} value={l.displayTitle}>{l.displayTitle}</option>
+                        <option key={i} value={l.displayTitle}>
+                          {l.displayTitle}
+                        </option>
                       ))}
                       <option value="__CUSTOM__">✍️ درس آخر (إدخال عنوان يدوي مخصص)...</option>
                     </select>
                     {availableLessons.length === 0 && (
                       <p style={{ fontSize: '12px', color: '#d97706', margin: '4px 0 0 0' }}>
-                        💡 لم يتم العثور على دروس محددة مسبقاً لهذا المسمى، يمكنك تفعيل "كتابة عنوان درس مخصص" وكتابة عنوان الدرس وأهدافه.
+                        💡 لم يتم العثور على دروس محددة مسبقاً لهذا المسمى في ({selectedStage})، يمكنك تفعيل "كتابة عنوان درس مخصص" وكتابة عنوان الدرس وأهدافه.
                       </p>
                     )}
                   </div>
@@ -1077,14 +1140,14 @@ export default function LessonPreparation() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>
-                    {t('lessonPreparation.attachPrepFile') || 'إرفاق ملف التحضير أو ورقة العمل (PDF / صور)'}
+                    إرفاق ملف التحضير أو ورقة العمل (PDF / صور)
                   </label>
                   <input type="file" accept=".pdf, .jpg, .jpeg, .png" onChange={handleFileUpload} disabled={isUploading} />
                 </div>
-                {isUploading && <div style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>{t('lessonPreparation.uploading') || 'جاري الرفع...'}</div>}
+                {isUploading && <div style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>جاري الرفع...</div>}
                 {fileUrl && (
                   <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '8px 16px', borderRadius: '6px', fontSize: '13px' }}>
-                    {t('lessonPreparation.attached') || 'المرفق الحالي:'} <a href={fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', fontWeight: 'bold', textDecoration: 'underline' }}>{fileName}</a>
+                    المرفق الحالي: <a href={fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', fontWeight: 'bold', textDecoration: 'underline' }}>{fileName}</a>
                   </div>
                 )}
               </div>
@@ -1093,80 +1156,80 @@ export default function LessonPreparation() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                 
                 <MarkdownInput 
-                  label={t('lessonPreparation.behavioralGoals') || 'الأهداف التعليمية والسلوكية'} 
+                  label="الأهداف التعليمية والسلوكية" 
                   value={goals} 
                   onChange={setGoals} 
-                  placeholder={t('lessonPreparation.behavioralGoalsPlaceholder') || 'تمت تعبئتها تلقائياً ويمكنك التعديل والإضافة بحرية...'} 
+                  placeholder="تمت تعبئتها تلقائياً ويمكنك التعديل والإضافة بحرية..." 
                   height="160px" 
                 />
 
                 <MarkdownInput 
-                  label={t('lessonPreparation.teachingStrategies') || 'استراتيجيات التدريس المتبعة'} 
+                  label="استراتيجيات التدريس المتبعة" 
                   value={strategy} 
                   onChange={setStrategy} 
-                  placeholder={t('lessonPreparation.teachingStrategiesPlaceholder') || 'استراتيجيات التدريس المحددة...'} 
+                  placeholder="استراتيجيات التدريس المحددة..." 
                   height="140px" 
                 />
 
                 <MarkdownInput 
-                  label={t('lessonPreparation.warmup') || 'التمهيد والتهيئة الحافزة'} 
+                  label="التمهيد والتهيئة الحافزة" 
                   value={warmup} 
                   onChange={setWarmup} 
-                  placeholder={t('lessonPreparation.warmupPlaceholder') || 'طرح تساؤل مثير للتفكير، قصة قصيرة، أو عرض مقطع مرئي تهيئةً للدرس...'} 
+                  placeholder="طرح تساؤل مثير للتفكير، قصة قصيرة، أو عرض مقطع مرئي تهيئةً للدرس..." 
                   height="140px" 
                 />
 
                 <MarkdownInput 
-                  label={t('lessonPreparation.portfolio') || 'ملف الإنجاز والمخرجات المتوقعة'} 
+                  label="ملف الإنجاز والمخرجات المتوقعة" 
                   value={portfolio} 
                   onChange={setPortfolio} 
-                  placeholder={t('lessonPreparation.portfolioPlaceholder') || 'المخرجات والمهام التي سينجزها الطلاب...'} 
+                  placeholder="المخرجات والمهام التي سينجزها الطلاب..." 
                   height="140px" 
                 />
 
                 <MarkdownInput 
-                  label={t('lessonPreparation.lessonContent') || 'المحتوى والإجراءات التعليمية'} 
+                  label="المحتوى والإجراءات التعليمية" 
                   value={content} 
                   onChange={setContent} 
-                  placeholder={t('lessonPreparation.lessonContentPlaceholder') || 'خطوات سير الدرس والشرح والأنشطة الصفية...'} 
+                  placeholder="خطوات سير الدرس والشرح والأنشطة الصفية..." 
                   height="250px" 
                 />
 
                 <MarkdownInput 
-                  label={t('lessonPreparation.resources') || 'الوسائل والتقنيات ومصادر التعلم'} 
+                  label="الوسائل والتقنيات ومصادر التعلم" 
                   value={resources} 
                   onChange={setResources} 
-                  placeholder={t('lessonPreparation.resourcesPlaceholder') || 'السبورة الذكية، منصة مدرستي، أوراق العمل، العروض التقديمية...'} 
+                  placeholder="السبورة الذكية، منصة مدرستي، أوراق العمل، العروض التقديمية..." 
                   height="140px" 
                 />
 
                 <MarkdownInput 
-                  label={t('lessonPreparation.formativeEval') || 'التقويم المرحلي التكويني'} 
+                  label="التقويم المرحلي التكويني" 
                   value={formativeEval} 
                   onChange={setFormativeEval} 
-                  placeholder={t('lessonPreparation.formativeEvalPlaceholder') || 'الأسئلة والأنشطة للتأكد من فهم كل هدف خلال الحصة...'} 
+                  placeholder="الأسئلة والأنشطة للتأكد من فهم كل هدف خلال الحصة..." 
                   height="140px" 
                 />
 
                 <MarkdownInput 
-                  label={t('lessonPreparation.summativeEval') || 'التقويم الختامي النهائي'} 
+                  label="التقويم الختامي النهائي" 
                   value={summativeEval} 
                   onChange={setSummativeEval} 
-                  placeholder={t('lessonPreparation.summativeEvalPlaceholder') || 'التطبيق الختامي أو ورقة الدقيقة الواحدة في نهاية الدرس...'} 
+                  placeholder="التطبيق الختامي أو ورقة الدقيقة الواحدة في نهاية الدرس..." 
                   height="140px" 
                 />
 
                 <MarkdownInput 
-                  label={t('lessonPreparation.homework') || 'الواجبات والأنشطة الإثرائية'} 
+                  label="الواجبات والأنشطة الإثرائية" 
                   value={homework} 
                   onChange={setHomework} 
-                  placeholder={t('lessonPreparation.homeworkPlaceholder') || 'الواجبات المنزلية والمهام الإثرائية للطلاب...'} 
+                  placeholder="الواجبات المنزلية والمهام الإثرائية للطلاب..." 
                   height="140px" 
                 />
 
               </div>
 
-              {/* Bottom Sticky-like Save Bar */}
+              {/* Bottom Save Bar */}
               <div style={{
                 background: '#f8fafc',
                 border: '1px solid #e2e8f0',
@@ -1210,7 +1273,7 @@ export default function LessonPreparation() {
         <div>
           {allPreparations.length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '50px 20px', background: '#f8fafc', borderRadius: '12px' }}>
-              {t('lessonPreparation.noSavedPreps') || 'لا توجد تحاضير محفوظة حتى الآن.'}
+              لا توجد تحاضير محفوظة حتى الآن.
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1224,6 +1287,11 @@ export default function LessonPreparation() {
                       <span style={{ background: '#f0fdfa', color: '#0e7490', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
                         {p.className}
                       </span>
+                      {p.stage && (
+                        <span style={{ background: '#f8fafc', color: '#0284c7', border: '1px solid #bae6fd', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                          {p.stage}
+                        </span>
+                      )}
                       {p.semester && (
                         <span style={{ background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '4px', fontSize: '11px' }}>
                           {p.semester}
@@ -1241,13 +1309,13 @@ export default function LessonPreparation() {
                     <button className="btn" style={{ padding: '8px 14px', background: '#0e7490', color: 'white', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 'bold' }} onClick={() => setPrintingPrep(p)} title="طباعة التحضير (PDF)">
                       <Printer size={16} /> طباعة (PDF)
                     </button>
-                    <button className="btn" style={{ padding: '8px', background: '#e0f2fe', color: '#0284c7' }} onClick={() => setPreviewPrep(p)} title={t('lessonPreparation.preview') || 'معاينة'}>
+                    <button className="btn" style={{ padding: '8px', background: '#e0f2fe', color: '#0284c7' }} onClick={() => setPreviewPrep(p)} title="معاينة">
                       <Eye size={18} />
                     </button>
-                    <button className="btn" style={{ padding: '8px', background: '#fef3c7', color: '#d97706' }} onClick={() => handleEdit(p)} title={t('lessonPreparation.edit') || 'تعديل'}>
+                    <button className="btn" style={{ padding: '8px', background: '#fef3c7', color: '#d97706' }} onClick={() => handleEdit(p)} title="تعديل">
                       <Edit size={18} />
                     </button>
-                    <button className="btn" style={{ padding: '8px', background: '#fee2e2', color: '#dc2626' }} onClick={() => handleDelete(p.id)} title={t('lessonPreparation.delete') || 'حذف'}>
+                    <button className="btn" style={{ padding: '8px', background: '#fee2e2', color: '#dc2626' }} onClick={() => handleDelete(p.id)} title="حذف">
                       <Trash2 size={18} />
                     </button>
                   </div>
@@ -1270,7 +1338,7 @@ export default function LessonPreparation() {
           }}>
             <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
               <h2 style={{ margin: 0, color: 'var(--color-primary-dark)', fontSize: '18px' }}>
-                {t('lessonPreparation.previewPrep') || 'معاينة بطاقة تحضير'} {previewPrep.lessonTitle ? `[${previewPrep.lessonTitle}] - ` : ''}{previewPrep.subject} - {previewPrep.className}
+                معاينة بطاقة تحضير {previewPrep.lessonTitle ? `[${previewPrep.lessonTitle}] - ` : ''}{previewPrep.subject} - {previewPrep.className}
               </h2>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <button
@@ -1288,6 +1356,7 @@ export default function LessonPreparation() {
             <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
               <div style={{ display: 'flex', gap: '24px', color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: '13px', flexWrap: 'wrap' }}>
+                {previewPrep.stage && <span>🏫 {previewPrep.stage}</span>}
                 {previewPrep.semester && <span>📚 {previewPrep.semester}</span>}
                 <span>🗓️ {previewPrep.week}</span>
                 <span>⏰ {previewPrep.period}</span>
@@ -1296,7 +1365,7 @@ export default function LessonPreparation() {
 
               {previewPrep.fileUrl && (
                 <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '12px 16px', borderRadius: '8px' }}>
-                  <strong>{t('lessonPreparation.attachedFile') || 'الملف المرفق:'}</strong> <a href={previewPrep.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', textDecoration: 'underline' }}>{previewPrep.fileName}</a>
+                  <strong>الملف المرفق:</strong> <a href={previewPrep.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', textDecoration: 'underline' }}>{previewPrep.fileName}</a>
                 </div>
               )}
 

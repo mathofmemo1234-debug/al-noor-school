@@ -1,266 +1,258 @@
-// قاعدة بيانات المنهج الأمريكي المعتمد للمدارس والمجمعات التعليمية العالمية (American Curriculum - International Schools)
-// متوافق مع معايير Common Core State Standards (CCSS) ومعايير العلوم للجيل القادم (NGSS)
-// تشمل: English Language Arts, Mathematics, Science, Social Studies, Computer Science, Arabic & Islamic Studies, Saudi History
+// قاعدة بيانات المنهج الأمريكي المعتمد للمدارس العالمية (American Curriculum - CCSS & NGSS)
+// تصنيف صارم ومفصول 100% حسب المراحل: Elementary (Grades 1-5), Middle School (Grades 6-8), High School (Grades 9-12)
 
-export const AMERICAN_CURRICULUM_DATA = {
-  // -------------------------------------------------------------
-  // 1. الفصل الأول / Semester 1 (Fall)
-  // -------------------------------------------------------------
-  "الفصل الدراسي الأول (Semester 1)": {
-    "English Language Arts (ELA & Literature)": [
-      {
-        grade: "Elementary School (Grades 1-5)",
-        unit: "Unit 1: Foundations of Reading & Narrative Craft",
-        lesson: "Lesson: Central Idea, Character Analysis & Narrative Writing",
-        objectives: [
-          "Students will identify the main idea and key supporting details in informational and literary texts.",
-          "Students will analyze character traits, motivations, and conflicts using direct text evidence (CCSS.ELA-LITERACY.RL.3.3).",
-          "Students will write structured narrative paragraphs featuring a clear beginning, middle, climax, and resolution.",
-          "Students will apply conventions of standard English grammar, including irregular verbs and pronoun-antecedent agreement.",
-          "Students will decode multi-syllabic vocabulary words using context clues, prefixes, and root words."
-        ]
-      },
-      {
-        grade: "Middle School (Grades 6-8)",
-        unit: "Unit 1: Expository Synthesis & Literary Devices",
-        lesson: "Lesson: Theme Development, Figurative Language & Argumentative Claims",
-        objectives: [
-          "Students will cite strong and thorough textual evidence to support explicit inferences drawn from complex texts.",
-          "Students will determine figurative, connotative, and technical meanings of words and phrases in literature.",
-          "Students will construct a 5-paragraph argumentative essay stating a defensible claim, counterclaims, and solid evidence.",
-          "Students will analyze how an author develops and contrasts the points of view of different characters or narrators.",
-          "Students will participate collaboratively in structured academic discussions (Socratic Seminars) with evidence."
-        ]
-      },
-      {
-        grade: "High School (Grades 9-12 / AP Capstone)",
-        unit: "Unit 1: Rhetorical Analysis & World Literature",
-        lesson: "Lesson: Rhetorical Appeals (Ethos, Pathos, Logos) & Synthesis Essays",
-        objectives: [
-          "Students will evaluate rhetorical strategies, logical fallacies, and structural choices employed by classical and modern authors.",
-          "Students will synthesize multiple primary and secondary sources to construct sophisticated academic research papers (MLA/APA format).",
-          "Students will analyze seminal historical documents and literary masterworks for thematic coherence and stylistic mastery.",
-          "Students will demonstrate command of advanced syntactic structures, voice, tone, and nuanced academic vocabulary.",
-          "Students will defend or challenge philosophical perspectives in formal debate settings."
-        ]
-      }
-    ],
+export const AMERICAN_STAGES = {
+  ELEMENTARY: 'Elementary School (Grades 1-5)',
+  MIDDLE: 'Middle School (Grades 6-8)',
+  HIGH: 'High School (Grades 9-12)'
+};
 
-    "Mathematics (Common Core Math)": [
-      {
-        grade: "Elementary School (Grades 1-5)",
-        unit: "Unit 1: Numbers & Operations in Base Ten & Algebraic Thinking",
-        lesson: "Lesson: Place Value Multi-Digit Operations & Fraction Foundations",
-        objectives: [
-          "Students will read, write, and compare decimals to thousandths using base-ten numerals and expanded form (CCSS.MATH.5.NBT.A.3).",
-          "Students will fluently multiply and divide multi-digit whole numbers using standard algorithmic strategies.",
-          "Students will generate equivalent fractions, simplify expressions, and locate fractions on number lines.",
-          "Students will solve multi-step real-world word problems using arithmetic operations and algebraic bar models.",
-          "Students will classify two-dimensional figures based on the presence or absence of parallel or perpendicular lines."
-        ]
-      },
-      {
-        grade: "Middle School (Pre-Algebra & Algebra I)",
-        unit: "Unit 1: Ratios, Proportions & Linear Equations",
-        lesson: "Lesson: Solving Multi-Step Linear Equations & Slope-Intercept Graphing",
-        objectives: [
-          "Students will solve linear equations and inequalities in one variable involving absolute values and fractional coefficients.",
-          "Students will calculate the slope of a line from graphs, coordinates, and equations, interpreting the rate of change.",
-          "Students will graph linear functions in slope-intercept (y = mx + b) and standard forms accurately.",
-          "Students will model real-life proportional relationships with constant rates of proportionality.",
-          "Students will evaluate algebraic expressions containing integer exponents and scientific notation."
-        ]
-      },
-      {
-        grade: "High School (Geometry, Algebra II & Pre-Calculus)",
-        unit: "Unit 1: Coordinate Geometry, Polynomial Functions & Matrix Operations",
-        lesson: "Lesson: Quadratic Equations, Transformations & Geometric Proofs",
-        objectives: [
-          "Students will solve quadratic equations using factoring, completing the square, and the Quadratic Formula with complex roots.",
-          "Students will write formal deductive geometric proofs establishing congruency (SSS, SAS, ASA, AAS) and similarity.",
-          "Students will graph and analyze polynomial and rational functions, determining end behavior, zeroes, and asymptotes.",
-          "Students will perform matrix additions, multiplications, and determinant evaluations to solve systems of linear equations.",
-          "Students will apply trigonometric ratios to solve right and oblique triangles using the Law of Sines and Law of Cosines."
-        ]
-      }
-    ],
+export const AMERICAN_CURRICULUM_STRICT = {
+  // =========================================================================
+  // 1. Elementary School (Grades 1 - 5)
+  // =========================================================================
+  [AMERICAN_STAGES.ELEMENTARY]: {
+    "الفصل الدراسي الأول (Semester 1)": {
+      "English Language Arts (ELA Elementary)": [
+        {
+          grade: "Elementary (Grades 1-3)",
+          unit: "Unit 1: Phonics, Decoding & Basic Reading Comprehension",
+          lesson: "Lesson: Short & Long Vowels, Sight Words & Story Elements",
+          objectives: [
+            "Students will decode words with short and long vowel patterns and common vowel teams (CCSS.ELA-LITERACY.RF.2.3).",
+            "Students will identify the central message, lesson, or moral in diverse folktales and fables (RL.2.2).",
+            "Students will describe characters, settings, and major events in a story using key illustrations and text details.",
+            "Students will write short narrative pieces recounting a well-elaborated event with temporal words.",
+            "Students will demonstrate command of capitalization, end punctuation, and spelling of high-frequency words."
+          ]
+        },
+        {
+          grade: "Elementary (Grades 4-5)",
+          unit: "Unit 1: Expository Text Structure & Narrative Craft",
+          lesson: "Lesson: Main Idea, Supporting Details & Structured Paragraph Writing",
+          objectives: [
+            "Students will explain what a text says explicitly and draw inferences from the text (CCSS.ELA-LITERACY.RI.4.1).",
+            "Students will determine the main idea of an informational text and explain how it is supported by key details.",
+            "Students will write informative/explanatory essays introducing a topic clearly, grouping related information in paragraphs.",
+            "Students will use relative pronouns, adverbs, and progressive verb tenses correctly in context.",
+            "Students will consult reference materials (dictionaries, glossaries) to determine the exact meaning of academic words."
+          ]
+        }
+      ],
 
-    "Science (NGSS - Next Generation Science Standards)": [
-      {
-        grade: "Elementary & Middle School (Integrated Sciences)",
-        unit: "Unit 1: Matter, Energy Dynamics & Cell Structures",
-        lesson: "Lesson: Cellular Organelles, Photosynthesis & States of Matter",
-        objectives: [
-          "Students will develop and use models to describe the atomic composition of simple molecules and extended structures (NGSS MS-PS1-1).",
-          "Students will contrast plant and animal cell organelles and explain their specialized biological functions.",
-          "Students will trace the flow of energy and matter through ecosystems via photosynthesis and cellular respiration.",
-          "Students will design and execute controlled scientific investigations, recording quantitative and qualitative data.",
-          "Students will formulate evidence-based explanations connecting thermal energy transfer to phase changes."
-        ]
-      },
-      {
-        grade: "High School (Biology, Chemistry & Physics)",
-        unit: "Unit 1: Cellular Energetics, Chemical Bonding & Newtonian Mechanics",
-        lesson: "Lesson: Molecular Genetics / Stoichiometric Calculations / Kinematics",
-        objectives: [
-          "Students will explain the mechanisms of DNA replication, transcription, and translation leading to protein synthesis (HS-LS1-1).",
-          "Students will calculate molar mass, percent yield, and limiting reactants in complex chemical reactions.",
-          "Students will model ionic, covalent, and metallic bonding through Lewis structures and VSEPR geometry.",
-          "Students will analyze 1D and 2D kinematic motion using vectors, velocity-time graphs, and projectile trajectories.",
-          "Students will verify Newton's Laws of Motion through laboratory experiments and mathematical force diagrams."
-        ]
-      }
-    ],
+      "Mathematics (Common Core Elementary)": [
+        {
+          grade: "Elementary (Grades 1-3)",
+          unit: "Unit 1: Operations in Base Ten & Multiplication Foundations",
+          lesson: "Lesson: Place Value to 1,000 & Multiplication Facts (2-10)",
+          objectives: [
+            "Students will understand that the three digits of a three-digit number represent hundreds, tens, and ones (CCSS.MATH.2.NBT.A.1).",
+            "Students will fluently add and subtract within 100 using strategies based on place value and properties of operations.",
+            "Students will interpret products of whole numbers (e.g., interpret 5 × 7 as the total number of objects in 5 groups of 7).",
+            "Students will represent and solve two-step word problems involving the four arithmetic operations.",
+            "Students will recognize and draw shapes having specified attributes (number of angles, equal faces)."
+          ]
+        },
+        {
+          grade: "Elementary (Grades 4-5)",
+          unit: "Unit 1: Multi-Digit Arithmetic & Fraction Equivalence",
+          lesson: "Lesson: Multi-Digit Multiplication & Adding/Subtracting Fractions",
+          objectives: [
+            "Students will multiply a whole number of up to four digits by a one-digit whole number and multiply two two-digit numbers.",
+            "Students will find whole-number quotients and remainders with up to four-digit dividends and one-digit divisors.",
+            "Students will explain why a fraction a/b is equivalent to a fraction (n × a)/(n × b) using visual fraction models.",
+            "Students will add and subtract fractions and mixed numbers with like and unlike denominators.",
+            "Students will read, write, and compare decimals to thousandths using standard and expanded forms."
+          ]
+        }
+      ],
 
-    "Social Studies & World History": [
-      {
-        grade: "Elementary, Middle & High School",
-        unit: "Unit 1: World Geography, Ancient Civilizations & Global Governance",
-        lesson: "Lesson: Geographical Systems, Cradle of Civilizations & Global Trade",
-        objectives: [
-          "Students will analyze the physical and human geography of world regions using thematic maps, GIS, and demographic charts.",
-          "Students will examine the political, economic, and cultural contributions of ancient civilizations (Mesopotamia, Nile Valley, Indus).",
-          "Students will evaluate the causes and global impacts of historical trade networks (The Silk Road, Maritime Routes).",
-          "Students will compare different systems of government (Constitutional Republics, Monarchies, Democracies).",
-          "Students will assess global economic interdependence and contemporary geopolitical challenges."
-        ]
-      }
-    ],
+      "Science (NGSS Elementary)": [
+        {
+          grade: "Elementary (Grades 1-5)",
+          unit: "Unit 1: Earth Systems, Plant & Animal Structures",
+          lesson: "Lesson: Plant & Animal Life Cycles, Habitats & Weather Patterns",
+          objectives: [
+            "Students will develop models to describe that organisms have unique and diverse life cycles (NGSS 3-LS1-1).",
+            "Students will construct an argument with evidence that in a particular habitat some organisms can survive well and some cannot.",
+            "Students will represent data in tables and graphical displays to describe typical weather conditions expected during a season.",
+            "Students will plan and conduct an investigation to provide evidence of the effects of balanced and unbalanced forces on motion.",
+            "Students will identify evidence from patterns in rock formations and fossils in rock layers to explain changes in landscapes over time."
+          ]
+        }
+      ]
+    },
 
-    "Computer Science & ICT (Digital Literacy)": [
-      {
-        grade: "All Grades (K-12)",
-        unit: "Unit 1: Computational Thinking, Coding & Cybersecurity",
-        lesson: "Lesson: Python Algorithms, Object-Oriented Programming & Web Tech",
-        objectives: [
-          "Students will write clean, documented code in Python using data structures, loops, functions, and conditional logic.",
-          "Students will design responsive web pages incorporating HTML5 semantics, modern CSS styling, and JavaScript event handlers.",
-          "Students will evaluate cybersecurity threats, encryption techniques, and best practices for personal data protection.",
-          "Students will decompose complex computational problems into reusable algorithmic components.",
-          "Students will explore ethical considerations surrounding Artificial Intelligence, automation, and digital privacy."
-        ]
-      }
-    ],
-
-    "Arabic & Islamic Studies for International Schools (البرامج المعتمدة)": [
-      {
-        grade: "International School Program",
-        unit: "الوحدة الأولى: اللغة العربية والدراسات الإسلامية للمدارس العالمية",
-        lesson: "درس: مهارات القراءة والكتابة العربية والقيم الأخلاقية الإسلامية",
-        objectives: [
-          "Students will read Arabic literary texts fluently with accurate pronunciation and phonetic awareness.",
-          "Students will formulate correct Arabic nominal and verbal sentences adhering to standard grammar.",
-          "Students will articulate core Islamic pillars, moral values, and tolerance from prophetic traditions.",
-          "Students will write concise essays in Arabic demonstrating proper vocabulary and grammatical structures.",
-          "Students will appreciate the rich cultural and literary heritage of the Arab and Islamic world."
-        ]
-      }
-    ],
-
-    "Saudi History & Cultural Studies in English (تاريخ المملكة للمدارس العالمية)": [
-      {
-        grade: "International Curriculum",
-        unit: "Unit 1: Heritage & History of the Kingdom of Saudi Arabia",
-        lesson: "Lesson: Unification of Saudi Arabia, Vision 2030 & Giga-Projects",
-        objectives: [
-          "Students will outline the key historical milestones in the unification of Saudi Arabia under King Abdulaziz.",
-          "Students will identify the geographical landmarks, strategic waterways, and natural resources of the Kingdom.",
-          "Students will analyze the economic and cultural transformation pillars outlined in Saudi Vision 2030 (NEOM, Red Sea, Qiddiya).",
-          "Students will showcase the Kingdom's leadership in global energy markets and humanitarian international initiatives.",
-          "Students will present research on UNESCO World Heritage Sites across Saudi Arabia (Al-Ula, Diriyah, Historic Jeddah)."
-        ]
-      }
-    ]
+    "الفصل الدراسي الثاني (Semester 2)": {
+      "Elementary Comprehensive Subjects": [
+        {
+          grade: "Elementary (Grades 1-5)",
+          unit: "Unit 2: Measurement, Geometry, Ecosystems & Persuasive Writing",
+          lesson: "Lesson: Area and Perimeter, States of Matter & Opinion Speeches",
+          objectives: [
+            "Students will measure and estimate liquid volumes, masses of objects, area, and perimeter of rectilinear shapes.",
+            "Students will write opinion pieces supporting a point of view with reasons and factual information.",
+            "Students will conduct simple experiments demonstrating physical and chemical changes in matter.",
+            "Students will describe the flow of energy in an ecosystem from sunlight through producers to consumers and decomposers.",
+            "Students will deliver oral presentations using clear articulation and visual multimedia."
+          ]
+        }
+      ]
+    }
   },
 
-  // -------------------------------------------------------------
-  // 2. الفصل الثاني / Semester 2 (Spring)
-  // -------------------------------------------------------------
-  "الفصل الدراسي الثاني (Semester 2)": {
-    "English Language Arts (ELA & Literature)": [
-      {
-        grade: "Elementary & Middle School",
-        unit: "Unit 2: Poetry, Informational Synthesis & Persuasive Writing",
-        lesson: "Lesson: Poetic Structures, Author's Purpose & Persuasive Speeches",
-        objectives: [
-          "Students will analyze sound devices (alliteration, onomatopoeia, rhythm, rhyme) in diverse poetic forms.",
-          "Students will synthesize information from multiple digital and print sources to answer complex research questions.",
-          "Students will write an effective persuasive speech with credible supporting arguments and emotional appeals.",
-          "Students will deliver oral presentations using clear articulation, visual aids, and interactive digital media.",
-          "Students will edit written work for syntactic variety, punctuation, transitions, and academic register."
-        ]
-      },
-      {
-        grade: "High School (AP Literature & Composition)",
-        unit: "Unit 2: Dramatic Analysis, Modernist Prose & Literary Research",
-        lesson: "Lesson: Shakespearean Drama, Symbolism & Comparative Research Paper",
-        objectives: [
-          "Students will perform in-depth literary analysis of classical drama (Shakespeare, Arthur Miller) exploring subtext and tragedy.",
-          "Students will trace universal archetypes, motifs, and symbols across various multicultural literary traditions.",
-          "Students will construct a comprehensive 8-page literary research paper adhering to rigorous scholarly citation standards.",
-          "Students will defend interpretive theses through close textual analysis during formal round-table critiques.",
-          "Students will critique contemporary media and journalistic pieces for bias, rhetoric, and visual messaging."
-        ]
-      }
-    ],
+  // =========================================================================
+  // 2. Middle School (Grades 6 - 8)
+  // =========================================================================
+  [AMERICAN_STAGES.MIDDLE]: {
+    "الفصل الدراسي الأول (Semester 1)": {
+      "English Language Arts (ELA Middle School)": [
+        {
+          grade: "Middle School (Grades 6-8)",
+          unit: "Unit 1: Literary Analysis & Argumentative Writing",
+          lesson: "Lesson: Citing Textual Evidence, Theme Analysis & 5-Paragraph Essays",
+          objectives: [
+            "Students will cite several pieces of textual evidence to support analysis of what the text says explicitly as well as inferences (CCSS.ELA.RL.7.1).",
+            "Students will determine a theme or central idea of a text and analyze its development over the course of the text.",
+            "Students will write arguments to support claims with clear reasons, relevant evidence, and credible counterclaims.",
+            "Students will analyze how an author's choice of point of view shapes the content, style, and tone of a narrative.",
+            "Students will engage effectively in a range of collaborative Socratic discussions with diverse partners."
+          ]
+        }
+      ],
 
-    "Mathematics (Common Core Math)": [
-      {
-        grade: "Elementary & Middle School",
-        unit: "Unit 2: Geometry, Measurement, Data & Probability",
-        lesson: "Lesson: Area, Volume, Coordinate Graphing & Statistical Measures",
-        objectives: [
-          "Students will calculate the surface area and volume of rectangular prisms, cylinders, and composite 3D solids.",
-          "Students will plot points, interpret distances, and perform translations on Cartesian coordinate grids.",
-          "Students will summarize numerical data sets in relation to their context (Mean, Median, Mode, Interquartile Range, Box Plots).",
-          "Students will determine the experimental and theoretical probability of independent and dependent compound events.",
-          "Students will solve real-world geometry problems involving angle relationships (complementary, supplementary, vertical)."
-        ]
-      },
-      {
-        grade: "High School (Pre-Calculus & AP Calculus / Statistics)",
-        unit: "Unit 2: Limits, Derivatives, Integrals & Inferential Statistics",
-        lesson: "Lesson: Derivatives, Optimization, Integrals & Hypothesis Testing",
-        objectives: [
-          "Students will evaluate limits algebraically and determine the continuity of piecewise and rational functions.",
-          "Students will compute derivatives using power, product, quotient, and chain rules to solve optimization and rate problems.",
-          "Students will evaluate definite and indefinite integrals to determine areas under curves and physical displacements.",
-          "Students will perform statistical hypothesis testing (Z-test, T-test, Chi-Square) and interpret p-values and confidence intervals.",
-          "Students will apply mathematical modeling to real-world engineering, financial, and physical scenarios."
-        ]
-      }
-    ],
+      "Mathematics (Pre-Algebra & Algebra I)": [
+        {
+          grade: "Middle School (Grades 6-8)",
+          unit: "Unit 1: Ratios, Proportions & Solving Linear Equations",
+          lesson: "Lesson: Unit Rates, Multi-Step Equations & Slope-Intercept Graphing",
+          objectives: [
+            "Students will compute unit rates associated with ratios of fractions and analyze proportional relationships (CCSS.MATH.7.RP.A.1).",
+            "Students will solve multi-step linear equations and inequalities in one variable with rational number coefficients.",
+            "Students will graph proportional relationships, interpreting the unit rate as the slope of the graph (y = mx + b).",
+            "Students will apply the Pythagorean Theorem to find missing side lengths in right triangles and distances in coordinate planes.",
+            "Students will summarize numerical data sets (Mean, Median, Interquartile Range, Box Plots) in relation to their context."
+          ]
+        }
+      ],
 
-    "Science (NGSS - Next Generation Science Standards)": [
-      {
-        grade: "All Grades (K-12 Sciences)",
-        unit: "Unit 2: Waves, Thermodynamics, Genetics & Environmental Sustainability",
-        lesson: "Lesson: Electromagnetic Spectrum, Inheritance Patterns & Ecology",
-        objectives: [
-          "Students will model wave properties (frequency, wavelength, amplitude) and behavior (reflection, refraction, diffraction).",
-          "Students will predict genetic inheritance outcomes using Punnett squares and analyze human pedigree charts.",
-          "Students will evaluate the human impact on global climate systems and propose engineering solutions for carbon reduction.",
-          "Students will construct thermodynamic arguments relating enthalpy, entropy, and Gibbs free energy to reaction spontaneity.",
-          "Students will design and test an engineering prototype that mitigates an environmental challenge."
-        ]
-      }
-    ],
+      "Science (NGSS Middle School Integrated Science)": [
+        {
+          grade: "Middle School (Grades 6-8)",
+          unit: "Unit 1: Atoms, Chemical Reactions & Cellular Energetics",
+          lesson: "Lesson: Molecular Structures, Photosynthesis & Newton's Laws",
+          objectives: [
+            "Students will develop models to describe the atomic composition of simple molecules and extended crystal structures (NGSS MS-PS1-1).",
+            "Students will analyze and interpret data on the properties of substances before and after substances interact to determine if a reaction occurred.",
+            "Students will construct a scientific explanation based on evidence for the role of photosynthesis in the cycling of matter and energy.",
+            "Students will apply Newton’s Third Law to design a solution to a problem involving the motion of two colliding objects.",
+            "Students will model how genes located in the chromosomes of each cell determine organism traits."
+          ]
+        }
+      ]
+    },
 
-    "Social Studies, ICT & World Languages": [
-      {
-        grade: "International Curriculum",
-        unit: "Unit 2: Modern Global Affairs, Innovation & Cultural Diplomacy",
-        lesson: "Lesson: Model United Nations, Cloud Technologies & Global Economy",
-        objectives: [
-          "Students will simulate international diplomacy through Model United Nations (MUN) caucus debates and resolutions.",
-          "Students will deploy cloud-based software architectures and explore modern database management systems.",
-          "Students will examine macro-economic indicators (GDP, Inflation, Trade Balance) shaping 21st-century globalization.",
-          "Students will synthesize learning across multiple disciplines in a capstone interdisciplinary portfolio.",
-          "Students will demonstrate global citizenship, cross-cultural competence, and collaborative leadership."
-        ]
-      }
-    ]
+    "الفصل الدراسي الثاني (Semester 2)": {
+      "Middle School Comprehensive Subjects": [
+        {
+          grade: "Middle School (Grades 6-8)",
+          unit: "Unit 2: Systems of Equations, Genetics, World Geography & Coding",
+          lesson: "Lesson: Solving Systems of Linear Equations / Punnett Squares / Python Coding",
+          objectives: [
+            "Students will solve systems of two linear equations in two variables algebraically and graphically.",
+            "Students will develop Punnett square models to describe why asexual reproduction results in offspring with identical genes while sexual reproduction results in genetic variation.",
+            "Students will write structured Python programs using variables, conditionals, loops, and custom functions.",
+            "Students will examine macro-geographical patterns, global trade routes, and international governance systems.",
+            "Students will design and complete an interdisciplinary STEM capstone project."
+          ]
+        }
+      ]
+    }
+  },
+
+  // =========================================================================
+  // 3. High School (Grades 9 - 12)
+  // =========================================================================
+  [AMERICAN_STAGES.HIGH]: {
+    "الفصل الدراسي الأول (Semester 1)": {
+      "English Language Arts (High School Literature & AP Capstone)": [
+        {
+          grade: "High School (Grades 9-12)",
+          unit: "Unit 1: Rhetorical Strategies & Scholarly Research",
+          lesson: "Lesson: Rhetorical Appeals (Ethos, Pathos, Logos) & Academic Synthesis",
+          objectives: [
+            "Students will determine an author’s point of view or purpose in a text and analyze how style and content contribute to the power and persuasiveness (CCSS.ELA.RI.11-12.6).",
+            "Students will synthesize findings from multiple authoritative print and digital sources, demonstrating understanding of the subject under investigation.",
+            "Students will write analytical research papers adhering to rigorous MLA/APA academic citation formats.",
+            "Students will critique the logical validity of premises, inferences, and conclusions in classical and modern political documents.",
+            "Students will participate in formal parliamentary debates and deliver persuasive presentations."
+          ]
+        }
+      ],
+
+      "Mathematics (Geometry, Algebra II, Pre-Calculus & AP Calculus)": [
+        {
+          grade: "High School (Grades 9-12)",
+          unit: "Unit 1: Quadratic Functions, Geometric Proofs & Trigonometric Identities",
+          lesson: "Lesson: Complex Numbers, Coordinate Proofs, Unit Circle & Limits",
+          objectives: [
+            "Students will solve quadratic equations with real and complex roots using factoring, completing the square, and the Quadratic Formula.",
+            "Students will prove formal geometric theorems about lines, angles, triangles, and parallelograms deductively.",
+            "Students will evaluate trigonometric functions of any angle using the Unit Circle and prove Pythagorean trigonometric identities.",
+            "Students will analyze polynomial, rational, and exponential functions, determining domains, asymptotes, and end behavior.",
+            "Students will calculate limits of functions algebraically and define the derivative as the limit of a difference quotient."
+          ]
+        }
+      ],
+
+      "Science (Biology, Chemistry & Physics - NGSS High School)": [
+        {
+          grade: "High School (Grades 9-12)",
+          unit: "Unit 1: Cellular Genetics, Chemical Stoichiometry & 2D Kinematics",
+          lesson: "Lesson: DNA Replication & Translation / Molar Calculations / Projectile Motion",
+          objectives: [
+            "Students will construct an explanation based on evidence for how the structure of DNA determines the structure of proteins (NGSS HS-LS1-1).",
+            "Students will use mathematical representations of chemical reactions to calculate stoichiometric relationships, limiting reactants, and percent yield.",
+            "Students will analyze 2D projectile motion and circular motion using kinematic vector equations and Newton's Universal Law of Gravitation.",
+            "Students will model chemical bonding (ionic, covalent, metallic) through Lewis structures, electronegativity differences, and molecular geometry.",
+            "Students will plan and conduct advanced laboratory investigations evaluating experimental error and uncertainty."
+          ]
+        }
+      ],
+
+      "Social Studies & World History (High School)": [
+        {
+          grade: "High School (Grades 9-12)",
+          unit: "Unit 1: Global Governance, Economics & Modern World History",
+          lesson: "Lesson: Enlightenment Philosophy, Industrialization & Geopolitical Interdependence",
+          objectives: [
+            "Students will analyze the philosophical roots of modern democratic systems (Locke, Montesquieu, Rousseau).",
+            "Students will evaluate the economic, social, and technological transformations brought about by the Industrial Revolution.",
+            "Students will assess macroeconomic indicators (GDP, fiscal policy, monetary systems) and their global impacts.",
+            "Students will examine the diplomatic treaties, conflicts, and global alliances of the 20th and 21st centuries.",
+            "Students will defend historical theses through rigorous primary-source documentary analysis."
+          ]
+        }
+      ]
+    },
+
+    "الفصل الدراسي الثاني (Semester 2)": {
+      "High School Advanced Electives & AP Standards": [
+        {
+          grade: "High School (Grades 9-12)",
+          unit: "Unit 2: Calculus Integrals, Thermodynamics, Electromagnetism & Global Affairs",
+          lesson: "Lesson: Derivatives & Integrals / Equilibrium & Le Chatelier / Electromagnetic Induction",
+          objectives: [
+            "Students will compute definite and indefinite integrals to evaluate areas under curves and physical work done.",
+            "Students will apply Le Chatelier’s Principle and thermodynamic Gibbs free energy calculations to chemical equilibrium.",
+            "Students will explain electromagnetic induction, Faraday’s Law, Lenz's Law, and modern generator technologies.",
+            "Students will conduct an independent scientific research thesis with experimental design and formal defense.",
+            "Students will demonstrate global leadership, scholarly writing, and college-ready academic excellence."
+          ]
+        }
+      ]
+    }
   }
 };
 
-export default AMERICAN_CURRICULUM_DATA;
+export default AMERICAN_CURRICULUM_STRICT;

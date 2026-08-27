@@ -1,5 +1,5 @@
-import { SAUDI_CURRICULUM_DATA } from './saudiCurriculumData';
-import { AMERICAN_CURRICULUM_DATA } from './americanCurriculumData';
+import { SAUDI_CURRICULUM_STRICT, SAUDI_STAGES } from './saudiCurriculumData';
+import { AMERICAN_CURRICULUM_STRICT, AMERICAN_STAGES } from './americanCurriculumData';
 import { POPULAR_TEACHING_STRATEGIES } from './teachingStrategies';
 
 // النظام معتمد على فصلين دراسيين فقط
@@ -13,6 +13,80 @@ export const CURRICULUM_TYPES = {
   AMERICAN: 'american',
   DUAL: 'dual'
 };
+
+/**
+ * الكشف الذكي الصارم عن المرحلة التعليمية من اسم الفصل (الصف)
+ */
+export function detectStageFromClassName(className = '', curriculumType = CURRICULUM_TYPES.SAUDI) {
+  const name = (className || '').toLowerCase().trim();
+  
+  if (curriculumType === CURRICULUM_TYPES.AMERICAN) {
+    if (
+      name.includes('high') || name.includes('9') || name.includes('10') || 
+      name.includes('11') || name.includes('12') || name.includes('secondary')
+    ) {
+      return AMERICAN_STAGES.HIGH;
+    }
+    if (
+      name.includes('middle') || name.includes('6') || name.includes('7') || 
+      name.includes('8') || name.includes('prep')
+    ) {
+      return AMERICAN_STAGES.MIDDLE;
+    }
+    return AMERICAN_STAGES.ELEMENTARY;
+  }
+
+  // Saudi Curriculum Stage Detection
+  if (
+    name.includes('ثانوي') || 
+    name.includes('ثانوية') || 
+    name.includes('مسار') || 
+    name.includes('مسارات') ||
+    name.includes('1 ثانوي') ||
+    name.includes('2 ثانوي') ||
+    name.includes('3 ثانوي') ||
+    name.includes('أول ثانوي') ||
+    name.includes('ثاني ثانوي') ||
+    name.includes('ثالث ثانوي')
+  ) {
+    return SAUDI_STAGES.SECONDARY;
+  }
+
+  if (
+    name.includes('متوسط') || 
+    name.includes('متوسطة') || 
+    name.includes('1 متوسط') ||
+    name.includes('2 متوسط') ||
+    name.includes('3 متوسط') ||
+    name.includes('أول متوسط') ||
+    name.includes('ثاني متوسط') ||
+    name.includes('ثالث متوسط')
+  ) {
+    return SAUDI_STAGES.INTERMEDIATE;
+  }
+
+  if (
+    name.includes('ابتدائي') || 
+    name.includes('ابتدائية') ||
+    name.includes('أول ابتدائي') ||
+    name.includes('ثاني ابتدائي') ||
+    name.includes('ثالث ابتدائي') ||
+    name.includes('رابع ابتدائي') ||
+    name.includes('خامس ابتدائي') ||
+    name.includes('سادس ابتدائي') ||
+    name.includes('أول') ||
+    name.includes('ثاني') ||
+    name.includes('ثالث') ||
+    name.includes('رابع') ||
+    name.includes('خامس') ||
+    name.includes('سادس')
+  ) {
+    return SAUDI_STAGES.PRIMARY;
+  }
+
+  // Default to Secondary if contains 'ثانوي' else Primary
+  return SAUDI_STAGES.SECONDARY;
+}
 
 /**
  * الكشف الذكي عن نوع المنهج للمدرسة
@@ -38,39 +112,49 @@ export function detectCurriculumType(schoolName = '', configuredType = null) {
 }
 
 /**
- * الحصول على مصفوفة بيانات المنهج المناسبة
+ * الحصول على مصفوفة بيانات المنهج المناسبة للمرحلة بدقة
  */
 export function getCurriculumData(curriculumType = CURRICULUM_TYPES.SAUDI) {
   if (curriculumType === CURRICULUM_TYPES.AMERICAN) {
-    return AMERICAN_CURRICULUM_DATA;
+    return AMERICAN_CURRICULUM_STRICT;
   }
-  return SAUDI_CURRICULUM_DATA;
+  return SAUDI_CURRICULUM_STRICT;
 }
 
 /**
- * استخراج قائمة المواد المتاحة لفصل دراسي معين
+ * استخراج قائمة المواد المتاحة لفصل دراسي ومرحلة معينة بدقة صارمة
  */
-export function getAvailableCurriculumSubjects(curriculumType, semester) {
+export function getAvailableCurriculumSubjects(curriculumType, semester, className = '', explicitStage = null) {
   const data = getCurriculumData(curriculumType);
-  const matchedSemester = Object.keys(data).find(s => s.includes(semester) || semester.includes(s)) || Object.keys(data)[0];
+  const stage = explicitStage || detectStageFromClassName(className, curriculumType);
   
-  if (!data[matchedSemester]) return [];
-  return Object.keys(data[matchedSemester]);
+  const stageData = data[stage];
+  if (!stageData) return [];
+
+  // Match Semester
+  const matchedSemesterKey = Object.keys(stageData).find(s => s.includes(semester) || semester.includes(s)) || Object.keys(stageData)[0];
+  if (!matchedSemesterKey || !stageData[matchedSemesterKey]) return [];
+
+  return Object.keys(stageData[matchedSemesterKey]);
 }
 
 /**
- * استخراج الدروس المعتمدة لمادة معينة في فصل دراسي معين
+ * استخراج الدروس المعتمدة لمادة معينة في فصل دراسي ومرحلة محددة بدقة تامة ومنع تداخل المراحل
  */
-export function getLessonsForSubject(curriculumType, semester, subjectName, className = '') {
+export function getLessonsForSubject(curriculumType, semester, subjectName, className = '', explicitStage = null) {
   const data = getCurriculumData(curriculumType);
-  const matchedSemester = Object.keys(data).find(s => s.includes(semester) || semester.includes(s)) || Object.keys(data)[0];
-  const semesterData = data[matchedSemester] || {};
+  const stage = explicitStage || detectStageFromClassName(className, curriculumType);
+  
+  const stageData = data[stage];
+  if (!stageData) return [];
 
-  // Find matching subject key (exact match or includes)
+  const matchedSemesterKey = Object.keys(stageData).find(s => s.includes(semester) || semester.includes(s)) || Object.keys(stageData)[0];
+  const semesterData = stageData[matchedSemesterKey] || {};
+
+  // Find exact or closest subject match within the stage
   let matchedSubjectKey = Object.keys(semesterData).find(s => s === subjectName || s.includes(subjectName) || subjectName.includes(s));
   
   if (!matchedSubjectKey) {
-    // If not found directly, check if any subject category matches
     const lowerSub = (subjectName || '').toLowerCase();
     matchedSubjectKey = Object.keys(semesterData).find(k => {
       const lowerK = k.toLowerCase();
@@ -78,12 +162,23 @@ export function getLessonsForSubject(curriculumType, semester, subjectName, clas
     });
   }
 
-  if (!matchedSubjectKey || !semesterData[matchedSubjectKey]) {
-    // Return empty if no match
-    return [];
+  // If still not matched, check if all subjects in stage have lessons
+  if (!matchedSubjectKey) {
+    // If subject not found directly, return all lessons for this stage's semester as fallback
+    const allLessons = [];
+    Object.values(semesterData).forEach(list => {
+      if (Array.isArray(list)) allLessons.push(...list);
+    });
+    return allLessons.map(item => ({
+      grade: item.grade,
+      unit: item.unit,
+      lesson: item.lesson,
+      displayTitle: `${item.lesson} (${item.unit} - ${item.grade})`,
+      objectives: item.objectives || []
+    }));
   }
 
-  const list = semesterData[matchedSubjectKey];
+  const list = semesterData[matchedSubjectKey] || [];
   return list.map(item => ({
     grade: item.grade,
     unit: item.unit,
@@ -96,8 +191,8 @@ export function getLessonsForSubject(curriculumType, semester, subjectName, clas
 /**
  * استخراج أهداف درس معين
  */
-export function getObjectivesForLesson(curriculumType, semester, subjectName, lessonTitle) {
-  const lessons = getLessonsForSubject(curriculumType, semester, subjectName);
+export function getObjectivesForLesson(curriculumType, semester, subjectName, lessonTitle, className = '') {
+  const lessons = getLessonsForSubject(curriculumType, semester, subjectName, className);
   const found = lessons.find(l => l.lesson === lessonTitle || l.displayTitle === lessonTitle || lessonTitle.includes(l.lesson));
   return found ? found.objectives : [];
 }
@@ -120,4 +215,4 @@ export function formatStrategiesToMarkdown(selectedStrategies = [], customStrate
   return all.map(s => `- ${s}`).join('\n');
 }
 
-export { POPULAR_TEACHING_STRATEGIES };
+export { POPULAR_TEACHING_STRATEGIES, SAUDI_STAGES, AMERICAN_STAGES };
