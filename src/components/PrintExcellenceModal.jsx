@@ -105,7 +105,7 @@ export default function PrintExcellenceModal({
       allIndicatorsList
         .filter(i => {
           const ev = evidenceOverrides[i.id] || evidences[i.id];
-          return Boolean(ev && (ev.isCompleted || ev.description?.trim() || ev.fileName || ev.linkUrl));
+          return Boolean((ev && (ev.isCompleted || ev.description?.trim() || ev.fileName || ev.linkUrl)) || i.defaultEvidence);
         })
         .map(i => i.id)
     );
@@ -173,7 +173,7 @@ export default function PrintExcellenceModal({
       d.criteria.forEach(c => {
         c.indicators.forEach(i => {
           const ev = evidenceOverrides[i.id] || evidences[i.id];
-          if (ev && (ev.isCompleted || ev.description?.trim() || ev.fileName || ev.linkUrl)) count++;
+          if ((ev && (ev.isCompleted || ev.description?.trim() || ev.fileName || ev.linkUrl)) || Boolean(i.defaultEvidence)) count++;
         });
       });
     });
@@ -251,7 +251,7 @@ export default function PrintExcellenceModal({
   };
 
   return (
-    <div style={{
+    <div className="excellence-modal-root" style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -270,42 +270,82 @@ export default function PrintExcellenceModal({
       {/* Printable CSS Injection */}
       <style>{`
         @media print {
+          html, body {
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
           body * {
             visibility: hidden !important;
           }
-          #excellence-printable-document, #excellence-printable-document * {
+          .no-print, .no-print * {
+            display: none !important;
+          }
+
+          /* Reset all modal containers so pagination flows naturally across infinite pages */
+          .excellence-modal-root,
+          .excellence-modal-dialog,
+          .excellence-modal-preview-scroll {
+            position: static !important;
+            inset: auto !important;
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+            display: block !important;
+            backdrop-filter: none !important;
+          }
+
+          #excellence-printable-document,
+          #excellence-printable-document * {
             visibility: visible !important;
           }
+
           #excellence-printable-document {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
             width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
             color: #0f172a !important;
             box-shadow: none !important;
+            border: none !important;
+            display: block !important;
           }
-          .no-print {
-            display: none !important;
-          }
+
           .page-break-before {
             page-break-before: always !important;
             break-before: page !important;
           }
+
           .avoid-break {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
+
           @page {
             size: A4 portrait;
-            margin: 1.2cm 1.2cm 1.2cm 1.2cm;
+            margin: 12mm 10mm 12mm 10mm;
           }
         }
       `}</style>
 
-      <div className="glass-panel" style={{
+      <div className="excellence-modal-dialog glass-panel" style={{
         width: '1200px',
         maxWidth: '100%',
         maxHeight: '94vh',
@@ -654,7 +694,7 @@ export default function PrintExcellenceModal({
         </div>
 
         {/* ================= DOCUMENT PREVIEW AREA (PRINTABLE) ================= */}
-        <div style={{
+        <div className="excellence-modal-preview-scroll" style={{
           flex: 1,
           overflowY: 'auto',
           padding: '24px',
@@ -793,7 +833,7 @@ export default function PrintExcellenceModal({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {filteredData.map((domain, dIdx) => (
-                  <div key={domain.id} className="avoid-break" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div key={domain.id} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     
                     {/* Domain Banner */}
                     <div style={{
