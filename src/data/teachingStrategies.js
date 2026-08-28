@@ -156,4 +156,93 @@ export const POPULAR_TEACHING_STRATEGIES = [
   }
 ];
 
+// أشهر مصادر التعلم والوسائل والتقنيات التعليمية
+export const POPULAR_LEARNING_RESOURCES = [
+  {
+    id: 'smartboard',
+    nameAr: 'السبورة الذكية / التفاعلية',
+    nameEn: 'Interactive Smartboard',
+    category: 'شاشات وتقنيات تفاعلية',
+    desc: 'عرض الدروس والأنشطة الرقمية والمخططات التفاعلية وإشراك الطلاب على الشاشة.'
+  },
+  {
+    id: 'madrasati',
+    nameAr: 'منصة مدرستي / المنصات الرقمية',
+    nameEn: 'Madrasati E-Learning Platform',
+    category: 'منصات ومقررات رقمية',
+    desc: 'الواجبات الإلكترونية، الإثراءات، بنك الأسئلة، وغرف النقاش الافتراضية.'
+  },
+  {
+    id: 'textbook',
+    nameAr: 'كتاب الطالب ودليل الأنشطة',
+    nameEn: 'Student Textbook & Guide',
+    category: 'مصادر مطبوعة',
+    desc: 'استعراض الشروحات، التمارين والمسائل التدريبية، وأنشطة الاستكشاف.'
+  },
+  {
+    id: 'worksheets',
+    nameAr: 'أوراق العمل والمهام الأدائية',
+    nameEn: 'Worksheets & Performance Tasks',
+    category: 'أنشطة تطبيقية',
+    desc: 'أوراق عمل فردية وجماعية لتدريب الطلاب وقياس الفهم الفوري والتطبيق.'
+  },
+  {
+    id: 'presentation',
+    nameAr: 'عروض تقديمية (PowerPoint / Canva)',
+    nameEn: 'Presentation Slides',
+    category: 'وسائط بصرية',
+    desc: 'شرائح عرض منظمة تتضمن خرائط مفاهيم، صوراً ورسوماً توضيحية جاذبة.'
+  },
+  {
+    id: 'simulations',
+    nameAr: 'برمجيات ومحاكاة رقمية (GeoGebra / PhET)',
+    nameEn: 'Simulations (GeoGebra / PhET / Desmos)',
+    category: 'مختبرات ومحاكاة افتراضية',
+    desc: 'تجارب تفاعلية في الرياضيات والعلوم والفيزياء لتمثيل المفاهيم المجردة.'
+  },
+  {
+    id: 'school_lab',
+    nameAr: 'المعمل المدرسي / الأدوات المخبرية',
+    nameEn: 'School Lab & Instruments',
+    category: 'تجارب حسية وواقعية',
+    desc: 'أدوات القياس، المجاهر، المحاليل، والمجسمات العلمية لإجراء التجارب.'
+  },
+  {
+    id: 'educational_videos',
+    nameAr: 'مقاطع مرئية تعليمية (يوتيوب / عين)',
+    nameEn: 'Educational Videos & Animation',
+    category: 'وسائط سمعية بصرية',
+    desc: 'فيديوهات علمية وتاريخية وثائقية ورسوم متحركة لتجسيد المعارف.'
+  },
+  {
+    id: 'manipulatives',
+    nameAr: 'مجسمات ونماذج محسوسة (Manipulatives)',
+    nameEn: 'Concrete Models & Manipulatives',
+    category: 'أدوات ونماذج حسية',
+    desc: 'أشكال هندسية، كتل عد، مجسمات ثلاثية الأبعاد لتنمية الفهم الحسي.'
+  },
+  {
+    id: 'tablets_devices',
+    nameAr: 'أجهزة لوحية وحواسب (iPads / Laptops)',
+    nameEn: 'Student Tablets & Laptops',
+    category: 'أجهزة رقمية',
+    desc: 'استخدام أجهزة الطلاب في البحث السريع، الأنشطة الفردية، والتعلم الذاتي.'
+  },
+  {
+    id: 'flashcards_qr',
+    nameAr: 'بطاقات تعليمية ورموز QR التفاعلية',
+    nameEn: 'Flashcards & QR Interactive Codes',
+    category: 'بطاقات وتفاعل سريع',
+    desc: 'بطاقات التحدي، ومسح الـ QR للانتقال الفوري إلى مصادر إثرائية واختبارات.'
+  },
+  {
+    id: 'gamification_tools',
+    nameAr: 'تطبيقات تفاعلية (Kahoot / Quizizz / Wordwall)',
+    nameEn: 'Interactive Quiz Apps',
+    category: 'تلعيب ومسابقات',
+    desc: 'مسابقات تفاعلية سريعة لتحفيز التنافس الإيجابي والتقويم التكويني.'
+  }
+];
+
 export default POPULAR_TEACHING_STRATEGIES;
+

@@ -1,6 +1,6 @@
 import { SAUDI_CURRICULUM_STRICT, SAUDI_STAGES } from './saudiCurriculumData';
 import { AMERICAN_CURRICULUM_STRICT, AMERICAN_STAGES } from './americanCurriculumData';
-import { POPULAR_TEACHING_STRATEGIES } from './teachingStrategies';
+import { POPULAR_TEACHING_STRATEGIES, POPULAR_LEARNING_RESOURCES } from './teachingStrategies';
 
 // النظام معتمد على فصلين دراسيين فقط
 export const SEMESTERS = [
@@ -84,13 +84,12 @@ export function detectStageFromClassName(className = '', curriculumType = CURRIC
     return SAUDI_STAGES.PRIMARY;
   }
 
-  // Default to Secondary if contains 'ثانوي' else Primary
+  // Default to Secondary
   return SAUDI_STAGES.SECONDARY;
 }
 
 /**
  * الكشف الذكي عن نوع المنهج للمدرسة
- * إذا كان اسم المجمع يحتوي على كلمة (عالمي / عالمية / International / American) يتم اعتماد المنهج الأمريكي افتراضياً
  */
 export function detectCurriculumType(schoolName = '', configuredType = null) {
   if (configuredType && Object.values(CURRICULUM_TYPES).includes(configuredType)) {
@@ -122,6 +121,63 @@ export function getCurriculumData(curriculumType = CURRICULUM_TYPES.SAUDI) {
 }
 
 /**
+ * تنظيف ومطابقة مسميات المواد بدقة ذكية فائقة
+ */
+export function matchSubjectKey(rawSubject = '', availableKeys = []) {
+  if (!rawSubject || !availableKeys || availableKeys.length === 0) return null;
+
+  const raw = rawSubject.trim();
+  const rawClean = raw.replace(/^(مادة|درس|كتاب)\s+/g, '').trim().toLowerCase();
+
+  // 1. Direct match
+  const directMatch = availableKeys.find(k => k.trim() === raw || k.toLowerCase().trim() === rawClean);
+  if (directMatch) return directMatch;
+
+  // 2. Exact word inclusion
+  const includeMatch = availableKeys.find(k => {
+    const kClean = k.toLowerCase().trim();
+    return kClean.includes(rawClean) || rawClean.includes(kClean);
+  });
+  if (includeMatch) return includeMatch;
+
+  // 3. Subject aliases & keywords map
+  const SUBJECT_KEYWORDS = {
+    'الرياضيات 1-1': ['رياضيات 1-1', 'رياضيات 1', 'رياضيات1-1', '1-1', 'رياضيات 1ث', 'رياضيات 1ث ف1', 'رياضيات', 'الرياضيات', 'الرياضيات 1-1', 'math 1-1', 'math 1', 'math', 'maths', 'mathematics'],
+    'الرياضيات': ['رياضيات 1-1', 'رياضيات 1', 'رياضيات1-1', '1-1', 'رياضيات 1ث', 'رياضيات 1ث ف1', 'رياضيات', 'الرياضيات', 'الرياضيات 1-1', 'math 1-1', 'math 1', 'math', 'maths', 'mathematics'],
+    'الأحياء': ['أحياء', 'احياء', 'الأحياء', 'الاحياء', 'biology', 'علم الأحياء', 'life science'],
+    'الفيزياء': ['فيزياء', 'الفيزياء', 'physics', 'فيزيائية'],
+    'الكيمياء': ['كيمياء', 'الكيمياء', 'chemistry', 'كيميائية'],
+    'علم البيئة': ['بيئة', 'البيئة', 'علم البيئة', 'ecology', 'environmental'],
+    'علوم الأرض والفضاء': ['علوم الأرض', 'علوم الارض', 'فضاء', 'الفضاء', 'جيولوجيا', 'earth science', 'astronomy', 'earth & space'],
+    'الكفايات اللغوية (اللغة العربية)': ['كفايات', 'الكفايات', 'الكفايات اللغوية', 'لغتي', 'لغتي الخالدة', 'لغتي الجميلة', 'لغة عربية', 'اللغة العربية', 'عربي', 'نحو', 'إملاء', 'املاء', 'بلاغة', 'أدب', 'ادب', 'قراءة', 'arabic', 'ela'],
+    'التقنية الرقمية (الحاسب والبرمجة)': ['تقنية', 'التقنية', 'تقنية رقمية', 'التقنية الرقمية', 'مهارات رقمية', 'المهارات الرقمية', 'حاسب', 'حاسب آلي', 'الحاسب الآلي', 'حاسوب', 'الحاسوب', 'برمجة', 'بايثون', 'python', 'computer', 'ict', 'it', 'digital skills'],
+    'القرآن الكريم والدراسات الإسلامية': ['دراسات إسلامية', 'الدراسات الإسلامية', 'دراسات اسلامية', 'إسلاميات', 'اسلاميات', 'تربية إسلامية', 'التربية الإسلامية', 'دين', 'القرآن', 'القرآن الكريم', 'قرآن', 'توحيد', 'التوحيد', 'فقه', 'الفقه', 'حديث', 'الحديث', 'تفسير', 'التفسير', 'تجويد', 'islamic'],
+    'الدراسات الاجتماعية': ['اجتماعيات', 'الاجتماعيات', 'دراسات اجتماعية', 'الدراسات الاجتماعية', 'تاريخ', 'التاريخ', 'جغرافيا', 'الجغرافيا', 'وطنية', 'تربية وطنية', 'social studies', 'history', 'geography'],
+    'اللغة الإنجليزية': ['إنجليزي', 'انجليزي', 'الانجليزي', 'الإنجليزي', 'اللغة الإنجليزية', 'اللغة الانجليزية', 'english', 'mega goal', 'super goal', 'we can', 'top goal'],
+    'العلوم': ['علوم', 'العلوم', 'science', 'general science', 'physical science'],
+    'التفكير الناقد': ['تفكير ناقد', 'التفكير الناقد', 'critical thinking'],
+    'التربية البدنية والدفاع عن النفس': ['بدنية', 'البدنية', 'تربية بدنية', 'التربية البدنية', 'دفاع عن النفس', 'رياضة', 'pe', 'physical education', 'sports'],
+    'التربية الفنية': ['فنية', 'الفنية', 'تربية فنية', 'التربية الفنية', 'رسم', 'الرسم', 'art', 'arts', 'fine arts'],
+    'المهارات الحياتية والأسرية': ['مهارات حياتية', 'المهارات الحياتية', 'مهارات أسرية', 'المهارات الأسرية', 'تربية أسرية', 'life skills', 'home economics']
+  };
+
+  for (const [canonical, keywords] of Object.entries(SUBJECT_KEYWORDS)) {
+    const isMatched = keywords.some(kw => rawClean.includes(kw) || kw.includes(rawClean));
+    if (isMatched) {
+      // Find key matching canonical or any of keywords
+      const foundKey = availableKeys.find(k => {
+        const kClean = k.toLowerCase().trim();
+        return kClean.includes(canonical.toLowerCase()) || 
+          keywords.some(kw => kClean.includes(kw));
+      });
+      if (foundKey) return foundKey;
+    }
+  }
+
+  return null;
+}
+
+/**
  * استخراج قائمة المواد المتاحة لفصل دراسي ومرحلة معينة بدقة صارمة
  */
 export function getAvailableCurriculumSubjects(curriculumType, semester, className = '', explicitStage = null) {
@@ -139,9 +195,9 @@ export function getAvailableCurriculumSubjects(curriculumType, semester, classNa
 }
 
 /**
- * استخراج الدروس المعتمدة لمادة معينة في فصل دراسي ومرحلة محددة بدقة تامة ومنع تداخل المراحل
+ * استخراج الدروس المعتمدة لمادة معينة في فصل دراسي ومرحلة محددة مع التمييز الواضح التام للمواد
  */
-export function getLessonsForSubject(curriculumType, semester, subjectName, className = '', explicitStage = null) {
+export function getLessonsForSubject(curriculumType, semester, subjectName = '', className = '', explicitStage = null) {
   const data = getCurriculumData(curriculumType);
   const stage = explicitStage || detectStageFromClassName(className, curriculumType);
   
@@ -150,42 +206,59 @@ export function getLessonsForSubject(curriculumType, semester, subjectName, clas
 
   const matchedSemesterKey = Object.keys(stageData).find(s => s.includes(semester) || semester.includes(s)) || Object.keys(stageData)[0];
   const semesterData = stageData[matchedSemesterKey] || {};
+  const availableSubjectKeys = Object.keys(semesterData);
 
-  // Find exact or closest subject match within the stage
-  let matchedSubjectKey = Object.keys(semesterData).find(s => s === subjectName || s.includes(subjectName) || subjectName.includes(s));
-  
-  if (!matchedSubjectKey) {
-    const lowerSub = (subjectName || '').toLowerCase();
-    matchedSubjectKey = Object.keys(semesterData).find(k => {
-      const lowerK = k.toLowerCase();
-      return lowerK.includes(lowerSub) || lowerSub.includes(lowerK);
-    });
+  if (availableSubjectKeys.length === 0) return [];
+
+  // If specific subjectName is provided and is not '__ALL__'
+  if (subjectName && subjectName !== '__ALL__') {
+    const matchedKey = matchSubjectKey(subjectName, availableSubjectKeys);
+    if (matchedKey && semesterData[matchedKey]) {
+      const list = semesterData[matchedKey] || [];
+      return list.map(item => ({
+        subject: item.subject || matchedKey,
+        grade: item.grade,
+        unit: item.unit,
+        lesson: item.lesson,
+        displayTitle: `[${item.subject || matchedKey}] ${item.lesson} (${item.unit} - ${item.grade})`,
+        shortTitle: `${item.lesson} (${item.unit})`,
+        objectives: item.objectives || []
+      }));
+    }
   }
 
-  // If still not matched, check if all subjects in stage have lessons
-  if (!matchedSubjectKey) {
-    // If subject not found directly, return all lessons for this stage's semester as fallback
-    const allLessons = [];
-    Object.values(semesterData).forEach(list => {
-      if (Array.isArray(list)) allLessons.push(...list);
-    });
-    return allLessons.map(item => ({
-      grade: item.grade,
-      unit: item.unit,
-      lesson: item.lesson,
-      displayTitle: `${item.lesson} (${item.unit} - ${item.grade})`,
-      objectives: item.objectives || []
-    }));
-  }
+  // Fallback: If no subject matched or all subjects requested, return all lessons categorized with clear subject tags
+  const allLessons = [];
+  Object.entries(semesterData).forEach(([subjKey, list]) => {
+    if (Array.isArray(list)) {
+      list.forEach(item => {
+        allLessons.push({
+          subject: item.subject || subjKey,
+          grade: item.grade,
+          unit: item.unit,
+          lesson: item.lesson,
+          displayTitle: `[${item.subject || subjKey}] ${item.lesson} (${item.unit} - ${item.grade})`,
+          shortTitle: `${item.lesson} (${item.unit})`,
+          objectives: item.objectives || []
+        });
+      });
+    }
+  });
 
-  const list = semesterData[matchedSubjectKey] || [];
-  return list.map(item => ({
-    grade: item.grade,
-    unit: item.unit,
-    lesson: item.lesson,
-    displayTitle: `${item.lesson} (${item.unit} - ${item.grade})`,
-    objectives: item.objectives || []
-  }));
+  return allLessons;
+}
+
+/**
+ * تجميع قائمة الدروس حسب المادة لتمكين الـ optgroup والعرض المصنف بدقة
+ */
+export function groupLessonsBySubject(lessons = []) {
+  const groups = {};
+  lessons.forEach(l => {
+    const s = l.subject || 'دروس عامة';
+    if (!groups[s]) groups[s] = [];
+    groups[s].push(l);
+  });
+  return groups;
 }
 
 /**
@@ -215,4 +288,14 @@ export function formatStrategiesToMarkdown(selectedStrategies = [], customStrate
   return all.map(s => `- ${s}`).join('\n');
 }
 
-export { POPULAR_TEACHING_STRATEGIES, SAUDI_STAGES, AMERICAN_STAGES };
+/**
+ * تنسيق مصادر التعلم المختارة والمضافة يدوياً إلى نص Markdown
+ */
+export function formatResourcesToMarkdown(selectedResources = [], customResources = []) {
+  const all = [...selectedResources, ...customResources].filter(Boolean);
+  if (all.length === 0) return '';
+  return all.map(r => `- ${r}`).join('\n');
+}
+
+export { POPULAR_TEACHING_STRATEGIES, POPULAR_LEARNING_RESOURCES, SAUDI_STAGES, AMERICAN_STAGES };
+

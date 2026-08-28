@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, writeBatch, query, where } from 'firebase/firestore';
-import { Calendar, BookOpen, Plus, Trash2, Save, Printer } from 'lucide-react';
+import { Calendar, BookOpen, Plus, Trash2, Save, Printer, ShieldCheck, Lock, Sparkles, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { SAUDI_CURRICULUM_STRICT } from '../data/saudiCurriculumData';
 import PrintScheduleModal from '../components/PrintScheduleModal';
 
 export default function ManageSchedules({ schoolId }) {
@@ -28,9 +29,33 @@ export default function ManageSchedules({ schoolId }) {
   const [schedulesList, setSchedulesList] = useState([]);
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
   
-  // For managing subjects
+  // For managing custom subjects
   const [newSubject, setNewSubject] = useState('');
+
+  // Extract all official protected core subjects directly from verified curriculum
+  const officialCoreSubjects = useMemo(() => {
+    const list = [];
+    if (!SAUDI_CURRICULUM_STRICT) return list;
+    Object.entries(SAUDI_CURRICULUM_STRICT).forEach(([stage, semesters]) => {
+      Object.entries(semesters || {}).forEach(([semName, subjectObj]) => {
+        Object.entries(subjectObj || {}).forEach(([subjName, lessonsList]) => {
+          if (Array.isArray(lessonsList) && lessonsList.length > 0) {
+            const sample = lessonsList[0];
+            list.push({
+              name: subjName,
+              stage,
+              semester: semName,
+              grade: sample.grade || 'محدد بالمنهج',
+              lessonCount: lessonsList.length
+            });
+          }
+        });
+      });
+    });
+    return list;
+  }, []);
   
   // Data loading
   useEffect(() => {
@@ -46,20 +71,33 @@ export default function ManageSchedules({ schoolId }) {
       setTeachers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    const LEGACY_MOCK_SUBJECTS = new Set([
+      'القرآن الكريم', 'التفسير', 'التوحيد', 'الفقه', 'الحديث', 'لغتي', 'اللغة العربية',
+      'الرياضيات', 'العلوم', 'العلوم الطبيعية', 'الدراسات الاجتماعية', 'الاجتماعيات',
+      'اللغة الإنجليزية', 'التربية الفنية', 'التربية البدنية', 'كيمياء', 'فيزياء', 'أحياء'
+    ]);
+
     const qSubjects = query(collection(db, 'subjects'), where('schoolId', '==', schoolId));
-    const unsubSubjects = onSnapshot(qSubjects, (snap) => {
-      let subs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      if (subs.length === 0) {
-        const defaultSubjects = [
-          t('manageSchedules.quran'), t('manageSchedules.tafsir'), t('manageSchedules.tawhid'),
-          t('manageSchedules.fiqh'), t('manageSchedules.hadith'), t('manageSchedules.arabic'),
-          t('manageSchedules.math'), t('manageSchedules.science'), t('manageSchedules.socialStudies'),
-          t('manageSchedules.english'), t('manageSchedules.art'), t('manageSchedules.pe')
-        ];
-        defaultSubjects.forEach(async (sub) => {
-          await addDoc(collection(db, 'subjects'), { name: sub, schoolId });
-        });
+    const unsubSubjects = onSnapshot(qSubjects, async (snap) => {
+      // Clean legacy mock documents from Firestore
+      const legacyDocs = snap.docs.filter(docSnap => {
+        const name = docSnap.data()?.name?.trim();
+        return LEGACY_MOCK_SUBJECTS.has(name);
+      });
+
+      if (legacyDocs.length > 0) {
+        const batch = writeBatch(db);
+        legacyDocs.forEach(d => batch.delete(d.ref));
+        try {
+          await batch.commit();
+        } catch (e) {
+          console.error("Auto-cleanup error:", e);
+        }
       }
+
+      const subs = snap.docs
+        .filter(docSnap => !LEGACY_MOCK_SUBJECTS.has(docSnap.data()?.name?.trim()))
+        .map(doc => ({ id: doc.id, ...doc.data() }));
       setSubjects(subs);
     });
     
@@ -192,44 +230,171 @@ export default function ManageSchedules({ schoolId }) {
     }
   };
 
+  // Clean legacy temporary / duplicate mock subjects from database
+  const handleCleanLegacySubjects = async () => {
+    if (!window.confirm('هل أنت متأكد من حذف المواد التقديرية المؤقتة السابقة وتحديث قائمة المواد الأساسية المعتمدة؟')) return;
+    setIsCleaning(true);
+    try {
+      const q = query(collection(db, 'subjects'), where('schoolId', '==', schoolId));
+      const snap = await getDocs(q);
+      const batch = writeBatch(db);
+      snap.docs.forEach(docSnap => {
+        batch.delete(docSnap.ref);
+      });
+      await batch.commit();
+      alert('تم تنظيف كافة المواد التقديرية بنجاح! المواد الأساسية الرسمية المعتمدة فقط هي المثبتة الآن.');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تنظيف المواد');
+    } finally {
+      setIsCleaning(false);
+    }
+  };
+
+  // Filter and deduplicate custom subjects (excluding any that match core subject names)
+  const customSubjects = useMemo(() => {
+    const seen = new Set();
+    return subjects.filter(sub => {
+      const name = sub?.name?.trim();
+      if (!name) return false;
+      if (officialCoreSubjects.some(core => core.name.trim() === name)) return false;
+      if (seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    });
+  }, [subjects, officialCoreSubjects]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
       {/* Subjects Management */}
       <div className="glass-panel" style={{ padding: '24px' }}>
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: 'var(--color-primary-dark)' }}>
-          <BookOpen size={24} /> {t('manageSchedules.manageSubjectsTitle')}
-        </h2>
-        <form onSubmit={handleAddSubject} style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-          <input 
-            type="text" 
-            className="input-field" 
-            placeholder={t('manageSchedules.newSubjectPlaceholder')} 
-            value={newSubject}
-            onChange={(e) => setNewSubject(e.target.value)}
-            style={{ marginBottom: 0, flex: 1, maxWidth: '300px' }}
-          />
-          <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Plus size={18} /> {t('manageSchedules.addSubject')}
-          </button>
-        </form>
-        
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-          {subjects.map(sub => (
-            <div key={sub.id} style={{ 
-              background: 'rgba(255,255,255,0.5)', padding: '8px 16px', borderRadius: '20px', 
-              display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(0,0,0,0.05)'
-            }}>
-              <span>{sub.name}</span>
-              <button 
-                onClick={() => handleDeleteSubject(sub.id)}
-                style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: 0, display: 'flex' }}
-                title={t('manageSchedules.delete')}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-primary-dark)', margin: 0 }}>
+            <BookOpen size={24} /> {t('manageSchedules.manageSubjectsTitle')}
+          </h2>
+
+          {subjects.length > 0 && (
+            <button
+              type="button"
+              onClick={handleCleanLegacySubjects}
+              disabled={isCleaning}
+              style={{
+                background: '#fef2f2',
+                border: '1px solid #fca5a5',
+                color: '#b91c1c',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              title="إزالة المواد التقديرية السابقة المخزنة بالمدرسة"
+            >
+              <Trash2 size={15} />
+              {isCleaning ? 'جارٍ التنظيف...' : '🧹 تنظيف المواد التقديرية السابقة'}
+            </button>
+          )}
+        </div>
+
+        {/* 1. Core Official Subjects Section (Non-deletable & Protected) */}
+        <div style={{
+          background: 'linear-gradient(135deg, #f0fdfa, #eff6ff)',
+          border: '1px solid #99f6e4',
+          borderRadius: '12px',
+          padding: '16px',
+          marginBottom: '20px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', fontWeight: 'bold', color: '#0f766e', fontSize: '14px' }}>
+            <ShieldCheck size={18} color="#0d9488" /> المواد الأساسية المعتمدة (المنهج الرسمي - لا يمكن حذفها نهائياً):
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            {officialCoreSubjects.map((core, idx) => (
+              <div 
+                key={idx}
+                style={{
+                  background: 'white',
+                  border: '1px solid #0d9488',
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 4px rgba(13, 148, 136, 0.08)'
+                }}
               >
-                <Trash2 size={16} />
-              </button>
+                <Lock size={14} color="#0d9488" />
+                <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '13px' }}>
+                  {core.name}
+                </span>
+                <span style={{ 
+                  background: '#ccfbf1', 
+                  color: '#0f766e', 
+                  fontSize: '11px', 
+                  fontWeight: 'bold',
+                  padding: '2px 8px', 
+                  borderRadius: '6px' 
+                }}>
+                  {core.grade}
+                </span>
+                <span style={{
+                  background: '#e0f2fe',
+                  color: '#0369a1',
+                  fontSize: '11px',
+                  padding: '2px 6px',
+                  borderRadius: '6px'
+                }}>
+                  {core.lessonCount} درساً معتمداً
+                </span>
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#0d9488' }}>
+            🔒 يتم تثبيت هذه المواد تلقائياً من المنهج المعتمد لوزارة التعليم وتسند فورياً للصفوف المختصة مع كامل دروسها وأهدافها.
+          </p>
+        </div>
+
+        {/* 2. Custom School Subjects Section */}
+        <div style={{ marginTop: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '8px' }}>
+            إضافة مادة مخصصة أو إضافية للمدرسة:
+          </label>
+          <form onSubmit={handleAddSubject} style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+            <input 
+              type="text" 
+              className="input-field" 
+              placeholder={t('manageSchedules.newSubjectPlaceholder')} 
+              value={newSubject}
+              onChange={(e) => setNewSubject(e.target.value)}
+              style={{ marginBottom: 0, flex: 1, maxWidth: '300px' }}
+            />
+            <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Plus size={18} /> {t('manageSchedules.addSubject')}
+            </button>
+          </form>
+          
+          {customSubjects.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {customSubjects.map(sub => (
+                <div key={sub.id} style={{ 
+                  background: 'white', padding: '6px 14px', borderRadius: '8px', 
+                  display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #e2e8f0'
+                }}>
+                  <span style={{ fontSize: '13px', fontWeight: '500' }}>{sub.name}</span>
+                  <button 
+                    onClick={() => handleDeleteSubject(sub.id)}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: 0, display: 'flex' }}
+                    title={t('manageSchedules.delete')}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -323,7 +488,26 @@ export default function ManageSchedules({ schoolId }) {
                   <td>
                     <select className="input-field" value={entry.subject} onChange={(e) => handleRowChange(entry.id, 'subject', e.target.value)} style={{ marginBottom: 0 }}>
                       <option value="">{t('manageSchedules.selectSubject')}</option>
-                      {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                      
+                      {officialCoreSubjects.length > 0 && (
+                        <optgroup label="🔒 المواد الأساسية المعتمدة">
+                          {officialCoreSubjects.map(c => (
+                            <option key={c.name} value={c.name}>
+                              {c.name} ({c.grade})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+
+                      {customSubjects.length > 0 && (
+                        <optgroup label="📋 المواد الإضافية">
+                          {customSubjects.map(s => (
+                            <option key={s.id} value={s.name}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                   </td>
                   <td>

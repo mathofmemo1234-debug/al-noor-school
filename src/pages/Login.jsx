@@ -11,7 +11,14 @@ import './Login.css';
 export default function Login() {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { setLoginRole } = useAuth();
+  const { currentUser, userRole, loading: authLoading, setLoginRole } = useAuth();
+  
+  // Auto-redirect already authenticated users
+  React.useEffect(() => {
+    if (!authLoading && currentUser && userRole) {
+      navigate(`/${userRole}`, { replace: true });
+    }
+  }, [authLoading, currentUser, userRole, navigate]);
   
   // Form fields
   const [nationalId, setNationalId] = useState('');

@@ -16,11 +16,13 @@ export default function PrintLessonPreparationModal({ prep, onClose }) {
 
   const sections = [
     { key: 'goals', title: 'الأهداف التعليمية والسلوكية' },
-    { key: 'portfolio', title: 'ملف الإنجاز والمخرجات المتوقعة' },
+    { key: 'priorKnowledge', title: 'حقبنة: ربط معارف الدرس بالمعارف السابقة للدرس' },
     { key: 'warmup', title: 'التمهيد والتهيئة الحافزة' },
     { key: 'strategy', title: 'استراتيجيات التدريس المتبعة' },
-    { key: 'content', title: 'المحتوى والإجراءات التعليمية' },
     { key: 'resources', title: 'الوسائل والتقنيات ومصادر التعلم' },
+    { key: 'stem', title: 'أنشطة وتطبيقات نظام STEM (العلوم، التقنية، الهندسة، الرياضيات)' },
+    { key: 'content', title: 'المحتوى والإجراءات التعليمية' },
+    { key: 'portfolio', title: 'ملف الإنجاز والمخرجات المتوقعة' },
     { key: 'formativeEval', title: 'التقويم المرحلي التكويني' },
     { key: 'summativeEval', title: 'التقويم الختامي النهائي' },
     { key: 'homework', title: 'الواجبات والأنشطة الإثرائية' },

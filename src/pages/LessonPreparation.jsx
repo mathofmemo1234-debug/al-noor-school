@@ -6,7 +6,8 @@ import MarkdownViewer from '../components/MarkdownViewer';
 import { 
   Save, UploadCloud, Eye, Edit, Trash2, X, Image as ImageIcon, Loader, 
   Printer, BookOpen, Target, Sparkles, CheckSquare, Square, Plus, 
-  Layers, CheckCircle2, Globe, HelpCircle, Compass, GraduationCap
+  Layers, CheckCircle2, Globe, HelpCircle, Compass, GraduationCap,
+  Cpu, Atom, Laptop, Lightbulb, Box, BookmarkCheck
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import MarkdownInput from '../components/MarkdownInput';
@@ -22,9 +23,12 @@ import {
   getCurriculumData, 
   getAvailableCurriculumSubjects,
   getLessonsForSubject,
+  groupLessonsBySubject,
   POPULAR_TEACHING_STRATEGIES,
+  POPULAR_LEARNING_RESOURCES,
   formatGoalsToMarkdown,
-  formatStrategiesToMarkdown
+  formatStrategiesToMarkdown,
+  formatResourcesToMarkdown
 } from '../data/curriculumService';
 
 const DEFAULT_PERIODS = [
@@ -66,11 +70,12 @@ export default function LessonPreparation() {
   const [selectedSubject, setSelectedSubject] = useState('');
   const [teacherDocId, setTeacherDocId] = useState(null);
 
-  // Step 4: Lesson Selection (Strictly segregated by stage and grade)
+  // Step 4: Lesson Selection (Strictly segregated by stage, grade, and subject)
   const [availableLessons, setAvailableLessons] = useState([]);
   const [selectedLesson, setSelectedLesson] = useState('');
   const [isCustomLesson, setIsCustomLesson] = useState(false);
   const [customLessonTitle, setCustomLessonTitle] = useState('');
+  const [showAllStageLessons, setShowAllStageLessons] = useState(false);
 
   // Step 5: Objectives (Curriculum auto-loaded + Custom manual additions)
   const [lessonObjectives, setLessonObjectives] = useState([]);
@@ -83,7 +88,12 @@ export default function LessonPreparation() {
   const [customStrategies, setCustomStrategies] = useState([]);
   const [newStrategyInput, setNewStrategyInput] = useState('');
 
-  // Step 7: Dates, Period, Weeks
+  // Step 7: Learning Resources & Media (Popular list + Custom manual additions)
+  const [selectedResources, setSelectedResources] = useState([]);
+  const [customResources, setCustomResources] = useState([]);
+  const [newResourceInput, setNewResourceInput] = useState('');
+
+  // Step 8: Dates, Period, Weeks
   const [weeks] = useState(Array.from({length: 18}, (_, i) => `الأسبوع ${i + 1}`));
   const [selectedWeek, setSelectedWeek] = useState('الأسبوع 1');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -92,11 +102,13 @@ export default function LessonPreparation() {
 
   // Form Markdown fields
   const [goals, setGoals] = useState('');
-  const [strategy, setStrategy] = useState('');
-  const [portfolio, setPortfolio] = useState('');
+  const [priorKnowledge, setPriorKnowledge] = useState('');
   const [warmup, setWarmup] = useState('');
-  const [content, setContent] = useState('');
+  const [strategy, setStrategy] = useState('');
   const [resources, setResources] = useState('');
+  const [stem, setStem] = useState('');
+  const [content, setContent] = useState('');
+  const [portfolio, setPortfolio] = useState('');
   const [formativeEval, setFormativeEval] = useState('');
   const [summativeEval, setSummativeEval] = useState('');
   const [homework, setHomework] = useState('');
@@ -105,6 +117,7 @@ export default function LessonPreparation() {
   const [fileUrl, setFileUrl] = useState('');
   const [fileName, setFileName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
 
   // Saving state
   const [isSaving, setIsSaving] = useState(false);
@@ -313,7 +326,7 @@ export default function LessonPreparation() {
     return () => unsubClasses();
   }, [teacherDocId, userData, userData?.schoolId, userData?.nationalId, userData?.name, userData?.subject, curriculumType, selectedSemester, selectedStage]);
 
-  // Update subjects whenever selectedClass changes
+  // Update subjects whenever selectedClass or selectedStage or selectedSemester changes
   useEffect(() => {
     if (!selectedClass) {
       setSubjects([]);
@@ -321,14 +334,22 @@ export default function LessonPreparation() {
       return;
     }
 
-    if (classToSubjectsMap[selectedClass]) {
+    if (classToSubjectsMap[selectedClass] && classToSubjectsMap[selectedClass].size > 0) {
       const classSubjects = Array.from(classToSubjectsMap[selectedClass]);
       setSubjects(classSubjects);
       if (!selectedSubject || !classSubjects.includes(selectedSubject)) {
         setSelectedSubject(classSubjects[0] || '');
       }
+    } else {
+      const currSubjects = getAvailableCurriculumSubjects(curriculumType, selectedSemester, selectedClass, selectedStage);
+      const profileSubjects = userData?.subject ? userData.subject.split(/[,،]/).map(s => s.trim()).filter(Boolean) : [];
+      const finalSubjs = currSubjects.length > 0 ? currSubjects : profileSubjects;
+      setSubjects(finalSubjs);
+      if (!selectedSubject || !finalSubjs.includes(selectedSubject)) {
+        setSelectedSubject(finalSubjs[0] || '');
+      }
     }
-  }, [selectedClass, classToSubjectsMap]);
+  }, [selectedClass, classToSubjectsMap, curriculumType, selectedSemester, selectedStage, userData?.subject]);
 
   // 6. Fetch available periods based on selected class and subject
   useEffect(() => {
@@ -377,29 +398,29 @@ export default function LessonPreparation() {
 
   // 7. Update Available Lessons STRICTLY filtered by Stage, Grade, Semester, and Subject
   useEffect(() => {
-    if (!selectedSubject) {
+    if (!selectedSubject && !showAllStageLessons) {
       setAvailableLessons([]);
       setSelectedLesson('');
       setLessonObjectives([]);
       return;
     }
 
-    const lessons = getLessonsForSubject(curriculumType, selectedSemester, selectedSubject, selectedClass, selectedStage);
+    const effectiveSubjectParam = showAllStageLessons ? '__ALL__' : selectedSubject;
+    const lessons = getLessonsForSubject(curriculumType, selectedSemester, effectiveSubjectParam, selectedClass, selectedStage);
     setAvailableLessons(lessons);
 
     if (lessons.length > 0) {
-      const matched = lessons.find(l => l.lesson === selectedLesson || l.displayTitle === selectedLesson);
+      const matched = lessons.find(l => l.lesson === selectedLesson || l.displayTitle === selectedLesson || l.shortTitle === selectedLesson);
       if (!matched && !isCustomLesson) {
         setSelectedLesson(lessons[0].displayTitle);
-        setLessonObjectives(lessons[0].objectives);
-        setSelectedObjectives(lessons[0].objectives);
+        setLessonObjectives(lessons[0].objectives || []);
       } else if (matched) {
-        setLessonObjectives(matched.objectives);
+        setLessonObjectives(matched.objectives || []);
       }
     } else {
       setLessonObjectives([]);
     }
-  }, [curriculumType, selectedSemester, selectedSubject, selectedClass, selectedStage, isCustomLesson, selectedLesson]);
+  }, [curriculumType, selectedSemester, selectedSubject, selectedClass, selectedStage, isCustomLesson, selectedLesson, showAllStageLessons]);
 
   // 8. Handle Lesson Selection Change
   const handleLessonChange = (e) => {
@@ -412,13 +433,11 @@ export default function LessonPreparation() {
     } else {
       setIsCustomLesson(false);
       setSelectedLesson(val);
-      const found = availableLessons.find(l => l.displayTitle === val || l.lesson === val);
+      const found = availableLessons.find(l => l.displayTitle === val || l.lesson === val || l.shortTitle === val);
       if (found) {
-        setLessonObjectives(found.objectives);
-        setSelectedObjectives(found.objectives);
+        setLessonObjectives(found.objectives || []);
       } else {
         setLessonObjectives([]);
-        setSelectedObjectives([]);
       }
     }
   };
@@ -438,6 +457,14 @@ export default function LessonPreparation() {
       setStrategy(md);
     }
   }, [selectedStrategies, customStrategies]);
+
+  // 11. Auto-Sync Learning Resources Markdown whenever selectedResources or customResources change
+  useEffect(() => {
+    const md = formatResourcesToMarkdown(selectedResources, customResources);
+    if (md) {
+      setResources(md);
+    }
+  }, [selectedResources, customResources]);
 
   // Objective Checkbox Toggle
   const toggleObjective = (obj) => {
@@ -481,7 +508,29 @@ export default function LessonPreparation() {
     setCustomStrategies(prev => prev.filter((_, i) => i !== index));
   };
 
-  // 11. Fetch existing prep if matching class, subject, week, and period
+  // Learning Resource Toggle
+  const toggleResource = (resourceName) => {
+    setSelectedResources(prev => 
+      prev.includes(resourceName) 
+        ? prev.filter(r => r !== resourceName) 
+        : [...prev, resourceName]
+    );
+  };
+
+  // Add Custom Learning Resource
+  const handleAddCustomResource = (e) => {
+    e.preventDefault();
+    if (!newResourceInput.trim()) return;
+    setCustomResources(prev => [...prev, newResourceInput.trim()]);
+    setNewResourceInput('');
+  };
+
+  // Remove Custom Learning Resource
+  const handleRemoveCustomResource = (index) => {
+    setCustomResources(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // 12. Fetch existing prep if matching class, subject, week, and period
   useEffect(() => {
     if (!teacherDocId || !selectedClass || !selectedSubject || !selectedWeek || !selectedPeriod) {
       return;
@@ -507,13 +556,17 @@ export default function LessonPreparation() {
         if (data.customObjectives) setCustomObjectives(data.customObjectives);
         if (data.selectedStrategies) setSelectedStrategies(data.selectedStrategies);
         if (data.customStrategies) setCustomStrategies(data.customStrategies);
+        if (data.selectedResources) setSelectedResources(data.selectedResources);
+        if (data.customResources) setCustomResources(data.customResources);
         
         setGoals(data.goals || '');
-        setPortfolio(data.portfolio || '');
+        setPriorKnowledge(data.priorKnowledge || data.portfolio || '');
         setWarmup(data.warmup || '');
         setStrategy(data.strategy || '');
         setContent(data.content || '');
         setResources(data.resources || '');
+        setStem(data.stem || '');
+        setPortfolio(data.portfolio || '');
         setFormativeEval(data.formativeEval || '');
         setSummativeEval(data.summativeEval || '');
         setHomework(data.homework || '');
@@ -576,15 +629,19 @@ export default function LessonPreparation() {
         customObjectives,
         selectedStrategies,
         customStrategies,
+        selectedResources,
+        customResources,
         week: selectedWeek,
         date: selectedDate,
         period: selectedPeriod,
         goals,
-        portfolio,
+        priorKnowledge,
         warmup,
         strategy,
-        content,
         resources,
+        stem,
+        content,
+        portfolio,
         formativeEval,
         summativeEval,
         homework,
@@ -637,13 +694,17 @@ export default function LessonPreparation() {
     if (prep.customObjectives) setCustomObjectives(prep.customObjectives);
     if (prep.selectedStrategies) setSelectedStrategies(prep.selectedStrategies);
     if (prep.customStrategies) setCustomStrategies(prep.customStrategies);
+    if (prep.selectedResources) setSelectedResources(prep.selectedResources);
+    if (prep.customResources) setCustomResources(prep.customResources);
     
     setGoals(prep.goals || '');
-    setPortfolio(prep.portfolio || '');
+    setPriorKnowledge(prep.priorKnowledge || prep.portfolio || '');
     setWarmup(prep.warmup || '');
     setStrategy(prep.strategy || '');
     setContent(prep.content || '');
     setResources(prep.resources || '');
+    setStem(prep.stem || '');
+    setPortfolio(prep.portfolio || '');
     setFormativeEval(prep.formativeEval || '');
     setSummativeEval(prep.summativeEval || '');
     setHomework(prep.homework || '');
@@ -973,50 +1034,97 @@ export default function LessonPreparation() {
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <BookOpen size={18} color="#0e7490" /> الخطوة 3: اختيار الدرس المعتمد لـ ({selectedStage} • {selectedSemester})
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <BookOpen size={18} color="#0e7490" /> الخطوة 3: اختيار الدرس المعتمد لمادة ({selectedSubject}) • ({selectedStage} • {selectedSemester})
+                    </div>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                      الدروس مفصولة ومصنفة بدقة تامة حسب المادة والصف لمنع أي تداخل
+                    </p>
                   </div>
                   
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCustomLesson(prev => !prev);
-                      if (!isCustomLesson) setSelectedLesson('');
-                    }}
-                    style={{
-                      background: isCustomLesson ? '#f0fdf4' : '#f1f5f9',
-                      border: isCustomLesson ? '1px solid #86efac' : '1px solid #cbd5e1',
-                      color: isCustomLesson ? '#16a34a' : '#475569',
-                      padding: '4px 12px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {isCustomLesson ? '✓ إدخال درس يدوي مفعل' : '+ كتابة عنوان درس مخصص'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllStageLessons(prev => !prev)}
+                      style={{
+                        background: showAllStageLessons ? '#eff6ff' : '#f8fafc',
+                        border: showAllStageLessons ? '1px solid #93c5fd' : '1px solid #cbd5e1',
+                        color: showAllStageLessons ? '#1d4ed8' : '#64748b',
+                        padding: '4px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <Layers size={14} />
+                      {showAllStageLessons ? '✓ عرض جميع المواد (مصنفة)' : 'تصفح كافة مواد المرحلة'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomLesson(prev => !prev);
+                        if (!isCustomLesson) setSelectedLesson('');
+                      }}
+                      style={{
+                        background: isCustomLesson ? '#f0fdf4' : '#f1f5f9',
+                        border: isCustomLesson ? '1px solid #86efac' : '1px solid #cbd5e1',
+                        color: isCustomLesson ? '#16a34a' : '#475569',
+                        padding: '4px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {isCustomLesson ? '✓ إدخال درس يدوي مفعل' : '+ كتابة عنوان درس مخصص'}
+                    </button>
+                  </div>
                 </div>
 
                 {!isCustomLesson ? (
                   <div>
-                    <select
-                      className="input-field"
-                      style={{ width: '100%', marginBottom: '8px', fontWeight: 'bold', color: '#0e7490', fontSize: '13px' }}
-                      value={selectedLesson}
-                      onChange={handleLessonChange}
-                    >
-                      <option value="">-- اختر الدرس من قائمة الدروس المعتمدة لـ {selectedStage} --</option>
-                      {availableLessons.map((l, i) => (
-                        <option key={i} value={l.displayTitle}>
-                          {l.displayTitle}
-                        </option>
-                      ))}
-                      <option value="__CUSTOM__">✍️ درس آخر (إدخال عنوان يدوي مخصص)...</option>
-                    </select>
+                    {(() => {
+                      const grouped = groupLessonsBySubject(availableLessons);
+                      const groupEntries = Object.entries(grouped);
+
+                      return (
+                        <select
+                          className="input-field"
+                          style={{ width: '100%', marginBottom: '8px', fontWeight: 'bold', color: '#0e7490', fontSize: '13px' }}
+                          value={selectedLesson}
+                          onChange={handleLessonChange}
+                        >
+                          <option value="">
+                            {showAllStageLessons 
+                              ? `-- اختر الدرس من قائمة كافة المواد المعتمدة لـ ${selectedStage} --`
+                              : `-- اختر الدرس من قائمة الدروس المعتمدة لـ ${selectedSubject || selectedStage} --`
+                            }
+                          </option>
+
+                          {groupEntries.map(([subjName, lessonsList]) => (
+                            <optgroup key={subjName} label={`📚 مادة: ${subjName} (${lessonsList.length} دروس)`}>
+                              {lessonsList.map((l, i) => (
+                                <option key={i} value={l.displayTitle}>
+                                  {l.lesson} ({l.unit} - {l.grade})
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+
+                          <option value="__CUSTOM__">✍️ درس آخر (إدخال عنوان يدوي مخصص)...</option>
+                        </select>
+                      );
+                    })()}
+
                     {availableLessons.length === 0 && (
                       <p style={{ fontSize: '12px', color: '#d97706', margin: '4px 0 0 0' }}>
-                        💡 لم يتم العثور على دروس محددة مسبقاً لهذا المسمى في ({selectedStage})، يمكنك تفعيل "كتابة عنوان درس مخصص" وكتابة عنوان الدرس وأهدافه.
+                        💡 لم يتم العثور على دروس محددة مسبقاً لمادة ({selectedSubject}) في ({selectedStage})، يمكنك تفعيل "كتابة عنوان درس مخصص" أو النقر على "تصفح كافة مواد المرحلة".
                       </p>
                     )}
                   </div>
@@ -1044,7 +1152,7 @@ export default function LessonPreparation() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Target size={18} color="#0e7490" /> الخطوة 4: تحديد الأهداف السلوكية للدرس وإضافة أهداف يدوياً
+                    <Target size={18} color="#0e7490" /> الخطوة 4: الأهداف السلوكية للدرس (إضافة وصياغة الأهداف يدوياً)
                   </div>
 
                   {lessonObjectives.length > 0 && (
@@ -1067,7 +1175,7 @@ export default function LessonPreparation() {
                   )}
                 </div>
 
-                {/* Standard Objectives from Curriculum */}
+                {/* Standard Objectives from Curriculum (if any) */}
                 {lessonObjectives.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                     {lessonObjectives.map((obj, i) => {
@@ -1095,6 +1203,13 @@ export default function LessonPreparation() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {lessonObjectives.length === 0 && customObjectives.length === 0 && (
+                  <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '10px', color: '#64748b', fontSize: '13px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Target size={20} color="#0e7490" />
+                    <span>الأهداف السلوكية فارغة لتتيح لك صياغة أهدافك الخاصة بحرية. أضف أهدافك عبر الخانة أدناه أو اكتبها مباشرة في حقل الأهداف بالأسفل.</span>
                   </div>
                 )}
 
@@ -1149,10 +1264,10 @@ export default function LessonPreparation() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                   <div>
                     <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Sparkles size={18} color="#0e7490" /> الخطوة 5: استراتيجيات التدريس النشط الأشهر وإمكانية الإضافة اليدوية
+                      <Sparkles size={18} color="#0e7490" /> الخطوة 5: استراتيجيات التدريس النشط وإمكانية الإضافة اليدوية
                     </div>
                     <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748b' }}>
-                      انقر على الاستراتيجية لتحديدها وتضمينها فوراً في التحضير
+                      انقر على الاستراتيجية لتحديدها وتضمينها فوراً في خطة التحضير
                     </p>
                   </div>
 
@@ -1236,7 +1351,105 @@ export default function LessonPreparation() {
                 </form>
               </div>
 
-              {/* STEP 6: File Attachments */}
+              {/* STEP 6: Learning Resources & Educational Media */}
+              <div style={{
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: '14px',
+                padding: '20px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Laptop size={18} color="#0e7490" /> الخطوة 6: الوسائل والتقنيات ومصادر التعلم وإمكانية الإضافة اليدوية
+                    </div>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                      حدد مصادر التعلم والوسائل التقنية المستخدمة في الحصة لإدراجها في بطاقة التحضير
+                    </p>
+                  </div>
+
+                  <span style={{ fontSize: '12px', color: '#0e7490', fontWeight: 'bold' }}>
+                    تم تحديد: {selectedResources.length + customResources.length} مصدر تعليمي
+                  </span>
+                </div>
+
+                {/* Resources Cards Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+                  {POPULAR_LEARNING_RESOURCES.map(res => {
+                    const isSelected = selectedResources.includes(res.nameAr);
+                    return (
+                      <div
+                        key={res.id}
+                        onClick={() => toggleResource(res.nameAr)}
+                        style={{
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          border: isSelected ? '2px solid #0e7490' : '1px solid #e2e8f0',
+                          background: isSelected ? 'linear-gradient(135deg, #f0fdfa, #e0f2fe)' : '#ffffff',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          boxShadow: isSelected ? '0 2px 8px rgba(14, 116, 144, 0.15)' : 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontWeight: 'bold', fontSize: '13px', color: isSelected ? '#0e7490' : '#1e293b' }}>
+                            {res.nameAr}
+                          </span>
+                          {isSelected ? <CheckCircle2 size={16} color="#0e7490" /> : <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '1px solid #cbd5e1' }} />}
+                        </div>
+                        <span style={{ fontSize: '11px', color: '#64748b', lineHeight: '1.4' }}>
+                          {res.desc}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Custom Resources Added */}
+                {customResources.length > 0 && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0e7490', marginBottom: '6px' }}>
+                      مصادر التعلم المضافة يدوياً:
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {customResources.map((cRes, idx) => (
+                        <span key={idx} style={{ background: '#e0f2fe', color: '#0369a1', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          {cRes}
+                          <button type="button" onClick={() => handleRemoveCustomResource(idx)} style={{ background: 'transparent', border: 'none', color: '#0369a1', cursor: 'pointer', padding: 0 }}>
+                            <X size={14} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Custom Resource Form */}
+                <form onSubmit={handleAddCustomResource} style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="إضافة مصدر تعلم أو وسيلة تعليمية مخصصة..."
+                    style={{ flex: 1, marginBottom: 0, fontSize: '13px' }}
+                    value={newResourceInput}
+                    onChange={(e) => setNewResourceInput(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={!newResourceInput.trim()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px', whiteSpace: 'nowrap' }}
+                  >
+                    <Plus size={16} /> إضافة مصدر
+                  </button>
+                </form>
+              </div>
+
+              {/* STEP 7: File Attachments */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>
@@ -1252,22 +1465,22 @@ export default function LessonPreparation() {
                 )}
               </div>
 
-              {/* STEP 7: Full Markdown Form Fields */}
+              {/* STEP 8: Full Markdown Form Fields */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                 
                 <MarkdownInput 
                   label="الأهداف التعليمية والسلوكية" 
                   value={goals} 
                   onChange={setGoals} 
-                  placeholder="تمت تعبئتها تلقائياً ويمكنك التعديل والإضافة بحرية..." 
+                  placeholder="اكتب الأهداف السلوكية والإجرائية للدرس هنا..." 
                   height="160px" 
                 />
 
                 <MarkdownInput 
-                  label="استراتيجيات التدريس المتبعة" 
-                  value={strategy} 
-                  onChange={setStrategy} 
-                  placeholder="استراتيجيات التدريس المحددة..." 
+                  label="حقبنة: ربط معارف الدرس بالمعارف السابقة للدرس (الخبرات السابقة)" 
+                  value={priorKnowledge} 
+                  onChange={setPriorKnowledge} 
+                  placeholder="تحديد المفاهيم والمهارات القبلية التي يبنى عليها الدرس الجديد، وربطها بالخبرات السابقة وتطبيقات الحياة اليومية..." 
                   height="140px" 
                 />
 
@@ -1280,10 +1493,26 @@ export default function LessonPreparation() {
                 />
 
                 <MarkdownInput 
-                  label="ملف الإنجاز والمخرجات المتوقعة" 
-                  value={portfolio} 
-                  onChange={setPortfolio} 
-                  placeholder="المخرجات والمهام التي سينجزها الطلاب..." 
+                  label="استراتيجيات التدريس المتبعة" 
+                  value={strategy} 
+                  onChange={setStrategy} 
+                  placeholder="استراتيجيات التدريس المحددة..." 
+                  height="140px" 
+                />
+
+                <MarkdownInput 
+                  label="الوسائل والتقنيات ومصادر التعلم" 
+                  value={resources} 
+                  onChange={setResources} 
+                  placeholder="السبورة الذكية، منصة مدرستي، أوراق العمل، العروض التقديمية..." 
+                  height="140px" 
+                />
+
+                <MarkdownInput 
+                  label="أنشطة وتطبيقات نظام STEM (العلوم، التقنية، الهندسة، الرياضيات)" 
+                  value={stem} 
+                  onChange={setStem} 
+                  placeholder="تكامل العلوم والتقنية والهندسة والرياضيات: الأنشطة التطبيقية، النمذجة الهندسية، والتطبيقات الحياتية المعاصرة المرتبطة بموضوع الدرس..." 
                   height="140px" 
                 />
 
@@ -1296,10 +1525,10 @@ export default function LessonPreparation() {
                 />
 
                 <MarkdownInput 
-                  label="الوسائل والتقنيات ومصادر التعلم" 
-                  value={resources} 
-                  onChange={setResources} 
-                  placeholder="السبورة الذكية، منصة مدرستي، أوراق العمل، العروض التقديمية..." 
+                  label="ملف الإنجاز والمخرجات المتوقعة" 
+                  value={portfolio} 
+                  onChange={setPortfolio} 
+                  placeholder="المخرجات والمهام التي سينجزها الطلاب..." 
                   height="140px" 
                 />
 
@@ -1469,14 +1698,16 @@ export default function LessonPreparation() {
                 </div>
               )}
 
-              {['goals', 'strategy', 'warmup', 'portfolio', 'content', 'resources', 'formativeEval', 'summativeEval', 'homework'].map(field => {
+              {['goals', 'priorKnowledge', 'warmup', 'strategy', 'resources', 'stem', 'content', 'portfolio', 'formativeEval', 'summativeEval', 'homework'].map(field => {
                 const titles = {
                   goals: 'الأهداف التعليمية والسلوكية',
-                  strategy: 'استراتيجيات التدريس المتبعة',
+                  priorKnowledge: 'حقبنة: ربط معارف الدرس بالمعارف السابقة للدرس',
                   warmup: 'التمهيد والتهيئة الحافزة',
-                  portfolio: 'ملف الإنجاز والمخرجات المتوقعة',
-                  content: 'المحتوى والإجراءات التعليمية',
+                  strategy: 'استراتيجيات التدريس المتبعة',
                   resources: 'الوسائل والتقنيات ومصادر التعلم',
+                  stem: 'أنشطة وتطبيقات نظام STEM (العلوم، التقنية، الهندسة، الرياضيات)',
+                  content: 'المحتوى والإجراءات التعليمية',
+                  portfolio: 'ملف الإنجاز والمخرجات المتوقعة',
                   formativeEval: 'التقويم المرحلي التكويني',
                   summativeEval: 'التقويم الختامي النهائي',
                   homework: 'الواجبات والأنشطة الإثرائية'

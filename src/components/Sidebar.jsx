@@ -28,7 +28,7 @@ export default function Sidebar({ role }) {
     { path: '/admin/teachers', icon: Users, label: t('sidebar.teachers') },
     { path: '/admin/students', icon: Users, label: t('sidebar.students') },
     { path: '/admin/classes', icon: BookOpen, label: t('sidebar.classes') },
-    { path: '/admin/schedule', icon: Calendar, label: t('sidebar.schedule') },
+    { path: '/admin/schedule', icon: Calendar, label: 'إدارة المواد والجدول الدراسي' },
     { path: '/admin/attendance', icon: CheckSquare, label: t('sidebar.attendance') },
     { path: '/admin/preparations', icon: BookOpen, label: t('sidebar.preparations') },
     { path: '/admin/weekly-plan', icon: BookOpen, label: t('sidebar.weeklyPlan') },
