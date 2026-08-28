@@ -180,25 +180,34 @@ export default function LessonPreparation() {
     }
   }, [selectedClass, curriculumType]);
 
-  // 5. Fetch available classes and subjects for this teacher strictly from schedules
+  // 5. Fetch available classes and subjects for this teacher strictly from schedules and profile
   const [classToSubjectsMap, setClassToSubjectsMap] = useState({});
 
   useEffect(() => {
-    const schoolId = userData?.schoolId || 'default_school_1';
+    const rawSchoolId = userData?.schoolId;
+    const effectiveSchoolId = (rawSchoolId && rawSchoolId !== 'default_school_1') ? rawSchoolId : null;
     const isAdminOrSupervisor = userData?.role === 'admin' || userData?.role === 'superadmin' || userData?.role === 'supervisor';
 
-    const qClasses = schoolId === 'ALL'
-      ? collection(db, 'classes')
-      : query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+    // Query classes (school specific + all fallback)
+    const qClasses = effectiveSchoolId && effectiveSchoolId !== 'ALL'
+      ? query(collection(db, 'classes'), where('schoolId', '==', effectiveSchoolId))
+      : collection(db, 'classes');
 
     const unsubClasses = onSnapshot(qClasses, (classesSnap) => {
-      const allClassNames = classesSnap.docs.map(d => d.data().name).filter(Boolean);
+      let classDocs = classesSnap.docs;
       const classNamesMap = {};
-      classesSnap.docs.forEach(d => classNamesMap[d.id] = d.data().name);
-      
-      const qSchedules = schoolId === 'ALL'
-        ? collection(db, 'schedules')
-        : query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
+      const allClassNames = [];
+
+      classDocs.forEach(d => {
+        const cName = d.data().name || d.data().className || d.id;
+        classNamesMap[d.id] = cName;
+        if (cName && !allClassNames.includes(cName)) allClassNames.push(cName);
+      });
+
+      // Query schedules (school specific + all fallback)
+      const qSchedules = effectiveSchoolId && effectiveSchoolId !== 'ALL'
+        ? query(collection(db, 'schedules'), where('schoolId', '==', effectiveSchoolId))
+        : collection(db, 'schedules');
 
       const unsubSchedules = onSnapshot(qSchedules, (schedulesSnap) => {
         const myMap = {}; // { className: Set([subject1, subject2]) }
@@ -208,14 +217,16 @@ export default function LessonPreparation() {
           userData?.nationalId ? String(userData.nationalId).trim() : null,
           userData?.nationalId ? Number(userData.nationalId) : null,
           userData?.id,
+          userData?.uid,
           auth.currentUser?.uid,
           auth.currentUser?.email,
           auth.currentUser?.email?.split('@')[0],
-          userData?.name ? userData.name.trim().toLowerCase() : null
+          userData?.name ? userData.name.trim().toLowerCase() : null,
+          userData?.name ? userData.name.replace(/^(أستاذ|أ\.|د\.|الاستاذ|الأستاذ|المعلم)\s*/g, '').trim().toLowerCase() : null
         ].filter(Boolean));
 
         schedulesSnap.docs.forEach(docSnap => {
-          const className = classNamesMap[docSnap.id] || docSnap.data().className;
+          const className = classNamesMap[docSnap.id] || docSnap.data().className || docSnap.data().name || docSnap.id;
           if (!className) return;
 
           const matrix = docSnap.data().matrix || {};
@@ -225,10 +236,14 @@ export default function LessonPreparation() {
             const cellTid = cell.teacherId ? String(cell.teacherId).trim() : '';
             const cellTName = cell.teacherName ? String(cell.teacherName).trim().toLowerCase() : '';
             const myNameLower = userData?.name ? userData.name.trim().toLowerCase() : '';
+            const cleanMyName = myNameLower.replace(/^(أستاذ|أ\.|د\.|الاستاذ|الأستاذ|المعلم)\s*/g, '').trim();
 
             const isMyCell = isAdminOrSupervisor || 
               (cellTid && (myIdentities.has(cellTid) || myIdentities.has(Number(cellTid)))) ||
-              (cellTName && myNameLower && (cellTName === myNameLower || cellTName.includes(myNameLower) || myNameLower.includes(cellTName)));
+              (cellTName && (
+                myIdentities.has(cellTName) ||
+                (cleanMyName && (cellTName.includes(cleanMyName) || cleanMyName.includes(cellTName)))
+              ));
 
             if (isMyCell) {
               if (!myMap[className]) myMap[className] = new Set();
@@ -237,55 +252,66 @@ export default function LessonPreparation() {
           });
         });
 
-        // Fallback for teacher profile subject if no schedule exists yet
-        if (Object.keys(myMap).length === 0 && !isAdminOrSupervisor) {
-          if (userData?.subject) {
-            const userSubjs = userData.subject.split(/[,،]/).map(s => s.trim()).filter(Boolean);
-            const userClass = userData?.class || userData?.className;
-            if (userClass && userSubjs.length > 0) {
-              myMap[userClass] = new Set(userSubjs);
-            }
-          }
+        // 1. Check teacher profile assigned classes/subject from teachers/users collection
+        const profileClasses = userData?.assignedClasses || userData?.classes || (userData?.class ? [userData.class] : []) || (userData?.className ? [userData.className] : []);
+        const profileSubjects = userData?.subject ? userData.subject.split(/[,،]/).map(s => s.trim()).filter(Boolean) : [];
+
+        if (profileClasses.length > 0 && profileSubjects.length > 0) {
+          profileClasses.forEach(cls => {
+            if (!myMap[cls]) myMap[cls] = new Set();
+            profileSubjects.forEach(sub => myMap[cls].add(sub));
+          });
+        }
+
+        // 2. If teacher has a subject in profile but no schedule matrix matched yet:
+        if (Object.keys(myMap).length === 0 && profileSubjects.length > 0) {
+          allClassNames.forEach(cls => {
+            if (!myMap[cls]) myMap[cls] = new Set();
+            profileSubjects.forEach(sub => myMap[cls].add(sub));
+          });
+        }
+
+        // 3. If still empty (e.g. no schedule and no profile assigned), fallback to all classes & curriculum subjects so teacher is never blocked
+        if (Object.keys(myMap).length === 0) {
+          allClassNames.forEach(cls => {
+            myMap[cls] = new Set();
+          });
         }
 
         setClassToSubjectsMap(myMap);
 
         const assignedClasses = Object.keys(myMap);
-        const finalClasses = assignedClasses.length > 0 
-          ? assignedClasses 
-          : (isAdminOrSupervisor ? allClassNames : []);
+        const finalClasses = assignedClasses.length > 0 ? assignedClasses : allClassNames;
 
         setClassesList(finalClasses);
 
-        // Auto-select first assigned class if none selected or current selection is not in list
+        // Auto-select first class if none selected or not in list
         let currentClass = selectedClass;
         if ((!currentClass || !finalClasses.includes(currentClass)) && finalClasses.length > 0) {
           currentClass = finalClasses[0];
           setSelectedClass(currentClass);
         }
 
-        // Update subjects for current class strictly
-        if (currentClass && myMap[currentClass]) {
+        // Update subjects for current class
+        if (currentClass && myMap[currentClass] && myMap[currentClass].size > 0) {
           const classSubjects = Array.from(myMap[currentClass]);
           setSubjects(classSubjects);
           if (!selectedSubject || !classSubjects.includes(selectedSubject)) {
             setSelectedSubject(classSubjects[0] || '');
           }
-        } else if (isAdminOrSupervisor) {
-          const currSubjects = getAvailableCurriculumSubjects(curriculumType, selectedSemester, currentClass, selectedStage);
-          setSubjects(currSubjects);
-          if (!selectedSubject || !currSubjects.includes(selectedSubject)) {
-            setSelectedSubject(currSubjects[0] || '');
-          }
         } else {
-          setSubjects([]);
-          setSelectedSubject('');
+          const currSubjects = getAvailableCurriculumSubjects(curriculumType, selectedSemester, currentClass, selectedStage);
+          const finalSubjs = currSubjects.length > 0 ? currSubjects : profileSubjects;
+          setSubjects(finalSubjs);
+          if (!selectedSubject || !finalSubjs.includes(selectedSubject)) {
+            setSelectedSubject(finalSubjs[0] || '');
+          }
         }
       });
       return () => unsubSchedules();
     });
     return () => unsubClasses();
-  }, [teacherDocId, userData, userData?.schoolId, curriculumType, selectedSemester, selectedStage]);
+  }, [teacherDocId, userData, userData?.schoolId, userData?.nationalId, userData?.name, userData?.subject, curriculumType, selectedSemester, selectedStage]);
 
   // Update subjects whenever selectedClass changes
   useEffect(() => {
