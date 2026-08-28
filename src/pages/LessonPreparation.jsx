@@ -180,9 +180,13 @@ export default function LessonPreparation() {
     }
   }, [selectedClass, curriculumType]);
 
-  // 5. Fetch available classes and subjects for this teacher strictly for the stage
+  // 5. Fetch available classes and subjects for this teacher strictly from schedules
+  const [classToSubjectsMap, setClassToSubjectsMap] = useState({});
+
   useEffect(() => {
     const schoolId = userData?.schoolId || 'default_school_1';
+    const isAdminOrSupervisor = userData?.role === 'admin' || userData?.role === 'superadmin' || userData?.role === 'supervisor';
+
     const qClasses = schoolId === 'ALL'
       ? collection(db, 'classes')
       : query(collection(db, 'classes'), where('schoolId', '==', schoolId));
@@ -197,45 +201,108 @@ export default function LessonPreparation() {
         : query(collection(db, 'schedules'), where('schoolId', '==', schoolId));
 
       const unsubSchedules = onSnapshot(qSchedules, (schedulesSnap) => {
-        const myClassNames = new Set();
-        const mySubjects = new Set();
-        
+        const myMap = {}; // { className: Set([subject1, subject2]) }
+        const myIdentities = new Set([
+          teacherDocId,
+          userData?.nationalId,
+          userData?.nationalId ? String(userData.nationalId).trim() : null,
+          userData?.nationalId ? Number(userData.nationalId) : null,
+          userData?.id,
+          auth.currentUser?.uid,
+          auth.currentUser?.email,
+          auth.currentUser?.email?.split('@')[0],
+          userData?.name ? userData.name.trim().toLowerCase() : null
+        ].filter(Boolean));
+
         schedulesSnap.docs.forEach(docSnap => {
+          const className = classNamesMap[docSnap.id] || docSnap.data().className;
+          if (!className) return;
+
           const matrix = docSnap.data().matrix || {};
           Object.values(matrix).forEach(cell => {
-            if (!teacherDocId || cell.teacherId === teacherDocId) {
-              if (classNamesMap[docSnap.id]) myClassNames.add(classNamesMap[docSnap.id]);
-              if (cell.subject) mySubjects.add(cell.subject);
+            if (!cell || !cell.subject) return;
+
+            const cellTid = cell.teacherId ? String(cell.teacherId).trim() : '';
+            const cellTName = cell.teacherName ? String(cell.teacherName).trim().toLowerCase() : '';
+            const myNameLower = userData?.name ? userData.name.trim().toLowerCase() : '';
+
+            const isMyCell = isAdminOrSupervisor || 
+              (cellTid && (myIdentities.has(cellTid) || myIdentities.has(Number(cellTid)))) ||
+              (cellTName && myNameLower && (cellTName === myNameLower || cellTName.includes(myNameLower) || myNameLower.includes(cellTName)));
+
+            if (isMyCell) {
+              if (!myMap[className]) myMap[className] = new Set();
+              myMap[className].add(cell.subject.trim());
             }
           });
         });
 
-        // Add teacher's own subjects from profile if available
-        if (userData?.subject) {
-          userData.subject.split(/[,،]/).map(s => s.trim()).filter(Boolean).forEach(s => mySubjects.add(s));
+        // Fallback for teacher profile subject if no schedule exists yet
+        if (Object.keys(myMap).length === 0 && !isAdminOrSupervisor) {
+          if (userData?.subject) {
+            const userSubjs = userData.subject.split(/[,،]/).map(s => s.trim()).filter(Boolean);
+            const userClass = userData?.class || userData?.className;
+            if (userClass && userSubjs.length > 0) {
+              myMap[userClass] = new Set(userSubjs);
+            }
+          }
         }
 
-        // Add curriculum standard subjects STRICTLY for this stage and semester
-        const currSubjects = getAvailableCurriculumSubjects(curriculumType, selectedSemester, selectedClass, selectedStage);
-        currSubjects.forEach(s => mySubjects.add(s));
+        setClassToSubjectsMap(myMap);
 
-        const finalClasses = myClassNames.size > 0 ? Array.from(myClassNames) : allClassNames;
-        const finalSubjects = Array.from(mySubjects);
+        const assignedClasses = Object.keys(myMap);
+        const finalClasses = assignedClasses.length > 0 
+          ? assignedClasses 
+          : (isAdminOrSupervisor ? allClassNames : []);
 
         setClassesList(finalClasses);
-        setSubjects(finalSubjects);
 
-        if (finalClasses.length > 0 && !selectedClass) {
-          setSelectedClass(finalClasses[0]);
+        // Auto-select first assigned class if none selected or current selection is not in list
+        let currentClass = selectedClass;
+        if ((!currentClass || !finalClasses.includes(currentClass)) && finalClasses.length > 0) {
+          currentClass = finalClasses[0];
+          setSelectedClass(currentClass);
         }
-        if (finalSubjects.length > 0 && (!selectedSubject || !finalSubjects.includes(selectedSubject))) {
-          setSelectedSubject(finalSubjects[0]);
+
+        // Update subjects for current class strictly
+        if (currentClass && myMap[currentClass]) {
+          const classSubjects = Array.from(myMap[currentClass]);
+          setSubjects(classSubjects);
+          if (!selectedSubject || !classSubjects.includes(selectedSubject)) {
+            setSelectedSubject(classSubjects[0] || '');
+          }
+        } else if (isAdminOrSupervisor) {
+          const currSubjects = getAvailableCurriculumSubjects(curriculumType, selectedSemester, currentClass, selectedStage);
+          setSubjects(currSubjects);
+          if (!selectedSubject || !currSubjects.includes(selectedSubject)) {
+            setSelectedSubject(currSubjects[0] || '');
+          }
+        } else {
+          setSubjects([]);
+          setSelectedSubject('');
         }
       });
       return () => unsubSchedules();
     });
     return () => unsubClasses();
-  }, [teacherDocId, userData, userData?.schoolId, curriculumType, selectedSemester, selectedClass, selectedStage, selectedSubject]);
+  }, [teacherDocId, userData, userData?.schoolId, curriculumType, selectedSemester, selectedStage]);
+
+  // Update subjects whenever selectedClass changes
+  useEffect(() => {
+    if (!selectedClass) {
+      setSubjects([]);
+      setSelectedSubject('');
+      return;
+    }
+
+    if (classToSubjectsMap[selectedClass]) {
+      const classSubjects = Array.from(classToSubjectsMap[selectedClass]);
+      setSubjects(classSubjects);
+      if (!selectedSubject || !classSubjects.includes(selectedSubject)) {
+        setSelectedSubject(classSubjects[0] || '');
+      }
+    }
+  }, [selectedClass, classToSubjectsMap]);
 
   // 6. Fetch available periods based on selected class and subject
   useEffect(() => {
@@ -756,15 +823,15 @@ export default function LessonPreparation() {
               {/* Class Select */}
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '6px' }}>
-                  الصف / الفصل الدراسي
+                  الفصل المسند في الجدول
                 </label>
                 <select 
                   className="input-field" 
-                  style={{ width: '100%', marginBottom: 0 }}
+                  style={{ width: '100%', marginBottom: 0, fontWeight: 'bold', color: '#0e7490' }}
                   value={selectedClass} 
                   onChange={(e) => setSelectedClass(e.target.value)}
                 >
-                  <option value="">اختر الفصل...</option>
+                  <option value="">-- اختر الفصل المسند --</option>
                   {classesList.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
@@ -772,15 +839,15 @@ export default function LessonPreparation() {
               {/* Subject Select */}
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '6px' }}>
-                  المادة الدراسية
+                  المادة المسندة في هذا الفصل
                 </label>
                 <select 
                   className="input-field" 
-                  style={{ width: '100%', marginBottom: 0 }}
+                  style={{ width: '100%', marginBottom: 0, fontWeight: 'bold', color: '#0e7490' }}
                   value={selectedSubject} 
                   onChange={(e) => setSelectedSubject(e.target.value)}
                 >
-                  <option value="">اختر المادة...</option>
+                  <option value="">-- اختر المادة المسندة --</option>
                   {subjects.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
@@ -853,6 +920,13 @@ export default function LessonPreparation() {
               </div>
 
             </div>
+
+            {classesList.length === 0 && (
+              <div style={{ marginTop: '16px', padding: '14px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '10px', color: '#b45309', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <HelpCircle size={18} color="#d97706" />
+                <span>لم يتم العثور على فصول مسندة لك في الجدول المدرسي حتى الآن. يرجى مراجعة إدارة المدرسة لاعتماد وإسناد جدولك الدراسي.</span>
+              </div>
+            )}
           </div>
 
           {!selectedClass || !selectedSubject ? (
