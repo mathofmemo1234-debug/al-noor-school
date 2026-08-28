@@ -144,7 +144,7 @@ export default function PrintExcellenceModal({
         const matchingIndicators = crit.indicators.filter(ind => {
           if (!selectedIndicatorIds.includes(ind.id)) return false;
           const currentEvidence = evidenceOverrides[ind.id] || evidences[ind.id];
-          const hasEvidence = Boolean(currentEvidence && (currentEvidence.description?.trim() || currentEvidence.fileName || currentEvidence.linkUrl));
+          const hasEvidence = Boolean(currentEvidence && (currentEvidence.description?.trim() || currentEvidence.fileName || currentEvidence.linkUrl)) || Boolean(ind.defaultEvidence);
           if (!includeEmptyIndicators && !hasEvidence) return false;
           return true;
         });
@@ -807,7 +807,7 @@ export default function PrintExcellenceModal({
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           {criteria.indicators.map(indicator => {
                             const rawEvidence = evidenceOverrides[indicator.id] || evidences[indicator.id] || {};
-                            const hasEvidence = Boolean(rawEvidence.description?.trim() || rawEvidence.fileName || rawEvidence.linkUrl);
+                            const hasEvidence = Boolean(rawEvidence.description?.trim() || rawEvidence.fileName || rawEvidence.linkUrl || indicator.defaultEvidence);
 
                             return (
                               <div
@@ -876,14 +876,14 @@ export default function PrintExcellenceModal({
                                       </span>
                                       {isLiveEditMode ? (
                                         <textarea
-                                          rows={2}
-                                          value={rawEvidence.description || ''}
+                                          rows={4}
+                                          value={rawEvidence.description || indicator.defaultEvidence || ''}
                                           onChange={e => handleInlineEdit(indicator.id, 'description', e.target.value)}
-                                          style={{ width: '100%', padding: '6px', fontSize: '0.85rem', borderRadius: '4px', border: '1px dashed #0284c7' }}
+                                          style={{ width: '100%', padding: '6px', fontSize: '0.85rem', borderRadius: '4px', border: '1px dashed #0284c7', lineHeight: '1.6' }}
                                         />
                                       ) : (
-                                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#1e293b', lineHeight: '1.5' }}>
-                                          {rawEvidence.description || 'تم استيفاء الشاهد وفق المتطلبات النظامية.'}
+                                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#1e293b', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
+                                          {rawEvidence.description || indicator.defaultEvidence || 'تم استيفاء الشاهد وفق المتطلبات النظامية.'}
                                         </p>
                                       )}
                                     </div>
@@ -891,8 +891,8 @@ export default function PrintExcellenceModal({
                                     {/* Meta Row */}
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', fontSize: '0.75rem', color: '#64748b', borderTop: '1px solid #e2e8f0', paddingTop: '6px' }}>
                                       
-                                      {rawEvidence.targetGroup && (
-                                        <span>الفئة المستهدفة: <strong style={{ color: '#1e293b' }}>{rawEvidence.targetGroup}</strong></span>
+                                      {(rawEvidence.targetGroup || indicator.defaultTargetGroup) && (
+                                        <span>الفئة المستهدفة: <strong style={{ color: '#1e293b' }}>{rawEvidence.targetGroup || indicator.defaultTargetGroup}</strong></span>
                                       )}
 
                                       {rawEvidence.docDate && (

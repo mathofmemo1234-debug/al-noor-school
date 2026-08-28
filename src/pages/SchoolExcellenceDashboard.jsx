@@ -149,10 +149,10 @@ export default function SchoolExcellenceDashboard() {
   useEffect(() => {
     if (!selectedIndicator) return;
     const existing = evidences[selectedIndicator.id];
-    if (existing) {
+    if (existing && (existing.description || existing.targetGroup || existing.fileName || existing.linkUrl)) {
       setFormData({
-        description: existing.description || '',
-        targetGroup: existing.targetGroup || '',
+        description: existing.description || selectedIndicator.defaultEvidence || '',
+        targetGroup: existing.targetGroup || selectedIndicator.defaultTargetGroup || '',
         linkUrl: existing.linkUrl || '',
         fileName: existing.fileName || '',
         fileData: existing.fileData || '',
@@ -161,8 +161,8 @@ export default function SchoolExcellenceDashboard() {
       });
     } else {
       setFormData({
-        description: '',
-        targetGroup: '',
+        description: selectedIndicator.defaultEvidence || '',
+        targetGroup: selectedIndicator.defaultTargetGroup || '',
         linkUrl: '',
         fileName: '',
         fileData: '',
@@ -840,9 +840,46 @@ export default function SchoolExcellenceDashboard() {
               {/* Form */}
               <form onSubmit={handleSaveForm} style={{ display: 'flex', flexDirection: 'column', gap: '18px', flex: 1 }}>
                 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>
-                  <FileCheck size={20} />
-                  <span>نموذج توثيق وتعبئة الشواهد والأدلة</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>
+                    <FileCheck size={20} />
+                    <span>نموذج توثيق وتعبئة الشواهد والأدلة</span>
+                  </div>
+
+                  {canEditSelectedIndicator && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          description: selectedIndicator.defaultEvidence || '',
+                          targetGroup: selectedIndicator.defaultTargetGroup || ''
+                        }));
+                      }}
+                      className="btn btn-secondary"
+                      style={{
+                        fontSize: '0.8rem',
+                        padding: '5px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'rgba(99, 178, 198, 0.12)',
+                        color: 'var(--color-primary-dark)',
+                        border: '1px solid rgba(99, 178, 198, 0.4)',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                      title="استيراد أو استعادة الشواهد والمستهدفين النموذجية"
+                    >
+                      <Sparkles size={15} color="#0e7490" />
+                      <span>استيراد الشواهد والمستهدفين النموذجية</span>
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ background: 'rgba(14, 116, 144, 0.06)', border: '1px solid rgba(14, 116, 144, 0.2)', padding: '10px 14px', borderRadius: '10px', fontSize: '0.82rem', color: '#0e7490', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={16} style={{ flexShrink: 0 }} />
+                  <span>تم تضمين الشواهد والمستهدفين النموذجية المعتمدة تلقائياً، مع إمكانية التحرير والتعديل والإضافة بحرية تامة قبل الحفظ.</span>
                 </div>
 
                 <fieldset disabled={!canEditSelectedIndicator} style={{ border: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -852,7 +889,7 @@ export default function SchoolExcellenceDashboard() {
                       تفاصيل ووصف الإنجاز الشواهد *
                     </label>
                     <textarea
-                      rows={4}
+                      rows={6}
                       value={formData.description}
                       onChange={e => setFormData({ ...formData, description: e.target.value })}
                       placeholder="أدخل الخطوات والإنجازات والشواهد الميدانية المنفذة لتحقيق هذا المؤشر..."
@@ -865,6 +902,7 @@ export default function SchoolExcellenceDashboard() {
                         background: '#fff',
                         fontFamily: "'Cairo', sans-serif",
                         fontSize: '0.95rem',
+                        lineHeight: '1.6',
                         resize: 'vertical'
                       }}
                     />
