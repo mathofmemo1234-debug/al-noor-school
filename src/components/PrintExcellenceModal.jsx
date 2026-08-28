@@ -678,23 +678,54 @@ export default function PrintExcellenceModal({
           >
             
             {/* Header: Kingdom & Ministry */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #0284c7', paddingBottom: '14px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #0284c7', paddingBottom: '16px', marginBottom: '20px' }}>
               
-              <div style={{ textAlign: 'right', fontSize: '0.85rem', lineHeight: '1.5', color: '#1e293b' }}>
-                <strong style={{ fontSize: '0.95rem' }}>المملكة العربية السعودية</strong><br />
+              <div style={{ textAlign: 'right', fontSize: '0.85rem', lineHeight: '1.6', color: '#1e293b' }}>
+                <strong style={{ fontSize: '0.95rem', color: '#0369a1' }}>المملكة العربية السعودية</strong><br />
                 <span>وزارة التعليم</span><br />
                 <span>الإدارة العامة للتعليم بمنطقة مكة المكرمة</span><br />
                 <strong>{customSchoolName}</strong>
               </div>
 
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px auto', boxShadow: '0 4px 10px rgba(2, 132, 199, 0.3)' }}>
-                  <Award size={32} />
+              {/* Center: Ministry & School Logos Side-by-Side */}
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', marginBottom: '4px' }}>
+                  <img
+                    src={`${import.meta.env.BASE_URL}minst.svg`}
+                    alt="وزارة التعليم"
+                    style={{
+                      height: '70px',
+                      width: 'auto',
+                      maxWidth: '120px',
+                      objectFit: 'contain',
+                      display: 'block'
+                    }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                    }}
+                  />
+                  <div style={{ width: '1.5px', height: '44px', background: '#cbd5e1' }}></div>
+                  <img
+                    src={userData?.logoUrl || `${import.meta.env.BASE_URL}logo.webp`}
+                    alt="شعار المدرسة"
+                    style={{
+                      height: '64px',
+                      width: 'auto',
+                      maxWidth: '100px',
+                      objectFit: 'contain',
+                      display: 'block'
+                    }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                    }}
+                  />
                 </div>
-                <strong style={{ fontSize: '0.85rem', color: '#0369a1', display: 'block' }}>برنامج التقويم والتميز المدرسي</strong>
+                <strong style={{ fontSize: '0.8rem', color: '#0369a1' }}>برنامج التقويم والتميز المدرسي</strong>
               </div>
 
-              <div style={{ textAlign: 'left', fontSize: '0.85rem', lineHeight: '1.5', color: '#475569' }}>
+              <div style={{ textAlign: 'left', fontSize: '0.85rem', lineHeight: '1.6', color: '#475569' }}>
                 <span>العام الدراسي: <strong>{academicYear}</strong></span><br />
                 <span>التاريخ: {new Date().toLocaleDateString('ar-SA')}</span><br />
                 <span>المدينة: جدة</span>

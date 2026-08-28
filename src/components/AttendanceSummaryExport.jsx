@@ -1277,9 +1277,63 @@ export default function AttendanceSummaryExport({ schoolId }) {
 
           {/* Printable Report View */}
           <div className="glass-panel print-area" style={{ padding: '24px', background: 'white' }}>
+            
+            {/* Official Print Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderBottom: '2px solid #0e7490',
+              paddingBottom: '16px',
+              marginBottom: '20px'
+            }}>
+              <div style={{ textAlign: 'right', fontSize: '12px', lineHeight: '1.6' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#0e7490' }}>المملكة العربية السعودية</div>
+                <div>وزارة التعليم</div>
+                <div>الإدارة العامة للتعليم بمحافظة جدة</div>
+                <div style={{ fontWeight: 'bold' }}>{userData?.schoolName || 'مجمع المدارس المتقدمة للتعلم الذكي'}</div>
+              </div>
+
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', marginBottom: '6px' }}>
+                  <img
+                    src={`${import.meta.env.BASE_URL}minst.svg`}
+                    alt="وزارة التعليم"
+                    style={{ height: '65px', width: 'auto', maxWidth: '110px', objectFit: 'contain', display: 'block' }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                    }}
+                  />
+                  <div style={{ width: '1.5px', height: '38px', background: '#cbd5e1' }}></div>
+                  <img
+                    src={userData?.logoUrl || `${import.meta.env.BASE_URL}logo.webp`}
+                    alt="شعار المدرسة"
+                    style={{ height: '58px', width: 'auto', maxWidth: '90px', objectFit: 'contain', display: 'block' }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
+                    }}
+                  />
+                </div>
+                <h2 style={{ margin: '0 0 2px 0', color: '#0e7490', fontSize: '16px' }}>
+                  تقرير وكشف سجلات الحضور والغياب اليومي
+                </h2>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                  العام الدراسي: 1447 / 1448 هـ
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'left', fontSize: '12px', lineHeight: '1.6' }}>
+                <div><strong>تاريخ التقرير:</strong> {new Date().toLocaleDateString('ar-SA')}</div>
+                <div><strong>الفصل المحدد:</strong> {selectedClass || 'جميع الفصول'}</div>
+                <div><strong>المستخرج:</strong> {userData?.name || 'وكيل شؤون الطلاب'}</div>
+              </div>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, color: 'var(--color-primary-dark)', fontSize: '16px' }}>
-                كشف السجلات ({filteredRecords.length} سجل)
+              <h3 style={{ margin: 0, color: 'var(--color-primary-dark)', fontSize: '15px' }}>
+                كشف السجلات الميدانية ({filteredRecords.length} سجل)
               </h3>
             </div>
 
