@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, X, Users, Search, BookOpen, Download, Building, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -53,7 +54,7 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
     document.body.removeChild(link);
   };
 
-  return (
+  const modalJSX = (
     <div className="students-modal-root" style={{
       position: 'fixed',
       top: 0,
@@ -426,8 +427,9 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
             padding: 0 !important;
             font-size: 10.5pt !important;
           }
-          body * {
-            visibility: hidden !important;
+          /* Completely hide EVERYTHING under body except the modal container so NO blank pages exist! */
+          body > *:not(.students-modal-root) {
+            display: none !important;
           }
           .no-print, .no-print * {
             display: none !important;
@@ -483,4 +485,6 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
       `}</style>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalJSX, document.body) : modalJSX;
 }

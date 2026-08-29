@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, Download, X, FileText, CheckCircle, FileSpreadsheet, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -161,7 +162,7 @@ export default function PrintExamModal({
     document.body.removeChild(link);
   };
 
-  return (
+  const modalJSX = (
     <div className="exam-modal-root" style={{
       position: 'fixed',
       top: 0,
@@ -193,8 +194,9 @@ export default function PrintExamModal({
             padding: 0 !important;
             font-size: 11pt !important;
           }
-          body * {
-            visibility: hidden !important;
+          /* Completely hide EVERYTHING under body except the modal container so NO blank pages exist! */
+          body > *:not(.exam-modal-root) {
+            display: none !important;
           }
           .no-print, .no-print * {
             display: none !important;
@@ -858,4 +860,6 @@ export default function PrintExamModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalJSX, document.body) : modalJSX;
 }

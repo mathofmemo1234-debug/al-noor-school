@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, X, Download, Calendar, Users, BookOpen, Layers, UserCheck, ShieldCheck, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -229,7 +230,7 @@ export default function PrintScheduleModal({
     document.body.removeChild(link);
   };
 
-  return (
+  const modalJSX = (
     <div className="schedule-modal-root" style={{
       position: 'fixed',
       top: 0,
@@ -261,8 +262,9 @@ export default function PrintScheduleModal({
             margin: 0 !important;
             padding: 0 !important;
           }
-          body * {
-            visibility: hidden !important;
+          /* Completely hide EVERYTHING under body except the modal container so NO blank pages exist! */
+          body > *:not(.schedule-modal-root) {
+            display: none !important;
           }
           .no-print, .no-print * {
             display: none !important;
@@ -982,4 +984,6 @@ export default function PrintScheduleModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalJSX, document.body) : modalJSX;
 }

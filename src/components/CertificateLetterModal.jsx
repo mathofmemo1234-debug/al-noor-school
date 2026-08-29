@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, X, ShieldCheck, Download, Award, Building, FileText, UserCheck, Calendar, Hash } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import NationalitySelect from './NationalitySelect';
@@ -44,7 +45,7 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
     badgeTitle = person.roleTitle || person.specialty || 'كادر إداري';
   }
 
-  return (
+  const modalJSX = (
     <div className="cert-modal-root" style={{
       position: 'fixed',
       top: 0,
@@ -512,8 +513,9 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
             padding: 0 !important;
             font-size: 11pt !important;
           }
-          body * {
-            visibility: hidden !important;
+          /* Completely hide EVERYTHING under body except the modal container so NO blank pages exist! */
+          body > *:not(.cert-modal-root) {
+            display: none !important;
           }
           .no-print, .no-print * {
             display: none !important;
@@ -561,4 +563,6 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
       `}</style>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalJSX, document.body) : modalJSX;
 }

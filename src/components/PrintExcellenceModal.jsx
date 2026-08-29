@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Printer, 
   Download, 
@@ -250,7 +251,7 @@ export default function PrintExcellenceModal({
     URL.revokeObjectURL(url);
   };
 
-  return (
+  const modalJSX = (
     <div className="excellence-modal-root" style={{
       position: 'fixed',
       top: 0,
@@ -286,26 +287,16 @@ export default function PrintExcellenceModal({
             width: 100% !important;
             font-size: 11pt !important;
           }
-          body * {
-            visibility: hidden !important;
+          /* Completely hide EVERYTHING under body except the modal container so NO blank pages exist! */
+          body > *:not(.excellence-modal-root) {
+            display: none !important;
           }
-          .sidebar,
-          .top-header,
-          aside,
-          header,
-          nav,
           .no-print,
           .no-print * {
             display: none !important;
           }
 
-          /* Reset all app & modal layout wrappers so they take full 100% paper width without sidebar shift */
-          .layout-container,
-          .main-content,
-          .page-container,
-          .excellence-modal-root,
-          .excellence-modal-dialog,
-          .excellence-modal-preview-scroll {
+          .excellence-modal-root {
             position: static !important;
             inset: auto !important;
             overflow: visible !important;
@@ -316,14 +307,30 @@ export default function PrintExcellenceModal({
             min-width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
-            margin-right: 0 !important;
-            margin-left: 0 !important;
             background: transparent !important;
             box-shadow: none !important;
             border: none !important;
             display: block !important;
             backdrop-filter: none !important;
-            float: none !important;
+          }
+
+          .excellence-modal-dialog,
+          .excellence-modal-preview-scroll {
+            position: static !important;
+            inset: auto !important;
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            min-height: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+            display: block !important;
           }
 
           #excellence-printable-document,
@@ -348,7 +355,6 @@ export default function PrintExcellenceModal({
             box-shadow: none !important;
             border: none !important;
             display: block !important;
-            float: none !important;
             box-sizing: border-box !important;
           }
 
@@ -1122,4 +1128,6 @@ export default function PrintExcellenceModal({
 
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalJSX, document.body) : modalJSX;
 }

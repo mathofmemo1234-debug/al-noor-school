@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, X, BookOpen, Calendar, Clock, User, CheckCircle2, FileText, Building } from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,7 +29,7 @@ export default function PrintLessonPreparationModal({ prep, onClose }) {
     { key: 'homework', title: 'الواجبات والأنشطة الإثرائية' },
   ];
 
-  return (
+  const modalJSX = (
     <div className="prep-modal-root" style={{
       position: 'fixed',
       top: 0,
@@ -298,8 +299,9 @@ export default function PrintLessonPreparationModal({ prep, onClose }) {
             padding: 0 !important;
             font-size: 11pt !important;
           }
-          body * {
-            visibility: hidden !important;
+          /* Completely hide EVERYTHING under body except the modal container so NO blank pages exist! */
+          body > *:not(.prep-modal-root) {
+            display: none !important;
           }
           .no-print, .no-print * {
             display: none !important;
@@ -347,4 +349,6 @@ export default function PrintLessonPreparationModal({ prep, onClose }) {
       `}</style>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalJSX, document.body) : modalJSX;
 }
