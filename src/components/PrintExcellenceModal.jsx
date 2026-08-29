@@ -270,6 +270,11 @@ export default function PrintExcellenceModal({
       {/* Printable CSS Injection */}
       <style>{`
         @media print {
+          *, *:before, *:after {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
           html, body {
             height: auto !important;
             min-height: 100% !important;
@@ -277,6 +282,7 @@ export default function PrintExcellenceModal({
             background: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
+            font-size: 11pt !important;
           }
           body * {
             visibility: hidden !important;
@@ -328,9 +334,14 @@ export default function PrintExcellenceModal({
             display: block !important;
           }
 
-          .page-break-before {
-            page-break-before: always !important;
+          .domain-page-break {
             break-before: page !important;
+            page-break-before: always !important;
+          }
+
+          .criteria-header-break {
+            break-after: avoid !important;
+            page-break-after: avoid !important;
           }
 
           .avoid-break {
@@ -340,7 +351,7 @@ export default function PrintExcellenceModal({
 
           @page {
             size: A4 portrait;
-            margin: 12mm 10mm 12mm 10mm;
+            margin: 12mm 12mm 12mm 12mm;
           }
         }
       `}</style>
@@ -833,13 +844,13 @@ export default function PrintExcellenceModal({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {filteredData.map((domain, dIdx) => (
-                  <div key={domain.id} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div key={domain.id} className={dIdx > 0 ? "domain-page-break" : ""} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     
                     {/* Domain Banner */}
                     <div style={{
-                      background: '#0284c7',
+                      background: 'linear-gradient(135deg, #0284c7, #0369a1)',
                       color: '#fff',
-                      padding: '10px 14px',
+                      padding: '10px 16px',
                       borderRadius: '8px',
                       display: 'flex',
                       alignItems: 'center',
@@ -862,11 +873,11 @@ export default function PrintExcellenceModal({
                       <div key={criteria.id} style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '6px' }}>
                         
                         {/* Criterion Subheader */}
-                        <div style={{
+                        <div className="criteria-header-break" style={{
                           background: '#f1f5f9',
                           borderRight: '4px solid #0284c7',
-                          padding: '6px 12px',
-                          borderRadius: '4px',
+                          padding: '8px 14px',
+                          borderRadius: '6px',
                           color: '#0f172a',
                           fontWeight: 'bold',
                           fontSize: '0.95rem'
@@ -1066,6 +1077,24 @@ export default function PrintExcellenceModal({
 
               </div>
             )}
+
+            {/* Official Document Running Stamp */}
+            <div style={{
+              marginTop: '28px',
+              paddingTop: '12px',
+              borderTop: '1px solid #cbd5e1',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '8px',
+              fontSize: '0.72rem',
+              color: '#64748b'
+            }}>
+              <span>🏛️ <strong>وثيقة شواهد وأدلة التميز والتقويم المدرسي الرسمية</strong> — {customSchoolName}</span>
+              <span>العام الدراسي: <strong>{academicYear}</strong></span>
+              <span>تاريخ التصدير: <strong>{new Date().toLocaleDateString('ar-SA')} م</strong></span>
+            </div>
 
           </div>
 

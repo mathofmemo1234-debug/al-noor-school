@@ -1422,31 +1422,55 @@ export default function AttendanceSummaryExport({ schoolId }) {
       {/* Print Styles */}
       <style>{`
         @media print {
+          *, *:before, *:after {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          html, body {
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 10pt !important;
+          }
           body * {
             visibility: hidden;
+          }
+          .no-print, .no-print * {
+            display: none !important;
           }
           .print-area, .print-area * {
             visibility: visible;
           }
           .print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 20px;
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
             box-shadow: none !important;
             border: none !important;
-          }
-          .no-print {
-            display: none !important;
+            background: white !important;
+            display: block !important;
           }
           table {
             width: 100% !important;
             page-break-inside: auto;
           }
           tr {
-            page-break-inside: avoid;
-            page-break-after: auto;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          @page {
+            size: A4 portrait;
+            margin: 12mm 10mm 12mm 10mm;
           }
         }
       `}</style>

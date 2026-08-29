@@ -162,7 +162,7 @@ export default function PrintExamModal({
   };
 
   return (
-    <div style={{
+    <div className="exam-modal-root" style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -176,7 +176,76 @@ export default function PrintExamModal({
       zIndex: 2000,
       padding: '20px'
     }}>
-      <div style={{
+      {/* Printable CSS Injection */}
+      <style>{`
+        @media print {
+          *, *:before, *:after {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          html, body {
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 11pt !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          .no-print, .no-print * {
+            display: none !important;
+          }
+          .exam-modal-root,
+          .exam-modal-dialog {
+            position: static !important;
+            inset: auto !important;
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+            display: block !important;
+            backdrop-filter: none !important;
+          }
+          #exam-printable-document,
+          #exam-printable-document * {
+            visibility: visible !important;
+          }
+          #exam-printable-document {
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            background: white !important;
+            display: block !important;
+          }
+          .avoid-break {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          @page {
+            size: A4 portrait;
+            margin: 12mm 12mm 12mm 12mm;
+          }
+        }
+      `}</style>
+      <div className="exam-modal-dialog" style={{
         background: '#ffffff',
         width: '100%',
         maxWidth: '920px',

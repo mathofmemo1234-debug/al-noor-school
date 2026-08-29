@@ -230,13 +230,14 @@ export default function PrintScheduleModal({
   };
 
   return (
-    <div style={{
+    <div className="schedule-modal-root" style={{
       position: 'fixed',
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
       background: 'rgba(15, 23, 42, 0.75)',
+      backdropFilter: 'blur(4px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -244,7 +245,71 @@ export default function PrintScheduleModal({
       padding: '16px',
       overflowY: 'auto'
     }}>
-      <div className="glass-panel" style={{
+      {/* Print CSS Injection */}
+      <style>{`
+        @media print {
+          *, *:before, *:after {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          html, body {
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          .no-print, .no-print * {
+            display: none !important;
+          }
+          .schedule-modal-root,
+          .schedule-modal-dialog {
+            position: static !important;
+            inset: auto !important;
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+            display: block !important;
+            backdrop-filter: none !important;
+          }
+          #printable-schedule-area,
+          #printable-schedule-area * {
+            visibility: visible !important;
+          }
+          #printable-schedule-area {
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            background: white !important;
+            display: block !important;
+          }
+          @page {
+            size: A4 landscape;
+            margin: 10mm 10mm 10mm 10mm;
+          }
+        }
+      `}</style>
+      <div className="schedule-modal-dialog glass-panel" style={{
         width: '1100px',
         maxWidth: '100%',
         maxHeight: '94vh',

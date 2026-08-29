@@ -45,13 +45,14 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
   }
 
   return (
-    <div style={{
+    <div className="cert-modal-root" style={{
       position: 'fixed',
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(15, 23, 42, 0.65)',
+      background: 'rgba(15, 23, 42, 0.7)',
+      backdropFilter: 'blur(4px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -59,7 +60,7 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
       padding: '16px',
       overflowY: 'auto'
     }}>
-      <div className="glass-panel" style={{
+      <div className="cert-modal-dialog glass-panel" style={{
         width: '850px',
         maxWidth: '100%',
         maxHeight: '92vh',
@@ -497,25 +498,64 @@ export default function CertificateLetterModal({ person, type = 'student', onClo
       {/* Print Stylesheet */}
       <style>{`
         @media print {
+          *, *:before, *:after {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          html, body {
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 11pt !important;
+          }
           body * {
             visibility: hidden !important;
+          }
+          .no-print, .no-print * {
+            display: none !important;
+          }
+          .cert-modal-root,
+          .cert-modal-dialog {
+            position: static !important;
+            inset: auto !important;
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+            display: block !important;
+            backdrop-filter: none !important;
           }
           .printable-certificate-page, .printable-certificate-page * {
             visibility: visible !important;
           }
           .printable-certificate-page {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
             width: 100% !important;
-            height: 100% !important;
-            padding: 30mm 20mm !important;
+            max-width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
             box-shadow: none !important;
             border: none !important;
             background: white !important;
+            display: block !important;
           }
-          .no-print {
-            display: none !important;
+          @page {
+            size: A4 portrait;
+            margin: 12mm 12mm 12mm 12mm;
           }
         }
       `}</style>

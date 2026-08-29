@@ -54,13 +54,14 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
   };
 
   return (
-    <div style={{
+    <div className="students-modal-root" style={{
       position: 'fixed',
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(15, 23, 42, 0.65)',
+      background: 'rgba(15, 23, 42, 0.7)',
+      backdropFilter: 'blur(4px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -68,7 +69,7 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
       padding: '16px',
       overflowY: 'auto'
     }}>
-      <div className="glass-panel" style={{
+      <div className="students-modal-dialog glass-panel" style={{
         width: '950px',
         maxWidth: '100%',
         maxHeight: '92vh',
@@ -411,33 +412,72 @@ export default function PrintStudentRecordsModal({ students = [], classesList = 
       {/* Print CSS */}
       <style>{`
         @media print {
+          *, *:before, *:after {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          html, body {
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 10.5pt !important;
+          }
           body * {
             visibility: hidden !important;
+          }
+          .no-print, .no-print * {
+            display: none !important;
+          }
+          .students-modal-root,
+          .students-modal-dialog {
+            position: static !important;
+            inset: auto !important;
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+            display: block !important;
+            backdrop-filter: none !important;
           }
           .printable-students-page, .printable-students-page * {
             visibility: visible !important;
           }
           .printable-students-page {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
             width: 100% !important;
-            height: 100% !important;
-            padding: 20mm 15mm !important;
+            max-width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
             box-shadow: none !important;
             border: none !important;
             background: white !important;
-          }
-          .no-print {
-            display: none !important;
+            display: block !important;
           }
           table {
             width: 100% !important;
             page-break-inside: auto;
           }
           tr {
-            page-break-inside: avoid;
-            page-break-after: auto;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          @page {
+            size: A4 portrait;
+            margin: 12mm 10mm 12mm 10mm;
           }
         }
       `}</style>
