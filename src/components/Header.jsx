@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Bell, Globe, Mail } from 'lucide-react';
+import { Bell, Globe, Mail, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -145,6 +145,31 @@ export default function Header({ title, role }) {
         >
           <Globe size={16} color={lang === 'ar' ? '#0e7490' : '#047857'} />
           <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
+        </button>
+
+        {/* Electronic Portfolio Quick Button */}
+        <button
+          className="btn"
+          onClick={() => navigate(`/${effectiveRole}/portfolio`)}
+          style={{
+            background: 'linear-gradient(135deg, rgba(14, 116, 144, 0.08), rgba(99, 178, 198, 0.15))',
+            border: '1px solid rgba(14, 116, 144, 0.25)',
+            borderRadius: '20px',
+            padding: '6px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            fontWeight: '700',
+            fontSize: '13px',
+            color: '#0e7490',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+          }}
+          title="ملف الإنجاز الإلكتروني الشامل"
+        >
+          <Award size={16} color="#0e7490" />
+          <span>ملف الإنجاز</span>
         </button>
 
         {/* Messaging Quick Button */}

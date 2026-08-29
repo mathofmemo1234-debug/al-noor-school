@@ -9,6 +9,7 @@ import StudentExams from './StudentExams';
 import SchoolMessagingHub from './SchoolMessagingHub';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import MarkdownViewer from '../components/MarkdownViewer';
+import AchievementPortfolioPage from './AchievementPortfolioPage';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import GamificationBadge from '../components/GamificationBadge';
@@ -1540,7 +1541,8 @@ export default function StudentDashboard() {
       <Routes>
         <Route path="/" element={<StudentHome />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
-        <Route path="/portfolio" element={<StudentPortfolio />} />
+        <Route path="/portfolio" element={<AchievementPortfolioPage />} />
+        <Route path="/grades" element={<StudentPortfolio />} />
         <Route path="/weekly-plan" element={<StudentWeeklyPlan />} />
         <Route path="/assignments" element={<StudentAssignments />} />
         <Route path="/schedule" element={<StudentSchedule />} />

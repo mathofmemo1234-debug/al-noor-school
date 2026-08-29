@@ -15,6 +15,7 @@ import SchoolSettings from './SchoolSettings';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
 import SchoolMessagingHub from './SchoolMessagingHub';
+import AchievementPortfolioPage from './AchievementPortfolioPage';
 
 function SupervisorHome({ schoolId }) {
   const { userData } = useAuth();
@@ -262,6 +263,7 @@ export default function SupervisorDashboard() {
       <Routes>
         <Route path="/" element={<SupervisorHome schoolId={userData?.schoolId} />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
+        <Route path="/portfolio" element={<AchievementPortfolioPage />} />
         <Route path="/attendance" element={<AttendanceSummaryExport schoolId={userData?.schoolId} />} />
         <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />
         <Route path="/weekly-plan" element={<WeeklyPlanView schoolId={userData?.schoolId} />} />

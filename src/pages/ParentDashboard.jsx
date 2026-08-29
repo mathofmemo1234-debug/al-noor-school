@@ -8,6 +8,7 @@ import StudentExams from './StudentExams';
 import SchoolMessagingHub from './SchoolMessagingHub';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import Settings from './Settings';
+import AchievementPortfolioPage from './AchievementPortfolioPage';
 import { User, GraduationCap, School, BookOpen, Calendar, Award, Mail, FileText, CheckCircle2, ChevronLeft } from 'lucide-react';
 
 function ParentHome() {
@@ -198,6 +199,17 @@ function ParentWeeklyPlan() {
   return <WeeklyPlanView studentClass={userData?.studentClass} schoolId={userData?.schoolId} />;
 }
 
+function ParentStudentPortfolio() {
+  const { userData } = useAuth();
+  const studentUser = {
+    name: userData?.studentName || 'الطالب',
+    nationalId: userData?.studentNationalId || '',
+    class: userData?.studentClass || '',
+    schoolName: userData?.schoolName || 'مجمع المدارس المتقدمة للتعلم الذكي'
+  };
+  return <AchievementPortfolioPage targetRole="student" targetUser={studentUser} />;
+}
+
 export default function ParentDashboard() {
   return (
     <Layout role="parent">
@@ -207,7 +219,7 @@ export default function ParentDashboard() {
         <Route path="/schedule" element={<StudentSchedule />} />
         <Route path="/exams" element={<StudentExams />} />
         <Route path="/assignments" element={<StudentExams />} />
-        <Route path="/portfolio" element={<StudentExams />} />
+        <Route path="/portfolio" element={<ParentStudentPortfolio />} />
         <Route path="/preparations" element={<ParentWeeklyPlan />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
         <Route path="/settings" element={<Settings />} />

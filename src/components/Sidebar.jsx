@@ -23,6 +23,7 @@ export default function Sidebar({ role }) {
   const adminLinks = [
     { path: '/admin', icon: Home, label: t('sidebar.overview') },
     { path: '/admin/messages', icon: Mail, label: 'المراسلات والتعاميم' },
+    { path: '/admin/portfolio', icon: Award, label: 'ملف الإنجاز القيادي' },
     { path: '/admin/staff', icon: ShieldCheck, label: t('sidebar.staff') },
     { path: '/admin/supervisors', icon: UserCheck, label: t('sidebar.supervisors') },
     { path: '/admin/teachers', icon: Users, label: t('sidebar.teachers') },
@@ -44,6 +45,7 @@ export default function Sidebar({ role }) {
   const staffLinks = [
     { path: '/staff', icon: Home, label: t('sidebar.overview') },
     { path: '/staff/messages', icon: Mail, label: 'المراسلات والتعاميم' },
+    { path: '/staff/portfolio', icon: Award, label: 'ملف الإنجاز الإداري' },
     ...(userPerms.includes('attendance') ? [{ path: '/staff/attendance', icon: CheckSquare, label: t('sidebar.attendance') }] : []),
     ...(userPerms.includes('preparations') ? [{ path: '/staff/preparations', icon: BookOpen, label: t('sidebar.preparations') }] : []),
     ...(userPerms.includes('weekly_plans') ? [{ path: '/staff/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') }] : []),
@@ -59,6 +61,7 @@ export default function Sidebar({ role }) {
   const supervisorLinks = [
     { path: '/supervisor', icon: Home, label: t('sidebar.overview') },
     { path: '/supervisor/messages', icon: Mail, label: 'المراسلات والتعاميم' },
+    { path: '/supervisor/portfolio', icon: Award, label: 'ملف الإنجاز الإشرافي' },
     { path: '/supervisor/attendance', icon: CheckSquare, label: t('sidebar.attendance') },
     { path: '/supervisor/preparations', icon: BookOpen, label: t('sidebar.preparations') },
     { path: '/supervisor/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
@@ -76,6 +79,7 @@ export default function Sidebar({ role }) {
   const teacherLinks = [
     { path: '/teacher', icon: Home, label: t('sidebar.overview') },
     { path: '/teacher/messages', icon: Mail, label: 'المراسلات والتعاميم' },
+    { path: '/teacher/portfolio', icon: Award, label: 'ملف الإنجاز التربوي' },
     { path: '/teacher/preparation', icon: BookOpen, label: t('sidebar.preparations') },
     { path: '/teacher/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
     { path: '/teacher/schedule', icon: Calendar, label: t('sidebar.schedule') },
@@ -90,7 +94,7 @@ export default function Sidebar({ role }) {
   const studentLinks = [
     { path: '/student', icon: Home, label: t('sidebar.overview') },
     { path: '/student/messages', icon: Mail, label: 'المراسلات والتعاميم' },
-    { path: '/student/portfolio', icon: Award, label: 'سجل الإنجاز والدرجات' },
+    { path: '/student/portfolio', icon: Award, label: 'ملف الإنجاز الأكاديمي' },
     { path: '/student/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
     { path: '/student/schedule', icon: Calendar, label: t('sidebar.schedule') },
     { path: '/student/assignments', icon: BookOpen, label: t('sidebar.assignments') },
@@ -103,7 +107,7 @@ export default function Sidebar({ role }) {
   const parentLinks = [
     { path: '/parent', icon: Home, label: t('sidebar.overview') },
     { path: '/parent/messages', icon: Mail, label: 'المراسلات والتعاميم' },
-    { path: '/parent/portfolio', icon: Award, label: 'سجل إنجاز الطالب والدرجات' },
+    { path: '/parent/portfolio', icon: Award, label: 'ملف إنجاز الطالب' },
     { path: '/parent/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
     { path: '/parent/schedule', icon: Calendar, label: t('sidebar.schedule') },
     { path: '/parent/assignments', icon: BookOpen, label: t('sidebar.assignments') },

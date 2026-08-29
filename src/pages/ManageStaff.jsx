@@ -4,6 +4,7 @@ import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, que
 import { Users, UserPlus, X, Edit, Trash2, Shield, ShieldCheck, CheckSquare, Square, Phone, Award, Star, BookOpen, Calendar, CheckCircle, FileText } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import CertificateLetterModal from '../components/CertificateLetterModal';
+import PrintPortfolioModal from '../components/PrintPortfolioModal';
 import NationalitySelect from '../components/NationalitySelect';
 
 export const ALL_PERMISSIONS = [
@@ -65,6 +66,7 @@ export default function ManageStaff({ schoolId }) {
   const [editingPermissionsStaff, setEditingPermissionsStaff] = useState(null);
   const [editingStaffInfo, setEditingStaffInfo] = useState(null);
   const [printingLetterStaff, setPrintingLetterStaff] = useState(null);
+  const [printingPortfolioStaff, setPrintingPortfolioStaff] = useState(null);
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -545,6 +547,27 @@ export default function ManageStaff({ schoolId }) {
                   </button>
 
                   <button
+                    onClick={() => setPrintingPortfolioStaff(staff)}
+                    className="btn"
+                    style={{
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer'
+                    }}
+                    title="طباعة وتصدير ملف الإنجاز الإداري"
+                  >
+                    <Award size={15} /> ملف الإنجاز
+                  </button>
+
+                  <button
                     onClick={() => setEditingPermissionsStaff({ ...staff })}
                     className="btn"
                     style={{
@@ -905,6 +928,15 @@ export default function ManageStaff({ schoolId }) {
 
       {printingLetterStaff && (
         <CertificateLetterModal person={printingLetterStaff} type="staff" onClose={() => setPrintingLetterStaff(null)} />
+      )}
+
+      {printingPortfolioStaff && (
+        <PrintPortfolioModal
+          role="staff"
+          userData={printingPortfolioStaff}
+          schoolName={printingPortfolioStaff?.schoolName}
+          onClose={() => setPrintingPortfolioStaff(null)}
+        />
       )}
     </div>
   );

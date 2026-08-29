@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Users, BookOpen, UserPlus, X, Edit, Trash2, ShieldCheck, UserCheck, Printer, FileText, Globe } from 'lucide-react';
+import { Users, BookOpen, UserPlus, X, Edit, Trash2, ShieldCheck, UserCheck, Printer, FileText, Globe, Award } from 'lucide-react';
 import ManageSchedules from './ManageSchedules';
 import { db } from '../firebase';
 import { collection, addDoc, setDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
@@ -14,10 +14,12 @@ import ManageStaff from './ManageStaff';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import CertificateLetterModal from '../components/CertificateLetterModal';
 import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
+import PrintPortfolioModal from '../components/PrintPortfolioModal';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
 import NationalitySelect from '../components/NationalitySelect';
 import SchoolMessagingHub from './SchoolMessagingHub';
 import SchoolExcellenceDashboard from './SchoolExcellenceDashboard';
+import AchievementPortfolioPage from './AchievementPortfolioPage';
 import { useLanguage } from '../contexts/LanguageContext';
 import GamificationBadge from '../components/GamificationBadge';
 import { calculateTeacherActivity, calculateStudentActivity } from '../utils/gamificationEngine';
@@ -233,6 +235,7 @@ function ManageTeachers({ schoolId }) {
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState(null);
   const [printingLetterTeacher, setPrintingLetterTeacher] = useState(null);
+  const [printingPortfolioTeacher, setPrintingPortfolioTeacher] = useState(null);
   
   // Single Add
   const [name, setName] = useState('');
@@ -553,6 +556,26 @@ function ManageTeachers({ schoolId }) {
                 >
                   <FileText size={15} /> مشهد تعريف
                 </button>
+                <button
+                  onClick={() => setPrintingPortfolioTeacher(tData)}
+                  className="btn"
+                  style={{
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    border: '1px solid #bfdbfe',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                  title="معاينة وطباعة ملف الإنجاز التربوي للمعلم"
+                >
+                  <Award size={15} /> ملف الإنجاز
+                </button>
                 <button onClick={() => setEditingTeacher(tData)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: 'var(--color-primary)', padding: '6px', display: 'flex', alignItems: 'center' }}><Edit size={16} /></button>
                 <button onClick={() => handleDelete(tData.id, tData.nationalId)} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#ff4d4f', padding: '6px', display: 'flex', alignItems: 'center' }}><Trash2 size={16} /></button>
               </div>
@@ -642,6 +665,15 @@ function ManageTeachers({ schoolId }) {
       {printingLetterTeacher && (
         <CertificateLetterModal person={printingLetterTeacher} type="teacher" onClose={() => setPrintingLetterTeacher(null)} />
       )}
+
+      {printingPortfolioTeacher && (
+        <PrintPortfolioModal
+          role="teacher"
+          userData={printingPortfolioTeacher}
+          schoolName={printingPortfolioTeacher?.schoolName}
+          onClose={() => setPrintingPortfolioTeacher(null)}
+        />
+      )}
     </div>
   );
 }
@@ -653,6 +685,7 @@ function ManageSupervisors({ schoolId }) {
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [editingSupervisor, setEditingSupervisor] = useState(null);
   const [printingLetterSupervisor, setPrintingLetterSupervisor] = useState(null);
+  const [printingPortfolioSupervisor, setPrintingPortfolioSupervisor] = useState(null);
   
   // Single Add
   const [name, setName] = useState('');
@@ -986,6 +1019,26 @@ function ManageSupervisors({ schoolId }) {
                 >
                   <FileText size={15} /> خطاب تعريف
                 </button>
+                <button
+                  onClick={() => setPrintingPortfolioSupervisor(sup)}
+                  className="btn"
+                  style={{
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    border: '1px solid #bfdbfe',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                  title="معاينة وطباعة ملف الإنجاز الإشرافي"
+                >
+                  <Award size={15} /> ملف الإنجاز
+                </button>
                 <button onClick={() => setEditingSupervisor(sup)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: '#0e7490', padding: '6px', display: 'flex', alignItems: 'center' }}><Edit size={16} /></button>
                 <button onClick={() => handleDelete(sup.id, sup.nationalId)} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#dc2626', padding: '6px', display: 'flex', alignItems: 'center' }}><Trash2 size={16} /></button>
               </div>
@@ -1139,6 +1192,15 @@ function ManageSupervisors({ schoolId }) {
       {printingLetterSupervisor && (
         <CertificateLetterModal person={printingLetterSupervisor} type="supervisor" onClose={() => setPrintingLetterSupervisor(null)} />
       )}
+
+      {printingPortfolioSupervisor && (
+        <PrintPortfolioModal
+          role="supervisor"
+          userData={printingPortfolioSupervisor}
+          schoolName={printingPortfolioSupervisor?.schoolName}
+          onClose={() => setPrintingPortfolioSupervisor(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1151,6 +1213,7 @@ function ManageStudents({ schoolId }) {
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [printingLetterStudent, setPrintingLetterStudent] = useState(null);
+  const [printingPortfolioStudent, setPrintingPortfolioStudent] = useState(null);
   const [isPrintingStudentRecords, setIsPrintingStudentRecords] = useState(false);
   
   // Single Add
@@ -1475,6 +1538,26 @@ function ManageStudents({ schoolId }) {
                 >
                   <FileText size={15} /> شهادة تعريف
                 </button>
+                <button
+                  onClick={() => setPrintingPortfolioStudent(s)}
+                  className="btn"
+                  style={{
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    border: '1px solid #bfdbfe',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                  title="معاينة وطباعة ملف إنجاز الطالب"
+                >
+                  <Award size={15} /> ملف الإنجاز
+                </button>
                 <button onClick={() => setEditingStudent(s)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', color: 'var(--color-primary)', padding: '6px', display: 'flex', alignItems: 'center' }}><Edit size={16} /></button>
                 <button onClick={() => handleDelete(s.id, s.nationalId)} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#ff4d4f', padding: '6px', display: 'flex', alignItems: 'center' }}><Trash2 size={16} /></button>
               </div>
@@ -1569,6 +1652,15 @@ function ManageStudents({ schoolId }) {
 
       {printingLetterStudent && (
         <CertificateLetterModal person={printingLetterStudent} type="student" onClose={() => setPrintingLetterStudent(null)} />
+      )}
+
+      {printingPortfolioStudent && (
+        <PrintPortfolioModal
+          role="student"
+          userData={printingPortfolioStudent}
+          schoolName={printingPortfolioStudent?.schoolName}
+          onClose={() => setPrintingPortfolioStudent(null)}
+        />
       )}
 
       {isPrintingStudentRecords && (
@@ -1747,6 +1839,7 @@ export default function AdminDashboard() {
       <Routes>
         <Route path="/" element={<AdminHome schoolId={userData?.schoolId} />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
+        <Route path="/portfolio" element={<AchievementPortfolioPage />} />
         <Route path="/staff" element={<ManageStaff schoolId={userData?.schoolId} />} />
         <Route path="/supervisors" element={<ManageSupervisors schoolId={userData?.schoolId} />} />
         <Route path="/teachers" element={<ManageTeachers schoolId={userData?.schoolId} />} />

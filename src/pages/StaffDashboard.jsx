@@ -18,6 +18,7 @@ import CertificateLetterModal from '../components/CertificateLetterModal';
 import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
 import SchoolMessagingHub from './SchoolMessagingHub';
+import AchievementPortfolioPage from './AchievementPortfolioPage';
 
 function StaffHome({ schoolId }) {
   const { userData } = useAuth();
@@ -490,6 +491,7 @@ export default function StaffDashboard() {
       <Routes>
         <Route path="/" element={<StaffHome schoolId={userData?.schoolId} />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
+        <Route path="/portfolio" element={<AchievementPortfolioPage />} />
         {userPerms.includes('preparations') && (
           <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />
         )}

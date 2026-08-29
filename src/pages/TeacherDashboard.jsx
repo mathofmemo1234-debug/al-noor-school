@@ -13,6 +13,7 @@ import TeacherExams from './TeacherExams';
 import SchoolExcellenceDashboard from './SchoolExcellenceDashboard';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import SchoolMessagingHub from './SchoolMessagingHub';
+import AchievementPortfolioPage from './AchievementPortfolioPage';
 import MarkdownInput from '../components/MarkdownInput';
 import { useLanguage } from '../contexts/LanguageContext';
 import SharedQuestionBankModal from '../components/SharedQuestionBankModal';
@@ -1812,6 +1813,7 @@ export default function TeacherDashboard() {
         <Route path="/assignments" element={<Assignments />} />
         <Route path="/exams" element={<TeacherExams />} />
         <Route path="/attendance" element={<Attendance />} />
+        <Route path="/portfolio" element={<AchievementPortfolioPage />} />
         <Route path="/excellence" element={<SchoolExcellenceDashboard />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
