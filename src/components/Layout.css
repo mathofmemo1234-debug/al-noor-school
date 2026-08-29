@@ -248,3 +248,44 @@
   font-size: 0.95rem;
   font-weight: 600;
 }
+
+/* ================= PRINT MEDIA OPTIMIZATIONS ================= */
+@media print {
+  .sidebar,
+  .top-header,
+  .no-print,
+  aside,
+  header,
+  nav {
+    display: none !important;
+  }
+  .layout-container {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+  .main-content {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    margin: 0 !important;
+    margin-right: 0 !important;
+    margin-left: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .page-container {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+}

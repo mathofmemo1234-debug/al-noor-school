@@ -274,6 +274,7 @@ export default function PrintExcellenceModal({
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
+            box-sizing: border-box !important;
           }
           html, body {
             height: auto !important;
@@ -282,16 +283,26 @@ export default function PrintExcellenceModal({
             background: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
+            width: 100% !important;
             font-size: 11pt !important;
           }
           body * {
             visibility: hidden !important;
           }
-          .no-print, .no-print * {
+          .sidebar,
+          .top-header,
+          aside,
+          header,
+          nav,
+          .no-print,
+          .no-print * {
             display: none !important;
           }
 
-          /* Reset all modal containers so pagination flows naturally across infinite pages */
+          /* Reset all app & modal layout wrappers so they take full 100% paper width without sidebar shift */
+          .layout-container,
+          .main-content,
+          .page-container,
           .excellence-modal-root,
           .excellence-modal-dialog,
           .excellence-modal-preview-scroll {
@@ -302,13 +313,17 @@ export default function PrintExcellenceModal({
             max-height: none !important;
             width: 100% !important;
             max-width: 100% !important;
+            min-width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
+            margin-right: 0 !important;
+            margin-left: 0 !important;
             background: transparent !important;
             box-shadow: none !important;
             border: none !important;
             display: block !important;
             backdrop-filter: none !important;
+            float: none !important;
           }
 
           #excellence-printable-document,
@@ -322,6 +337,7 @@ export default function PrintExcellenceModal({
             top: auto !important;
             width: 100% !important;
             max-width: 100% !important;
+            min-width: 100% !important;
             height: auto !important;
             min-height: auto !important;
             overflow: visible !important;
@@ -332,6 +348,8 @@ export default function PrintExcellenceModal({
             box-shadow: none !important;
             border: none !important;
             display: block !important;
+            float: none !important;
+            box-sizing: border-box !important;
           }
 
           .domain-page-break {
