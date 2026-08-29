@@ -131,14 +131,27 @@ export function AuthProvider({ children }) {
     localStorage.setItem('userRole', role);
   }, []);
 
+  const cachedUserData = (() => {
+    try {
+      return userData || JSON.parse(localStorage.getItem('userData') || 'null');
+    } catch {
+      return userData || null;
+    }
+  })();
+
   const value = { currentUser, userRole, userData, loading, setLoginRole };
 
   return (
     <AuthContext.Provider value={value}>
       {loading ? (
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--color-bg,#F4F8F9)', fontFamily:'Cairo,sans-serif', direction:'rtl' }}>
-          <div style={{ width:'48px', height:'48px', border:'4px solid rgba(99,178,198,0.2)', borderTopColor:'#63B2C6', borderRadius:'50%', animation:'spin 1s linear infinite' }} />
-          <p style={{ marginTop:'16px', color:'#4A93A6', fontWeight:700, fontSize:'1rem' }}>جاري استعادة الجلسة...</p>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--color-bg,#F4F8F9)', fontFamily:'Cairo,sans-serif', direction:'rtl', padding:'24px', textAlign:'center' }}>
+          <div style={{ width:'52px', height:'52px', border:'4px solid rgba(99,178,198,0.2)', borderTopColor:'#63B2C6', borderRadius:'50%', animation:'spin 1s linear infinite', marginBottom:'20px' }} />
+          <h2 style={{ margin:'0 0 8px 0', color:'#0e7490', fontWeight:800, fontSize:'1.35rem' }}>
+            {cachedUserData?.name ? `مرحباً بعودتك، ${cachedUserData.name}` : 'مرحباً بعودتك'}
+          </h2>
+          <p style={{ margin:0, color:'#4A93A6', fontWeight:600, fontSize:'1.05rem' }}>
+            في {cachedUserData?.schoolName || 'مجمع المدارس المتقدمة للتعلم الذكي'}
+          </p>
         </div>
       ) : children}
     </AuthContext.Provider>
