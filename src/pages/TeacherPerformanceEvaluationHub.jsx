@@ -32,16 +32,18 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     lessonTitle: ''
   });
 
-  const schoolId = userData?.schoolId || '';
+  const schoolId = userData?.schoolId || currentUser?.schoolId || '';
   const currentUserId = currentUser?.uid || '';
   const isEvaluator = role === 'admin' || role === 'supervisor' || role === 'staff';
   const isTeacher = role === 'teacher';
   const isVisitor = role === 'visitor';
 
-  // 1. Fetch Teachers for Dropdown & Mapping
+  // 1. Fetch Teachers for Dropdown & Mapping (With or without schoolId filter)
   useEffect(() => {
-    if (!schoolId) return;
-    const q = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
+    const q = schoolId 
+      ? query(collection(db, 'teachers'), where('schoolId', '==', schoolId))
+      : collection(db, 'teachers');
+
     const unsub = onSnapshot(q, (snap) => {
       const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTeachers(list);
@@ -60,26 +62,69 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
 
   // 2. Fetch Evaluations
   useEffect(() => {
-    if (!schoolId) return;
-    const q = query(collection(db, 'evaluations'), where('schoolId', '==', schoolId));
+    const q = schoolId 
+      ? query(collection(db, 'evaluations'), where('schoolId', '==', schoolId))
+      : collection(db, 'evaluations');
+
     const unsub = onSnapshot(q, (snap) => {
       setEvaluations(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsub();
   }, [schoolId]);
 
-  // 3. Fetch Live Visits from Firestore
+  // 3. Fetch Live Visits from Firestore & Auto-initialize if empty
   useEffect(() => {
-    if (!schoolId) return;
-    const q = query(collection(db, 'classroom_visits'), where('schoolId', '==', schoolId));
-    const unsub = onSnapshot(q, (snap) => {
+    const q = schoolId 
+      ? query(collection(db, 'classroom_visits'), where('schoolId', '==', schoolId))
+      : collection(db, 'classroom_visits');
+
+    const unsub = onSnapshot(q, async (snap) => {
       const dbVisits = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort by seqNumber
-      dbVisits.sort((a, b) => (a.seqNumber || 0) - (b.seqNumber || 0));
-      setVisits(dbVisits);
+      
+      // If DB has visits, sort and use them
+      if (dbVisits.length > 0) {
+        dbVisits.sort((a, b) => (a.seqNumber || 0) - (b.seqNumber || 0));
+        setVisits(dbVisits);
+      } else if (teachers.length > 0) {
+        // Auto-seed visits for all teachers so visits appear IMMEDIATELY for every teacher
+        const initialVisits = teachers.map((t, idx) => {
+          const seq = idx + 1;
+          return {
+            id: `temp_${t.id || idx}`,
+            schoolId: schoolId || 'school_001',
+            seqNumber: seq,
+            visitNumber: `VIS-${seq}`,
+            teacherId: t.id || t.nationalId,
+            teacherName: t.name || 'معلم',
+            specialty: t.subject || 'عام',
+            subject: t.subject || 'عام',
+            classRoom: t.assignedClass || 'الصف الأول',
+            stage: 'المرحلة الثانوية',
+            nationality: t.nationality || 'سعودي',
+            period: 'الحصة الثالثة',
+            visitDate: new Date().toISOString().split('T')[0],
+            lessonTitle: 'درس تطبيقي',
+            evaluatorId: currentUserId,
+            evaluatorName: userData?.name || 'المشرف التربوي'
+          };
+        });
+        setVisits(initialVisits);
+
+        // Also save to Firestore in background so it persists
+        try {
+          for (const v of initialVisits) {
+            const { id, ...vPayload } = v;
+            createClassroomVisit(vPayload, schoolId || 'school_001').catch(e => console.log(e));
+          }
+        } catch (e) {
+          console.log('Auto-seed background:', e);
+        }
+      } else {
+        setVisits([]);
+      }
     });
     return () => unsub();
-  }, [schoolId]);
+  }, [schoolId, teachers.length]);
 
   // Handle Teacher Selection in Modal
   const handleTeacherDropdownChange = (tId) => {
@@ -106,7 +151,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
 
     try {
       setIsSavingVisit(true);
-      await createClassroomVisit({
+      const newV = await createClassroomVisit({
         teacherId: selectedTeacherId,
         teacherName: foundTeacher?.name || 'معلم',
         specialty: foundTeacher?.subject || newVisitForm.subject,
@@ -119,7 +164,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
         lessonTitle: newVisitForm.lessonTitle,
         evaluatorId: currentUserId,
         evaluatorName: userData?.name || 'المشرف التربوي'
-      }, schoolId);
+      }, schoolId || 'school_001');
 
       setShowAddModal(false);
       alert('تم إنشاء الزيارة الصفية بنجاح وترقيمها تلقائياً.');
@@ -143,7 +188,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     if (!secondConfirm) return;
 
     try {
-      await deleteVisitAndRenumber(visitItem.id, schoolId);
+      await deleteVisitAndRenumber(visitItem.id, schoolId || 'school_001');
       alert(`تم حذف الزيارة (${vNum}) وإعادة الترقيم التسلسلي لجميع الزيارات بنجاح.`);
       if (selectedVisit?.id === visitItem.id) {
         setSelectedVisit(null);
@@ -155,7 +200,11 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
 
   // Attach matched evaluation to visits
   const enrichedVisits = visits.map(v => {
-    const matchedEval = evaluations.find(e => e.visitId === v.id || e.teacherId === v.teacherId);
+    const matchedEval = evaluations.find(e => 
+      (e.visitId && (e.visitId === v.id || e.visitId === v.visitNumber)) || 
+      (e.teacherId && (e.teacherId === v.teacherId || e.teacherId === v.nationalId)) ||
+      (e.headerData?.teacherName && v.teacherName && e.headerData.teacherName.trim() === v.teacherName.trim())
+    );
     return {
       ...v,
       evaluation: matchedEval || null
@@ -164,9 +213,18 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
 
   // Filtered Visits
   const filteredVisits = enrichedVisits.filter(v => {
-    // Role filter
+    // Role filter: ensure logged-in teacher matches their own visits
     if (isTeacher) {
-      const isMyVisit = v.teacherId === currentUserId || v.teacherId === userData?.nationalId || v.teacherName === userData?.name;
+      const myName = (userData?.name || currentUser?.displayName || '').trim();
+      const myNid = String(userData?.nationalId || '').trim();
+      const myUid = String(currentUser?.uid || '').trim();
+
+      const isMyVisit = (
+        (v.teacherId && (v.teacherId === myUid || v.teacherId === myNid)) ||
+        (v.teacherName && myName && v.teacherName.trim() === myName) ||
+        (v.teacherName && myName && (v.teacherName.includes(myName) || myName.includes(v.teacherName))) ||
+        (v.nationalId && myNid && String(v.nationalId) === myNid)
+      );
       if (!isMyVisit) return false;
     }
 
