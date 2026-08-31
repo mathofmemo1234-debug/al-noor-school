@@ -1,8 +1,8 @@
 import Settings from './Settings';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Calendar, FileText, Users, X, Edit, Trash2, CheckSquare, Square, Plus, Save, Award, AlertCircle, CheckCircle, BarChart2, Clock, BookOpen, Eye, RotateCcw, Check } from 'lucide-react';
+import { Calendar, FileText, Users, X, Edit, Trash2, CheckSquare, Square, Plus, Save, Award, AlertCircle, CheckCircle, BarChart2, Clock, BookOpen, Eye, RotateCcw, Check, ClipboardList } from 'lucide-react';
 import { db, auth } from '../firebase';
 import TeacherSchedule from './TeacherSchedule';
 import { doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, deleteDoc, updateDoc, getDocs, serverTimestamp } from 'firebase/firestore';
@@ -14,6 +14,7 @@ import SchoolExcellenceDashboard from './SchoolExcellenceDashboard';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import SchoolMessagingHub from './SchoolMessagingHub';
 import AchievementPortfolioPage from './AchievementPortfolioPage';
+import ComprehensiveStudentRecord from './ComprehensiveStudentRecord';
 import MarkdownInput from '../components/MarkdownInput';
 import { useLanguage } from '../contexts/LanguageContext';
 import SharedQuestionBankModal from '../components/SharedQuestionBankModal';
@@ -227,9 +228,29 @@ function TeacherTasks() {
                 مرحباً بك، {userData?.name || 'الأستاذ الفاضل'}
               </h2>
             </div>
-            <p style={{ margin: 0, opacity: 0.9, fontSize: '0.92rem' }}>
+            <p style={{ margin: '0 0 12px 0', opacity: 0.9, fontSize: '0.92rem' }}>
               مؤشر النشاط والتميز المهني للمعلم • احتساب تلقائي لنقاط التحاضير، الخطط، الواجبات، الاختبارات ورصد الحضور
             </p>
+            <Link
+              to="/teacher/student-records"
+              className="btn"
+              style={{
+                background: 'linear-gradient(135deg, #fef08a 0%, #facc15 100%)',
+                color: '#713f12',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '13px',
+                padding: '8px 18px',
+                borderRadius: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                textDecoration: 'none',
+                boxShadow: '0 4px 14px rgba(250, 204, 21, 0.4)'
+              }}
+            >
+              <ClipboardList size={17} /> سجل متابعة الطالب الشامل (فصولك المسندة)
+            </Link>
           </div>
 
           {/* Golden Stars & Points Badge Card */}
@@ -1544,7 +1565,7 @@ function Attendance() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <button
           onClick={() => setActiveTab('record')}
           className="btn"
@@ -1575,6 +1596,25 @@ function Attendance() {
         >
           📊 ملخص وتصدير تقرير الغياب (Excel / PDF)
         </button>
+        <Link
+          to="/teacher/student-records"
+          className="btn"
+          style={{
+            background: 'linear-gradient(135deg, #0e7490 0%, #0369a1 100%)',
+            color: 'white',
+            border: 'none',
+            fontWeight: 'bold',
+            borderRadius: '10px',
+            padding: '10px 20px',
+            textDecoration: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 12px rgba(14, 116, 144, 0.25)'
+          }}
+        >
+          <ClipboardList size={18} /> سجل متابعة الطالب الشامل
+        </Link>
       </div>
 
       {activeTab === 'summary' ? (
@@ -1813,6 +1853,7 @@ export default function TeacherDashboard() {
         <Route path="/assignments" element={<Assignments />} />
         <Route path="/exams" element={<TeacherExams />} />
         <Route path="/attendance" element={<Attendance />} />
+        <Route path="/student-records" element={<ComprehensiveStudentRecord role="teacher" />} />
         <Route path="/portfolio" element={<AchievementPortfolioPage />} />
         <Route path="/excellence" element={<SchoolExcellenceDashboard />} />
         <Route path="/settings" element={<Settings />} />

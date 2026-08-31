@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare, Globe, Mail, Award } from 'lucide-react';
+import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare, Globe, Mail, Award, ClipboardList } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,6 +24,7 @@ export default function Sidebar({ role }) {
     { path: '/admin', icon: Home, label: t('sidebar.overview') },
     { path: '/admin/messages', icon: Mail, label: 'المراسلات والتعاميم' },
     { path: '/admin/portfolio', icon: Award, label: 'ملف الإنجاز القيادي' },
+    { path: '/admin/student-records', icon: ClipboardList, label: 'سجل متابعة الطالب الشامل' },
     { path: '/admin/staff', icon: ShieldCheck, label: t('sidebar.staff') },
     { path: '/admin/supervisors', icon: UserCheck, label: t('sidebar.supervisors') },
     { path: '/admin/teachers', icon: Users, label: t('sidebar.teachers') },
@@ -46,6 +47,7 @@ export default function Sidebar({ role }) {
     { path: '/staff', icon: Home, label: t('sidebar.overview') },
     { path: '/staff/messages', icon: Mail, label: 'المراسلات والتعاميم' },
     { path: '/staff/portfolio', icon: Award, label: 'ملف الإنجاز الإداري' },
+    { path: '/staff/student-records', icon: ClipboardList, label: 'سجل متابعة الطالب الشامل' },
     ...(userPerms.includes('attendance') ? [{ path: '/staff/attendance', icon: CheckSquare, label: t('sidebar.attendance') }] : []),
     ...(userPerms.includes('preparations') ? [{ path: '/staff/preparations', icon: BookOpen, label: t('sidebar.preparations') }] : []),
     ...(userPerms.includes('weekly_plans') ? [{ path: '/staff/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') }] : []),
@@ -62,6 +64,7 @@ export default function Sidebar({ role }) {
     { path: '/supervisor', icon: Home, label: t('sidebar.overview') },
     { path: '/supervisor/messages', icon: Mail, label: 'المراسلات والتعاميم' },
     { path: '/supervisor/portfolio', icon: Award, label: 'ملف الإنجاز الإشرافي' },
+    { path: '/supervisor/student-records', icon: ClipboardList, label: 'سجل متابعة الطالب الشامل' },
     { path: '/supervisor/attendance', icon: CheckSquare, label: t('sidebar.attendance') },
     { path: '/supervisor/preparations', icon: BookOpen, label: t('sidebar.preparations') },
     { path: '/supervisor/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
@@ -80,6 +83,7 @@ export default function Sidebar({ role }) {
     { path: '/teacher', icon: Home, label: t('sidebar.overview') },
     { path: '/teacher/messages', icon: Mail, label: 'المراسلات والتعاميم' },
     { path: '/teacher/portfolio', icon: Award, label: 'ملف الإنجاز التربوي' },
+    { path: '/teacher/student-records', icon: ClipboardList, label: 'سجل متابعة الطالب الشامل' },
     { path: '/teacher/preparation', icon: BookOpen, label: t('sidebar.preparations') },
     { path: '/teacher/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
     { path: '/teacher/schedule', icon: Calendar, label: t('sidebar.schedule') },
@@ -108,6 +112,7 @@ export default function Sidebar({ role }) {
     { path: '/parent', icon: Home, label: t('sidebar.overview') },
     { path: '/parent/messages', icon: Mail, label: 'المراسلات والتعاميم' },
     { path: '/parent/portfolio', icon: Award, label: 'ملف إنجاز الطالب' },
+    { path: '/parent/student-records', icon: ClipboardList, label: 'سجل متابعة الطالب الشامل' },
     { path: '/parent/weekly-plan', icon: Calendar, label: t('sidebar.weeklyPlan') },
     { path: '/parent/schedule', icon: Calendar, label: t('sidebar.schedule') },
     { path: '/parent/assignments', icon: BookOpen, label: t('sidebar.assignments') },

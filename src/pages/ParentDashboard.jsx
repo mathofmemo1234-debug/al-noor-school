@@ -9,7 +9,8 @@ import SchoolMessagingHub from './SchoolMessagingHub';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import Settings from './Settings';
 import AchievementPortfolioPage from './AchievementPortfolioPage';
-import { User, GraduationCap, School, BookOpen, Calendar, Award, Mail, FileText, CheckCircle2, ChevronLeft } from 'lucide-react';
+import ComprehensiveStudentRecord from './ComprehensiveStudentRecord';
+import { User, GraduationCap, School, BookOpen, Calendar, Award, Mail, FileText, CheckCircle2, ChevronLeft, ClipboardList } from 'lucide-react';
 
 function ParentHome() {
   const { userData, currentUser } = useAuth();
@@ -67,6 +68,27 @@ function ParentHome() {
 
       {/* Quick Interactive Navigation Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+        <div 
+          onClick={() => setActiveTab('records')}
+          className="glass-panel" 
+          style={{ 
+            padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
+            cursor: 'pointer', border: activeTab === 'records' ? '2px solid #0e7490' : '1px solid var(--color-border)',
+            transition: 'all 0.2s', background: activeTab === 'records' ? '#f0f9ff' : 'var(--color-bg-card)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ClipboardList size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>التقرير الشامل</div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text)' }}>سجل متابعة الطالب الشامل</div>
+            </div>
+          </div>
+          <ChevronLeft size={20} color="#94a3b8" />
+        </div>
+
         <div 
           onClick={() => setActiveTab('schedule')}
           className="glass-panel" 
@@ -154,6 +176,12 @@ function ParentHome() {
 
       {/* Embedded Active Section */}
       <div style={{ marginTop: '10px' }}>
+        {activeTab === 'records' && (
+          <div>
+            <ComprehensiveStudentRecord role="parent" />
+          </div>
+        )}
+
         {activeTab === 'schedule' && (
           <div>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: 'var(--color-text)' }}>
@@ -215,6 +243,7 @@ export default function ParentDashboard() {
     <Layout role="parent">
       <Routes>
         <Route path="/" element={<ParentHome />} />
+        <Route path="/student-records" element={<ComprehensiveStudentRecord role="parent" />} />
         <Route path="/weekly-plan" element={<ParentWeeklyPlan />} />
         <Route path="/schedule" element={<StudentSchedule />} />
         <Route path="/exams" element={<StudentExams />} />

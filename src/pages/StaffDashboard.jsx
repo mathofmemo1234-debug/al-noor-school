@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { BookOpen, Calendar, Users, Star, CheckSquare, ShieldCheck, ArrowLeft, ArrowRight, Settings, FileText, Printer, Globe } from 'lucide-react';
+import { BookOpen, Calendar, Users, Star, CheckSquare, ShieldCheck, ArrowLeft, ArrowRight, Settings, FileText, Printer, Globe, ClipboardList } from 'lucide-react';
 import AdminPreparations from './AdminPreparations';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import ManageSchedules from './ManageSchedules';
@@ -19,6 +19,7 @@ import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
 import SchoolMessagingHub from './SchoolMessagingHub';
 import AchievementPortfolioPage from './AchievementPortfolioPage';
+import ComprehensiveStudentRecord from './ComprehensiveStudentRecord';
 
 function StaffHome({ schoolId }) {
   const { userData } = useAuth();
@@ -88,8 +89,11 @@ function StaffHome({ schoolId }) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <Link to="/staff/student-records" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', background: 'linear-gradient(135deg, #0e7490 0%, #0369a1 100%)' }}>
+            <ClipboardList size={18} /> سجل متابعة الطالب الشامل
+          </Link>
           {userPerms.includes('preparations') && (
-            <Link to="/staff/preparations" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+            <Link to="/staff/preparations" className="btn" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', background: 'white', border: '1px solid var(--color-border)', color: 'var(--color-primary-dark)' }}>
               <BookOpen size={18} /> متابعة التحضير
             </Link>
           )}
@@ -492,6 +496,7 @@ export default function StaffDashboard() {
         <Route path="/" element={<StaffHome schoolId={userData?.schoolId} />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
         <Route path="/portfolio" element={<AchievementPortfolioPage />} />
+        <Route path="/student-records" element={<ComprehensiveStudentRecord role="staff" />} />
         {userPerms.includes('preparations') && (
           <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />
         )}

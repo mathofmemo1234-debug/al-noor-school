@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { BookOpen, Calendar, Users, Star, Award, CheckCircle, FileText, ArrowLeft, ArrowRight } from 'lucide-react';
+import { BookOpen, Calendar, Users, Star, Award, CheckCircle, FileText, ArrowLeft, ArrowRight, ClipboardList } from 'lucide-react';
 import AdminPreparations from './AdminPreparations';
 import WeeklyPlanView from '../components/WeeklyPlanView';
 import ManageSchedules from './ManageSchedules';
@@ -16,6 +16,7 @@ import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import NoorIntegrationHub from '../components/NoorIntegrationHub';
 import SchoolMessagingHub from './SchoolMessagingHub';
 import AchievementPortfolioPage from './AchievementPortfolioPage';
+import ComprehensiveStudentRecord from './ComprehensiveStudentRecord';
 
 function SupervisorHome({ schoolId }) {
   const { userData } = useAuth();
@@ -76,8 +77,11 @@ function SupervisorHome({ schoolId }) {
             التخصص / المجال: <strong>{userData?.specialty || 'إشراف تربوي عام'}</strong> • {userData?.schoolName || 'المدرسة'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <Link to="/supervisor/preparations" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <Link to="/supervisor/student-records" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', background: 'linear-gradient(135deg, #0e7490 0%, #0369a1 100%)' }}>
+            <ClipboardList size={18} /> سجل متابعة الطالب الشامل
+          </Link>
+          <Link to="/supervisor/preparations" className="btn" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', background: 'white', border: '1px solid var(--color-border)', color: 'var(--color-primary-dark)' }}>
             <BookOpen size={18} /> متابعة التحضير
           </Link>
           <Link to="/supervisor/weekly-plan" className="btn" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', background: 'white', border: '1px solid var(--color-border)', color: 'var(--color-primary-dark)' }}>
@@ -264,6 +268,7 @@ export default function SupervisorDashboard() {
         <Route path="/" element={<SupervisorHome schoolId={userData?.schoolId} />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
         <Route path="/portfolio" element={<AchievementPortfolioPage />} />
+        <Route path="/student-records" element={<ComprehensiveStudentRecord role="supervisor" />} />
         <Route path="/attendance" element={<AttendanceSummaryExport schoolId={userData?.schoolId} />} />
         <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />
         <Route path="/weekly-plan" element={<WeeklyPlanView schoolId={userData?.schoolId} />} />

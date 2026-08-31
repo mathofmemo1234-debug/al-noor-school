@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Users, BookOpen, UserPlus, X, Edit, Trash2, ShieldCheck, UserCheck, Printer, FileText, Globe, Award } from 'lucide-react';
+import { Users, BookOpen, UserPlus, X, Edit, Trash2, ShieldCheck, UserCheck, Printer, FileText, Globe, Award, ClipboardList } from 'lucide-react';
 import ManageSchedules from './ManageSchedules';
 import { db } from '../firebase';
 import { collection, addDoc, setDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
@@ -11,6 +11,7 @@ import WeeklyPlanView from '../components/WeeklyPlanView';
 import SchoolSettings from './SchoolSettings';
 import AdminExcellence from './AdminExcellence';
 import ManageStaff from './ManageStaff';
+import ComprehensiveStudentRecord from './ComprehensiveStudentRecord';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import CertificateLetterModal from '../components/CertificateLetterModal';
 import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
@@ -168,8 +169,22 @@ function AdminHome({ schoolId }) {
 
   return (
     <div>
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
-        <button onClick={handleSeedData} className="btn btn-primary">
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <Link 
+          to="/admin/student-records" 
+          className="btn btn-primary"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            textDecoration: 'none',
+            background: 'linear-gradient(135deg, #0e7490 0%, #0369a1 100%)',
+            boxShadow: '0 4px 14px rgba(14, 116, 144, 0.3)'
+          }}
+        >
+          <ClipboardList size={18} /> سجل متابعة الطالب الشامل
+        </Link>
+        <button onClick={handleSeedData} className="btn" style={{ background: 'white', border: '1px solid var(--color-border)', color: 'var(--color-primary-dark)' }}>
           {t('adminDashboard.addSeedData')}
         </button>
       </div>
@@ -1844,6 +1859,7 @@ export default function AdminDashboard() {
         <Route path="/supervisors" element={<ManageSupervisors schoolId={userData?.schoolId} />} />
         <Route path="/teachers" element={<ManageTeachers schoolId={userData?.schoolId} />} />
         <Route path="/students" element={<ManageStudents schoolId={userData?.schoolId} />} />
+        <Route path="/student-records" element={<ComprehensiveStudentRecord role="admin" />} />
         <Route path="/classes" element={<ManageClasses schoolId={userData?.schoolId} />} />
         <Route path="/schedule" element={<ManageSchedules schoolId={userData?.schoolId} />} />
         <Route path="/attendance" element={<AttendanceSummaryExport schoolId={userData?.schoolId} />} />
