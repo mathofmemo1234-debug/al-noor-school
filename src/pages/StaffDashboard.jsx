@@ -20,6 +20,7 @@ import NoorIntegrationHub from '../components/NoorIntegrationHub';
 import SchoolMessagingHub from './SchoolMessagingHub';
 import AchievementPortfolioPage from './AchievementPortfolioPage';
 import ComprehensiveStudentRecord from './ComprehensiveStudentRecord';
+import TeacherPerformanceEvaluationHub from './TeacherPerformanceEvaluationHub';
 
 function StaffHome({ schoolId }) {
   const { userData } = useAuth();
@@ -496,6 +497,7 @@ export default function StaffDashboard() {
         <Route path="/" element={<StaffHome schoolId={userData?.schoolId} />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
         <Route path="/portfolio" element={<AchievementPortfolioPage />} />
+        <Route path="/teacher-evaluations" element={<TeacherPerformanceEvaluationHub role="staff" />} />
         <Route path="/student-records" element={<ComprehensiveStudentRecord role="staff" />} />
         {userPerms.includes('preparations') && (
           <Route path="/preparations" element={<AdminPreparations schoolId={userData?.schoolId} />} />

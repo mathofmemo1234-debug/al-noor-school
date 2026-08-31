@@ -12,6 +12,7 @@ import SchoolSettings from './SchoolSettings';
 import AdminExcellence from './AdminExcellence';
 import ManageStaff from './ManageStaff';
 import ComprehensiveStudentRecord from './ComprehensiveStudentRecord';
+import TeacherPerformanceEvaluationHub from './TeacherPerformanceEvaluationHub';
 import AttendanceSummaryExport from '../components/AttendanceSummaryExport';
 import CertificateLetterModal from '../components/CertificateLetterModal';
 import PrintStudentRecordsModal from '../components/PrintStudentRecordsModal';
@@ -1855,6 +1856,7 @@ export default function AdminDashboard() {
         <Route path="/" element={<AdminHome schoolId={userData?.schoolId} />} />
         <Route path="/messages" element={<SchoolMessagingHub />} />
         <Route path="/portfolio" element={<AchievementPortfolioPage />} />
+        <Route path="/teacher-evaluations" element={<TeacherPerformanceEvaluationHub role="admin" />} />
         <Route path="/staff" element={<ManageStaff schoolId={userData?.schoolId} />} />
         <Route path="/supervisors" element={<ManageSupervisors schoolId={userData?.schoolId} />} />
         <Route path="/teachers" element={<ManageTeachers schoolId={userData?.schoolId} />} />
