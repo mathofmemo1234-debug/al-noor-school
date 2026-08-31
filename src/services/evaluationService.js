@@ -4,24 +4,300 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
+  deleteDoc,
   serverTimestamp, 
   collection, 
   addDoc, 
   query, 
   where, 
+  orderBy,
   onSnapshot, 
-  getDocs 
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
 
 /**
- * Save evaluation as Draft (Hidden from teacher & visitor)
+ * بنود استمارة الملاحظة الصفية الرسمية لعام 1448هـ (شركة المدارس المتقدمة)
+ * 20 بنداً مقسمة على 3 مجالات أساسية: التخطيط، بناء خبرات التعلم، تقويم التعلم
+ */
+export const OFFICIAL_CRITERIA_TEMPLATE = [
+  // المجال 1: التخطيط
+  {
+    id: 'crit_1',
+    number: 1,
+    domain: 'التخطيط',
+    name: 'يتوافق تنفيذ محتوى المناهج مع الخطة الزمنية لتوزيع المنهج.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_2',
+    number: 2,
+    domain: 'التخطيط',
+    name: 'يخطط المعلم لخبرات تعلم جذابة ومحفزة، تتضمن أنشطة تطبيقية تحقق التكامل بين المواد، وفق مبدأ التعلم المتمركز حول المتعلم.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_3',
+    number: 3,
+    domain: 'التخطيط',
+    name: 'يوظف المعلم الحقيبة لاستثارة المعرفة السابقة، ورفع جاهزية المتعلمين، ومعالجة الفاقد التعليمي.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+
+  // المجال 2: بناء خبرات التعلم
+  {
+    id: 'crit_4',
+    number: 4,
+    domain: 'بناء خبرات التعلم',
+    name: 'تتيح بيئة التعلم مصادر وأنشطة متنوعة تلبي احتياجات المتعلمين المختلفة.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_5',
+    number: 5,
+    domain: 'بناء خبرات التعلم',
+    name: 'يُستثمر وقت التعلم بفاعلية بما يدعم تعلم المتعلمين ويلبي احتياجاتهم.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_6',
+    number: 6,
+    domain: 'بناء خبرات التعلم',
+    name: 'تتاح لجميع المتعلمين فرص متكافئة للمشاركة في الأنشطة والمناقشات واستخدام مصادر التعلم المتنوعة.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_7',
+    number: 7,
+    domain: 'بناء خبرات التعلم',
+    name: 'تتنوع استراتيجيات التعلم والتعليم بما يلبي احتياجات المتعلمين ويدعم تعلمهم.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_8',
+    number: 8,
+    domain: 'بناء خبرات التعلم',
+    name: 'تشجع بيئة التعلم على استخدام التقنية الرقمية لدعم تعلم المتعلمين وتلبية احتياجاتهم.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_9',
+    number: 9,
+    domain: 'بناء خبرات التعلم',
+    name: 'تركز أنشطة التعلم على تطبيقات عملية ترتبط بحياة المتعلمين.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_10',
+    number: 10,
+    domain: 'بناء خبرات التعلم',
+    name: 'يوظف المتعلمون مهارات القراءة والكتابة، والمهارات العددية (الحساب) المرتبطة بالموقف التعليمي.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_11',
+    number: 11,
+    domain: 'بناء خبرات التعلم',
+    name: 'يمارس المتعلمون مهارات التفكير والبحث والابتكار بما يلائم الموقف التعليمي.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_12',
+    number: 12,
+    domain: 'بناء خبرات التعلم',
+    name: 'تنمي بيئة التعلم المهارات العاطفية والاجتماعية لدى المتعلمين.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_13',
+    number: 13,
+    domain: 'بناء خبرات التعلم',
+    name: 'تدعم بيئة التعلم تنفيذ المنهج بما يحقق نواتج التعلم المستهدفة.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_14',
+    number: 14,
+    domain: 'بناء خبرات التعلم',
+    name: 'تتضمن بيئة التعلم محفزات متنوعة تعزز دافعية المتعلمين.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_15',
+    number: 15,
+    domain: 'بناء خبرات التعلم',
+    name: 'يشارك المتعلمون في أنشطة التعلم بفاعلية ويستمتعون بها.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+
+  // المجال 3: تقويم التعلم
+  {
+    id: 'crit_16',
+    number: 16,
+    domain: 'تقويم التعلم',
+    name: 'تتيح مهام التقويم للمتعلمين فرصاً متنوعة لإظهار تعلمهم والكشف عن مستويات أدائهم.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_17',
+    number: 17,
+    domain: 'تقويم التعلم',
+    name: 'تُستخدم أساليب وأدوات تقويم متنوعة لقياس تحقق نواتج التعلم المستهدفة.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_18',
+    number: 18,
+    domain: 'تقويم التعلم',
+    name: 'يتلقى المتعلمون تغذية راجعة واضحة ويستفيدون منها في تحسين أدائهم.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_19',
+    number: 19,
+    domain: 'تقويم التعلم',
+    name: 'تُوظف نتائج التقويم الصفي في تعديل مسار التعلم ومعالجة جوانب التعثر أثناء الحصة.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  },
+  {
+    id: 'crit_20',
+    number: 20,
+    domain: 'تقويم التعلم',
+    name: 'يكلف المعلم المتعلمين بمهام منزلية هادفة، ويتابع تنفيذها، ويقدم تغذية راجعة تسهم في تحسين تعلمهم.',
+    maxScore: 5,
+    earnedScore: 5,
+    notes: ''
+  }
+];
+
+/**
+ * حساب التقدير العام بناءً على النسبة
+ */
+export function calculateRating(percentage) {
+  if (percentage >= 90) return { label: 'ممتاز', color: '#16a34a', bg: '#dcfce7' };
+  if (percentage >= 80) return { label: 'جيد جداً', color: '#0284c7', bg: '#e0f2fe' };
+  if (percentage >= 70) return { label: 'جيد / مرضٍ', color: '#d97706', bg: '#fef3c7' };
+  return { label: 'غير مرضٍ', color: '#dc2626', bg: '#fee2e2' };
+}
+
+/**
+ * إنشاء زيارة صفية جديدة مع ترقيم تلقائي متسلسل
+ */
+export async function createClassroomVisit(visitData, schoolId) {
+  const q = query(
+    collection(db, 'classroom_visits'),
+    where('schoolId', '==', schoolId)
+  );
+  const snap = await getDocs(q);
+  const existingVisits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  
+  // رقم الزيارة المتسلسل
+  const nextSeq = existingVisits.length + 1;
+  const visitNumber = `VIS-${nextSeq}`;
+
+  const payload = {
+    ...visitData,
+    schoolId,
+    seqNumber: nextSeq,
+    visitNumber,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+
+  const docRef = await addDoc(collection(db, 'classroom_visits'), payload);
+  return { id: docRef.id, ...payload };
+}
+
+/**
+ * حذف زيارة وإعادة ترقيم جميع الزيارات المتبقية تسلسلياً (Re-indexing sequence)
+ */
+export async function deleteVisitAndRenumber(visitDocId, schoolId) {
+  // 1. حذف الزيارة المحددة
+  await deleteDoc(doc(db, 'classroom_visits', visitDocId));
+
+  // حذف التقييم المرتبط بها إن وجد
+  try {
+    const qEval = query(collection(db, 'evaluations'), where('visitId', '==', visitDocId));
+    const evalSnap = await getDocs(qEval);
+    for (let d of evalSnap.docs) {
+      await deleteDoc(doc(db, 'evaluations', d.id));
+    }
+  } catch (e) {
+    console.error('Error cleaning up evaluations:', e);
+  }
+
+  // 2. جلب جميع الزيارات المتبقية وإعادة ترقيمها
+  const q = query(collection(db, 'classroom_visits'), where('schoolId', '==', schoolId));
+  const snap = await getDocs(q);
+  const visits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  // فرز حسب تاريخ الإنشاء أو الرقم القديم
+  visits.sort((a, b) => (a.seqNumber || 0) - (b.seqNumber || 0));
+
+  const batch = writeBatch(db);
+  visits.forEach((v, index) => {
+    const newSeq = index + 1;
+    const newVisitNumber = `VIS-${newSeq}`;
+    const vRef = doc(db, 'classroom_visits', v.id);
+    batch.update(vRef, {
+      seqNumber: newSeq,
+      visitNumber: newVisitNumber,
+      updatedAt: serverTimestamp()
+    });
+  });
+
+  await batch.commit();
+  return true;
+}
+
+/**
+ * حفظ التقييم كمسودة
  */
 export async function saveEvaluationDraft(evalData, evaluatorId) {
-  const { id, visitId, teacherId, criteriaSnapshots, evaluatorNotes, schoolId } = evalData;
+  const { id, visitId, teacherId, criteriaSnapshots, successes, developmentPlan, evaluatorNotes, schoolId, headerData } = evalData;
   
   const totalMax = (criteriaSnapshots || []).reduce((sum, item) => sum + Number(item.maxScore || 0), 0);
   const totalEarned = (criteriaSnapshots || []).reduce((sum, item) => sum + Number(item.earnedScore || 0), 0);
   const percentage = totalMax > 0 ? Number(((totalEarned / totalMax) * 100).toFixed(2)) : 0;
+  const rating = calculateRating(percentage);
 
   const payload = {
     visitId: visitId || '',
@@ -29,10 +305,14 @@ export async function saveEvaluationDraft(evalData, evaluatorId) {
     teacherId: teacherId || '',
     evaluatorId: evaluatorId || '',
     status: 'draft',
-    criteriaSnapshots: criteriaSnapshots || [],
+    headerData: headerData || {},
+    criteriaSnapshots: criteriaSnapshots || OFFICIAL_CRITERIA_TEMPLATE,
+    successes: successes || [''],
+    developmentPlan: developmentPlan || [],
     totalMaxScore: totalMax,
     totalEarnedScore: totalEarned,
     percentage,
+    rating: rating.label,
     evaluatorNotes: evaluatorNotes || '',
     teacherDecision: 'pending',
     rejectionReason: null,
@@ -51,14 +331,15 @@ export async function saveEvaluationDraft(evalData, evaluatorId) {
 }
 
 /**
- * Submit & Send evaluation to teacher & visitor
+ * إرسال واعتماد التقييم للمعلم
  */
 export async function submitEvaluation(evalData, evaluatorId) {
-  const { id, visitId, teacherId, criteriaSnapshots, evaluatorNotes, schoolId } = evalData;
+  const { id, visitId, teacherId, criteriaSnapshots, successes, developmentPlan, evaluatorNotes, schoolId, headerData } = evalData;
 
   const totalMax = (criteriaSnapshots || []).reduce((sum, item) => sum + Number(item.maxScore || 0), 0);
   const totalEarned = (criteriaSnapshots || []).reduce((sum, item) => sum + Number(item.earnedScore || 0), 0);
   const percentage = totalMax > 0 ? Number(((totalEarned / totalMax) * 100).toFixed(2)) : 0;
+  const rating = calculateRating(percentage);
 
   const payload = {
     visitId: visitId || '',
@@ -67,10 +348,14 @@ export async function submitEvaluation(evalData, evaluatorId) {
     evaluatorId: evaluatorId || '',
     status: 'sent',
     sentAt: serverTimestamp(),
-    criteriaSnapshots: criteriaSnapshots || [],
+    headerData: headerData || {},
+    criteriaSnapshots: criteriaSnapshots || OFFICIAL_CRITERIA_TEMPLATE,
+    successes: successes || [''],
+    developmentPlan: developmentPlan || [],
     totalMaxScore: totalMax,
     totalEarnedScore: totalEarned,
     percentage,
+    rating: rating.label,
     evaluatorNotes: evaluatorNotes || '',
     teacherDecision: 'pending',
     rejectionReason: null,
@@ -89,7 +374,7 @@ export async function submitEvaluation(evalData, evaluatorId) {
 }
 
 /**
- * Automatically log teacher's read timestamp in background
+ * تسجيل وقت القراءة آلياً
  */
 export async function trackTeacherReadReceipt(evaluationId, teacherId) {
   if (!evaluationId || !teacherId) return { success: false };
@@ -115,7 +400,7 @@ export async function trackTeacherReadReceipt(evaluationId, teacherId) {
 }
 
 /**
- * Handle Teacher's decision (Approve or Reject with mandatory reason)
+ * معالجة قرار المعلم
  */
 export async function handleTeacherDecision(evaluationId, teacherId, decision, rejectionReason = '') {
   if (!evaluationId) throw new Error('معرف التقييم مطلوب');
@@ -163,7 +448,7 @@ export async function handleTeacherDecision(evaluationId, teacherId, decision, r
 }
 
 /**
- * Data Sanitizer for Visitor role - Strip rejection reason & enforce review banner
+ * تصفية البيانات للزائر
  */
 export function sanitizeForVisitor(evaluation) {
   if (!evaluation) return null;

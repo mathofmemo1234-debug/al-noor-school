@@ -1,51 +1,152 @@
 import React, { useState } from 'react';
-import { Plus, Save, Send, Clock, Eye, Trash2, AlertCircle } from 'lucide-react';
-import { saveEvaluationDraft, submitEvaluation } from '../../services/evaluationService';
+import { Plus, Save, Send, Clock, Eye, Trash2, AlertCircle, Printer, CheckCircle, ShieldAlert } from 'lucide-react';
+import { OFFICIAL_CRITERIA_TEMPLATE, saveEvaluationDraft, submitEvaluation, calculateRating } from '../../services/evaluationService';
 
 export default function EvaluatorView({ visit, initialEvaluation, currentUser, onSaved }) {
+  // Page 1 Header Metadata
+  const [headerData, setHeaderData] = useState(
+    initialEvaluation?.headerData || {
+      academicYear: '1448هـ',
+      semester: 'الفصل الدراسي الأول',
+      department: 'القسم التعليمي',
+      educationalComplex: 'مجمع المدارس المتقدمة',
+      visitDay: 'الأحد',
+      visitDate: visit?.visitDate || new Date().toISOString().split('T')[0],
+      subject: visit?.subject || '',
+      specialty: visit?.specialty || visit?.subject || '',
+      teacherName: visit?.teacherName || '',
+      nationality: visit?.nationality || 'سعودي',
+      stage: visit?.stage || 'المرحلة الثانوية',
+      classroom: visit?.classRoom || '',
+      period: visit?.period || 'الحصة الثالثة',
+      studentsCount: visit?.studentsCount || '25',
+      entryTime: 'بداية', // 'بداية' | 'وسط' | 'نهاية'
+      lessonTitle: visit?.lessonTitle || ''
+    }
+  );
+
+  // Criteria (Dynamic & Editable)
   const [criteria, setCriteria] = useState(
-    initialEvaluation?.criteriaSnapshots || [
-      { id: '1', name: 'التخطيط والإعداد الذهني والكتابي للدرس', category: 'التخطيط', maxScore: 10, earnedScore: 10, notes: '' },
-      { id: '2', name: 'استخدام الوسائل والتقنيات التعليمية المناسبة', category: 'التنفيذ', maxScore: 10, earnedScore: 9, notes: '' },
-      { id: '3', name: 'إدارة الصف وجذب انتباه الطلاب وتفاعلهم', category: 'الإدارة الصفية', maxScore: 10, earnedScore: 10, notes: '' },
-      { id: '4', name: 'تطبيق أساليب التقويم المستمر والتغذية الراجعة', category: 'التقويم', maxScore: 10, earnedScore: 9, notes: '' }
+    initialEvaluation?.criteriaSnapshots || OFFICIAL_CRITERIA_TEMPLATE
+  );
+
+  // Page 2 Deliberation & Support Plan
+  const [successes, setSuccesses] = useState(
+    initialEvaluation?.successes || [
+      'التفاعل الإيجابي والمشاركة الفعالة من غالبية الطلاب أثناء الأنشطة.',
+      'الاستثمار المميز للتقنيات والوسائل التعليمية الرقمية.'
     ]
   );
-  
+
+  const [developmentPlan, setDevelopmentPlan] = useState(
+    initialEvaluation?.developmentPlan || [
+      {
+        id: '1',
+        competency: 'تنويع استراتيجيات التقويم المرحلي أثناء الدرس',
+        focusArea: 'التقويم الصفي المستمر',
+        supervisoryMethod: 'حصة تطبيقية',
+        suggestedWeek: 'الأسبوع الخامس'
+      }
+    ]
+  );
+
   const [evaluatorNotes, setEvaluatorNotes] = useState(initialEvaluation?.evaluatorNotes || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [newCriterionName, setNewCriterionName] = useState('');
-  const [newCriterionMax, setNewCriterionMax] = useState(10);
-  const [newCriterionCat, setNewCriterionCat] = useState('معايير نوعية');
 
+  // Modal for new criterion
+  const [newCritName, setNewCritName] = useState('');
+  const [newCritDomain, setNewCritDomain] = useState('التخطيط');
+  const [newCritMax, setNewCritMax] = useState(5);
+
+  // Scoring calculations
   const totalMax = criteria.reduce((sum, c) => sum + Number(c.maxScore || 0), 0);
   const totalEarned = criteria.reduce((sum, c) => sum + Number(c.earnedScore || 0), 0);
-  const percentage = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(1) : 0;
+  const percentage = totalMax > 0 ? Number(((totalEarned / totalMax) * 100).toFixed(1)) : 0;
+  const rating = calculateRating(percentage);
 
-  const handleScoreChange = (index, field, value) => {
+  // Double confirmation helper
+  const confirmDoubleAction = (itemTitle, onConfirm) => {
+    const firstWarning = window.confirm(`تحذير (1/2): هل أنت متأكد من رغبتك في حذف "${itemTitle}"؟`);
+    if (!firstWarning) return;
+
+    const secondWarning = window.confirm(`تأكيد نهائي (2/2): سيتم حذف "${itemTitle}" بشكل نهائي وإعادة ترتيب البنود. هل تود الاستمرار بالتأكيد؟`);
+    if (secondWarning) {
+      onConfirm();
+    }
+  };
+
+  const handleScoreLevel = (critIndex, levelScore) => {
     const updated = [...criteria];
-    updated[index][field] = field === 'earnedScore' || field === 'maxScore' ? Number(value) : value;
+    updated[critIndex].earnedScore = Number(levelScore);
     setCriteria(updated);
   };
 
-  const handleAddCustomCriterion = () => {
-    if (!newCriterionName.trim()) return;
-    setCriteria([
-      ...criteria,
-      {
-        id: `custom_${Date.now()}`,
-        name: newCriterionName.trim(),
-        category: newCriterionCat,
-        maxScore: Number(newCriterionMax) || 10,
-        earnedScore: 0,
-        notes: ''
-      }
-    ]);
-    setNewCriterionName('');
+  const handleCustomScoreInput = (critIndex, val) => {
+    const updated = [...criteria];
+    updated[critIndex].earnedScore = Number(val);
+    setCriteria(updated);
   };
 
-  const handleRemoveCriterion = (index) => {
-    setCriteria(criteria.filter((_, i) => i !== index));
+  const handleNotesChange = (critIndex, val) => {
+    const updated = [...criteria];
+    updated[critIndex].notes = val;
+    setCriteria(updated);
+  };
+
+  const handleDeleteCriterion = (index) => {
+    const crit = criteria[index];
+    confirmDoubleAction(crit.name, () => {
+      const remaining = criteria.filter((_, i) => i !== index);
+      // Renumber items
+      const renumbered = remaining.map((c, i) => ({ ...c, number: i + 1 }));
+      setCriteria(renumbered);
+    });
+  };
+
+  const handleAddCriterion = () => {
+    if (!newCritName.trim()) return;
+    const newEntry = {
+      id: `crit_custom_${Date.now()}`,
+      number: criteria.length + 1,
+      domain: newCritDomain,
+      name: newCritName.trim(),
+      maxScore: Number(newCritMax) || 5,
+      earnedScore: Number(newCritMax) || 5,
+      notes: ''
+    };
+    setCriteria([...criteria, newEntry]);
+    setNewCritName('');
+  };
+
+  // Successes handlers
+  const handleAddSuccess = () => {
+    setSuccesses([...successes, '']);
+  };
+
+  const handleDeleteSuccess = (idx) => {
+    confirmDoubleAction(`بند النجاح رقم ${idx + 1}`, () => {
+      setSuccesses(successes.filter((_, i) => i !== idx));
+    });
+  };
+
+  // Development Plan handlers
+  const handleAddPlanRow = () => {
+    setDevelopmentPlan([
+      ...developmentPlan,
+      {
+        id: `plan_${Date.now()}`,
+        competency: '',
+        focusArea: '',
+        supervisoryMethod: 'حصة تطبيقية',
+        suggestedWeek: ''
+      }
+    ]);
+  };
+
+  const handleDeletePlanRow = (idx) => {
+    confirmDoubleAction(`خطة التطوير بند ${idx + 1}`, () => {
+      setDevelopmentPlan(developmentPlan.filter((_, i) => i !== idx));
+    });
   };
 
   const handleSave = async (isDraft) => {
@@ -56,7 +157,10 @@ export default function EvaluatorView({ visit, initialEvaluation, currentUser, o
         visitId: visit?.id || '',
         schoolId: visit?.schoolId || currentUser?.schoolId || '',
         teacherId: visit?.teacherId || '',
+        headerData,
         criteriaSnapshots: criteria,
+        successes,
+        developmentPlan,
         evaluatorNotes
       };
 
@@ -69,65 +173,63 @@ export default function EvaluatorView({ visit, initialEvaluation, currentUser, o
       }
       if (onSaved) onSaved();
     } catch (err) {
-      alert('حدث خطأ: ' + err.message);
+      alert('حدث خطأ أثناء الحفظ: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Group criteria by domain
+  const domains = ['التخطيط', 'بناء خبرات التعلم', 'تقويم التعلم'];
+  const otherDomains = [...new Set(criteria.map(c => c.domain))].filter(d => !domains.includes(d));
+  const allDomains = [...domains, ...otherDomains];
+
   return (
-    <div className="glass-panel" style={{ padding: '24px', borderRadius: '16px', background: 'var(--color-bg-card)', color: 'var(--color-text)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Header Info & Tracking Status */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--color-border)', pb: '16px', paddingBottom: '16px' }}>
+    <div className="glass-panel" style={{ padding: '24px', borderRadius: '16px', background: 'var(--color-bg-card)', color: 'var(--color-text)', display: 'flex', flexDirection: 'column', gap: '24px' }} dir="rtl">
+      
+      {/* Top Action Bar & Status */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
         <div>
           <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0284c7', background: 'rgba(2, 132, 199, 0.1)', padding: '4px 12px', borderRadius: '20px' }}>
-            زيارة رقم: {visit?.id || 'عامة'}
+            رقم الزيارة: {visit?.visitNumber || visit?.id || 'VIS-1'}
           </span>
-          <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '8px 0 4px 0' }}>
-            تقييم أداء المعلم: {visit?.teacherName || 'المعلم'}
+          <h2 style={{ fontSize: '20px', fontWeight: 900, margin: '8px 0 4px 0' }}>
+            أداة الملاحظة الصفية – لعام {headerData.academicYear}
           </h2>
           <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-            المادة: {visit?.subject || 'الكل'} | الصف: {visit?.classRoom || 'الكل'} | تاريخ الزيارة: {visit?.visitDate || 'اليوم'}
+            شركة المدارس المتقدمة • إدارة ضمان التعلم والتعليم الأهلي
           </p>
         </div>
 
-        {/* Status indicator & Read receipt */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'rgba(0,0,0,0.03)', padding: '10px 16px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>حالة التقييم</div>
-            <div style={{ fontSize: '13px', fontWeight: 800, marginTop: '2px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="btn"
+            style={{ background: 'white', border: '1px solid var(--color-border)', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Printer size={16} /> طباعة الاستمارة الرسمية
+          </button>
+
+          {/* Status badge */}
+          <div style={{ background: 'rgba(0,0,0,0.03)', padding: '8px 14px', borderRadius: '12px', border: '1px solid var(--color-border)', textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>حالة التقييم:</div>
+            <div style={{ fontSize: '13px', fontWeight: 800 }}>
               {initialEvaluation?.status === 'draft' && <span style={{ color: '#d97706' }}>📝 مسودة</span>}
-              {initialEvaluation?.status === 'sent' && <span style={{ color: '#2563eb' }}>📨 مُرسل</span>}
+              {initialEvaluation?.status === 'sent' && <span style={{ color: '#2563eb' }}>📨 مُرسل للمعلم</span>}
               {initialEvaluation?.status === 'approved' && <span style={{ color: '#16a34a' }}>✅ معتمد من المعلم</span>}
               {initialEvaluation?.status === 'rejected' && <span style={{ color: '#dc2626' }}>❌ مرفوض من المعلم</span>}
-              {!initialEvaluation && <span style={{ color: '#94a3b8' }}>جديد</span>}
-            </div>
-          </div>
-
-          <div style={{ width: '1px', height: '30px', background: 'var(--color-border)' }} />
-
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>مؤشر القراءة (Read Receipt)</div>
-            <div style={{ fontSize: '12px', fontWeight: 700, marginTop: '2px' }}>
-              {initialEvaluation?.readAt ? (
-                <span style={{ color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <Eye size={14} /> تم الاطلاع
-                </span>
-              ) : (
-                <span style={{ color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock size={14} /> لم يقرأ بعد
-                </span>
-              )}
+              {!initialEvaluation && <span style={{ color: '#94a3b8' }}>جديد قيد الإعداد</span>}
             </div>
           </div>
         </div>
       </div>
 
-      {/* If rejected, show reasons to evaluator */}
+      {/* If rejected, show teacher's reasons */}
       {initialEvaluation?.status === 'rejected' && (
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px', color: '#991b1b' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '14px' }}>
-            <AlertCircle size={18} /> تم رفض التقييم من قِبل المعلم بالأسباب التالية:
+            <AlertCircle size={18} /> تحفظات وأسباب عدم موافقة المعلم على التقييم:
           </div>
           <p style={{ margin: '8px 0 0 0', fontSize: '13px', background: 'white', padding: '10px 14px', borderRadius: '8px', border: '1px solid #fee2e2', lineHeight: '1.6' }}>
             {initialEvaluation.rejectionReason}
@@ -135,128 +237,506 @@ export default function EvaluatorView({ visit, initialEvaluation, currentUser, o
         </div>
       )}
 
-      {/* Dynamic Criteria Table */}
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-          <thead>
-            <tr style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '2px solid var(--color-border)', fontSize: '13px', color: '#475569' }}>
-              <th style={{ padding: '12px 10px' }}>#</th>
-              <th style={{ padding: '12px 10px' }}>المعيار التعليمي</th>
-              <th style={{ padding: '12px 10px' }}>المجال</th>
-              <th style={{ padding: '12px 10px', width: '110px' }}>الدرجة العظمى</th>
-              <th style={{ padding: '12px 10px', width: '110px' }}>الدرجة المستحقة</th>
-              <th style={{ padding: '12px 10px' }}>ملاحظات وشواهد</th>
-              <th style={{ padding: '12px 10px', textAlign: 'center', width: '60px' }}>حذف</th>
-            </tr>
-          </thead>
-          <tbody style={{ fontSize: '13px' }}>
-            {criteria.map((item, idx) => (
-              <tr key={item.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <td style={{ padding: '10px', color: '#94a3b8', fontWeight: 'bold' }}>{idx + 1}</td>
-                <td style={{ padding: '10px', fontWeight: 600 }}>{item.name}</td>
-                <td style={{ padding: '10px', color: '#64748b', fontSize: '12px' }}>{item.category}</td>
-                <td style={{ padding: '10px' }}>
+      {/* PAGE 1: Header Metadata Grid (استمارة الصفحة الأولى) */}
+      <div style={{ border: '2px solid #cbd5e1', borderRadius: '12px', overflow: 'hidden', background: '#f8fafc' }}>
+        <div style={{ background: '#0f172a', color: 'white', padding: '10px 16px', fontWeight: 800, fontSize: '14px', textAlign: 'center' }}>
+          بيانات الزيارة والملاحظة الصفية
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1px', background: '#cbd5e1' }}>
+          <div style={{ background: 'white', padding: '10px 14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>اسم المعلم:</label>
+            <input
+              type="text"
+              value={headerData.teacherName}
+              onChange={(e) => setHeaderData({ ...headerData, teacherName: e.target.value })}
+              style={{ width: '100%', border: 'none', fontWeight: 'bold', fontSize: '14px', outline: 'none', background: 'transparent' }}
+            />
+          </div>
+
+          <div style={{ background: 'white', padding: '10px 14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>المادة:</label>
+            <input
+              type="text"
+              value={headerData.subject}
+              onChange={(e) => setHeaderData({ ...headerData, subject: e.target.value })}
+              style={{ width: '100%', border: 'none', fontWeight: 600, fontSize: '13px', outline: 'none', background: 'transparent' }}
+            />
+          </div>
+
+          <div style={{ background: 'white', padding: '10px 14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>التخصص:</label>
+            <input
+              type="text"
+              value={headerData.specialty}
+              onChange={(e) => setHeaderData({ ...headerData, specialty: e.target.value })}
+              style={{ width: '100%', border: 'none', fontWeight: 600, fontSize: '13px', outline: 'none', background: 'transparent' }}
+            />
+          </div>
+
+          <div style={{ background: 'white', padding: '10px 14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>الجنسية:</label>
+            <input
+              type="text"
+              value={headerData.nationality}
+              onChange={(e) => setHeaderData({ ...headerData, nationality: e.target.value })}
+              style={{ width: '100%', border: 'none', fontWeight: 600, fontSize: '13px', outline: 'none', background: 'transparent' }}
+            />
+          </div>
+
+          <div style={{ background: 'white', padding: '10px 14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>المرحلة والصف:</label>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input
+                type="text"
+                value={headerData.stage}
+                onChange={(e) => setHeaderData({ ...headerData, stage: e.target.value })}
+                style={{ width: '55%', border: 'none', fontWeight: 600, fontSize: '12px', outline: 'none', background: 'transparent' }}
+              />
+              <input
+                type="text"
+                value={headerData.classroom}
+                onChange={(e) => setHeaderData({ ...headerData, classroom: e.target.value })}
+                style={{ width: '45%', border: 'none', fontWeight: 600, fontSize: '12px', outline: 'none', background: 'transparent' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ background: 'white', padding: '10px 14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>اليوم والتاريخ:</label>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input
+                type="text"
+                value={headerData.visitDay}
+                onChange={(e) => setHeaderData({ ...headerData, visitDay: e.target.value })}
+                style={{ width: '40%', border: 'none', fontWeight: 600, fontSize: '13px', outline: 'none', background: 'transparent' }}
+              />
+              <input
+                type="date"
+                value={headerData.visitDate}
+                onChange={(e) => setHeaderData({ ...headerData, visitDate: e.target.value })}
+                style={{ width: '60%', border: 'none', fontWeight: 600, fontSize: '13px', outline: 'none', background: 'transparent' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ background: 'white', padding: '10px 14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>الحصة وعدد الطلاب:</label>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input
+                type="text"
+                value={headerData.period}
+                onChange={(e) => setHeaderData({ ...headerData, period: e.target.value })}
+                style={{ width: '60%', border: 'none', fontWeight: 600, fontSize: '13px', outline: 'none', background: 'transparent' }}
+              />
+              <input
+                type="text"
+                value={headerData.studentsCount}
+                onChange={(e) => setHeaderData({ ...headerData, studentsCount: e.target.value })}
+                style={{ width: '40%', border: 'none', fontWeight: 600, fontSize: '13px', outline: 'none', background: 'transparent' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ background: 'white', padding: '10px 14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>وقت الدخول:</label>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+              {['بداية', 'وسط', 'نهاية'].map(t => (
+                <label key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
                   <input
-                    type="number"
-                    min="1"
-                    value={item.maxScore}
-                    onChange={(e) => handleScoreChange(idx, 'maxScore', e.target.value)}
-                    style={{ width: '80px', padding: '6px', borderRadius: '8px', border: '1px solid var(--color-border)', textAlign: 'center', fontWeight: 'bold' }}
+                    type="radio"
+                    name="entryTime"
+                    value={t}
+                    checked={headerData.entryTime === t}
+                    onChange={() => setHeaderData({ ...headerData, entryTime: t })}
                   />
-                </td>
-                <td style={{ padding: '10px' }}>
-                  <input
-                    type="number"
-                    min="0"
-                    max={item.maxScore}
-                    value={item.earnedScore}
-                    onChange={(e) => handleScoreChange(idx, 'earnedScore', e.target.value)}
-                    style={{ width: '80px', padding: '6px', borderRadius: '8px', border: '1px solid #0284c7', background: 'rgba(2, 132, 199, 0.05)', textAlign: 'center', fontWeight: 'bold', color: '#0369a1' }}
-                  />
-                </td>
-                <td style={{ padding: '10px' }}>
-                  <input
-                    type="text"
-                    placeholder="ملاحظات المقيّم..."
-                    value={item.notes}
-                    onChange={(e) => handleScoreChange(idx, 'notes', e.target.value)}
-                    style={{ width: '100%', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '12px' }}
-                  />
-                </td>
-                <td style={{ padding: '10px', textAlign: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveCriterion(idx)}
-                    style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px' }}
-                    title="حذف"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
+                  {t}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: 'white', padding: '10px 14px', gridColumn: 'span 2' }}>
+            <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>عنوان الدرس:</label>
+            <input
+              type="text"
+              placeholder="اكتب عنوان موضوع الدرس..."
+              value={headerData.lessonTitle}
+              onChange={(e) => setHeaderData({ ...headerData, lessonTitle: e.target.value })}
+              style={{ width: '100%', border: 'none', fontWeight: 600, fontSize: '13px', outline: 'none', background: 'transparent' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* PAGE 1: 20 Performance Criteria Table (الممارسات الأدائية) */}
+      <div style={{ border: '2px solid #cbd5e1', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ background: '#0284c7', color: 'white', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800 }}>
+            الممارسات الأدائية ومستويات الأداء
+          </h3>
+          <div style={{ fontSize: '12px', background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: '8px' }}>
+            مستويات الأداء: (5: مرتفع جداً / م ج) • (4: مرتفع) • (3: متوسط) • (2: منخفض) • (0/1: غير مرضٍ)
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+            <thead>
+              <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1', fontSize: '12px', color: '#334155' }}>
+                <th style={{ padding: '10px', width: '40px', textAlign: 'center' }}>م</th>
+                <th style={{ padding: '10px', width: '110px' }}>المجال</th>
+                <th style={{ padding: '10px' }}>الممارسات الأدائية</th>
+                <th style={{ padding: '10px', textAlign: 'center', width: '220px' }}>مستويات الأداء (الدرجة)</th>
+                <th style={{ padding: '10px', width: '180px' }}>شواهد وملاحظات</th>
+                <th style={{ padding: '10px', textAlign: 'center', width: '60px' }}>حذف</th>
               </tr>
+            </thead>
+            <tbody style={{ fontSize: '13px' }}>
+              {allDomains.map((dom) => {
+                const domainItems = criteria.filter(c => c.domain === dom);
+                if (domainItems.length === 0) return null;
+
+                return domainItems.map((item, itemIdx) => {
+                  const globalIdx = criteria.findIndex(c => c.id === item.id);
+                  return (
+                    <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0', background: itemIdx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                      <td style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold', color: '#64748b' }}>
+                        {item.number || globalIdx + 1}
+                      </td>
+
+                      {itemIdx === 0 ? (
+                        <td
+                          rowSpan={domainItems.length}
+                          style={{
+                            padding: '12px 10px',
+                            fontWeight: 800,
+                            color: '#0369a1',
+                            background: '#f0f9ff',
+                            borderLeft: '1px solid #cbd5e1',
+                            borderRight: '1px solid #cbd5e1',
+                            verticalAlign: 'middle',
+                            textAlign: 'center',
+                            fontSize: '13px'
+                          }}
+                        >
+                          {dom}
+                        </td>
+                      ) : null}
+
+                      <td style={{ padding: '10px', fontWeight: 600, color: '#1e293b', lineHeight: '1.5' }}>
+                        {item.name}
+                      </td>
+
+                      {/* Performance Levels Selector: 5, 4, 3, 2, 0 */}
+                      <td style={{ padding: '10px', textAlign: 'center' }}>
+                        <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center', background: '#f1f5f9', padding: '4px 6px', borderRadius: '8px' }}>
+                          {[
+                            { label: 'م ج (5)', val: 5, bg: '#16a34a' },
+                            { label: 'مرتفع (4)', val: 4, bg: '#0284c7' },
+                            { label: 'متوسط (3)', val: 3, bg: '#d97706' },
+                            { label: 'منخفض (2)', val: 2, bg: '#ea580c' },
+                            { label: 'غير مرض (0)', val: 0, bg: '#dc2626' }
+                          ].map(lvl => (
+                            <button
+                              key={lvl.val}
+                              type="button"
+                              onClick={() => handleScoreLevel(globalIdx, lvl.val)}
+                              style={{
+                                border: 'none',
+                                background: item.earnedScore === lvl.val ? lvl.bg : 'white',
+                                color: item.earnedScore === lvl.val ? 'white' : '#475569',
+                                fontWeight: 'bold',
+                                fontSize: '11px',
+                                padding: '4px 6px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              {lvl.val}
+                            </button>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                          المستحقة: <strong style={{ color: '#0284c7' }}>{item.earnedScore}</strong> / {item.maxScore}
+                        </div>
+                      </td>
+
+                      <td style={{ padding: '10px' }}>
+                        <input
+                          type="text"
+                          placeholder="ملاحظات..."
+                          value={item.notes}
+                          onChange={(e) => handleNotesChange(globalIdx, e.target.value)}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                        />
+                      </td>
+
+                      <td style={{ padding: '10px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCriterion(globalIdx)}
+                          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px' }}
+                          title="حذف هذا المعيار (مع التحذير مرتين)"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                });
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Add custom criterion row */}
+        <div style={{ background: '#f8fafc', padding: '12px 16px', borderTop: '1px solid #cbd5e1', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+          <select
+            value={newCritDomain}
+            onChange={(e) => setNewCritDomain(e.target.value)}
+            style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: 'bold', background: 'white' }}
+          >
+            <option value="التخطيط">مجال التخطيط</option>
+            <option value="بناء خبرات التعلم">مجال بناء خبرات التعلم</option>
+            <option value="تقويم التعلم">مجال تقويم التعلم</option>
+            <option value="معايير مخصصة">مجال إضافي مخصص</option>
+          </select>
+
+          <input
+            type="text"
+            placeholder="نص المعيار الجديد لإضافته للاستمارة..."
+            value={newCritName}
+            onChange={(e) => setNewCritName(e.target.value)}
+            style={{ flex: 1, minWidth: '220px', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+          />
+
+          <input
+            type="number"
+            min="1"
+            max="10"
+            value={newCritMax}
+            onChange={(e) => setNewCritMax(e.target.value)}
+            style={{ width: '80px', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 'bold', fontSize: '13px' }}
+          />
+
+          <button
+            type="button"
+            onClick={handleAddCriterion}
+            className="btn"
+            style={{ background: '#0284c7', color: 'white', fontWeight: 'bold', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Plus size={16} /> إضافة معيار للاستمارة
+          </button>
+        </div>
+      </div>
+
+      {/* PAGE 1 FOOTER: Score & Rating Summary (المجموع والتقدير) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+        <div style={{ background: 'white', border: '2px solid #cbd5e1', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>المجموع الكلي للدرجات:</div>
+            <div style={{ fontSize: '26px', fontWeight: 900, color: '#0f172a' }}>
+              {totalEarned} <span style={{ fontSize: '14px', color: '#64748b' }}>/ {totalMax}</span>
+            </div>
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>النسبة المئوية:</div>
+            <div style={{ fontSize: '26px', fontWeight: 900, color: '#0284c7' }}>{percentage}%</div>
+          </div>
+        </div>
+
+        <div style={{ background: rating.bg, border: `2px solid ${rating.color}`, borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '12px', color: '#475569', fontWeight: 'bold' }}>التقدير العام المعتمد:</div>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: rating.color }}>{rating.label}</div>
+          </div>
+          <div style={{ fontSize: '11px', color: '#475569', textAlign: 'left', lineHeight: '1.4' }}>
+            ممتاز (90-100) • جيد جداً (80-89)<br />جيد / مرض (70-79) • غير مرض (أقل من 70)
+          </div>
+        </div>
+      </div>
+
+      {/* PAGE 2: المداولة الإشرافية (Supervisory Deliberation) */}
+      <div style={{ border: '2px solid #cbd5e1', borderRadius: '12px', overflow: 'hidden', background: 'white' }}>
+        <div style={{ background: '#047857', color: 'white', padding: '12px 16px', fontWeight: 800, fontSize: '15px' }}>
+          المداولة الإشرافية
+        </div>
+
+        {/* 1. النجاحات */}
+        <div style={{ padding: '16px', borderBottom: '1px solid #cbd5e1' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#065f46' }}>
+              النجاحات ومواطن التميز المرصودة:
+            </h4>
+            <button
+              type="button"
+              onClick={handleAddSuccess}
+              className="btn"
+              style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '12px', fontWeight: 'bold', padding: '4px 10px', borderRadius: '6px' }}
+            >
+              + إضافة بند نجاح
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {successes.map((s, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#d1fae5', color: '#047857', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px', flexShrink: 0 }}>
+                  {idx + 1}
+                </span>
+                <input
+                  type="text"
+                  value={s}
+                  placeholder={`اكتب بند النجاح رقم ${idx + 1}...`}
+                  onChange={(e) => {
+                    const up = [...successes];
+                    up[idx] = e.target.value;
+                    setSuccesses(up);
+                  }}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSuccess(idx)}
+                  style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px' }}
+                  title="حذف البند (مع التحذير مرتين)"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </div>
 
-      {/* Add Custom Criterion Bar */}
-      <div style={{ background: 'rgba(0,0,0,0.02)', padding: '14px', borderRadius: '12px', border: '1px dashed var(--color-border)', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
-        <input
-          type="text"
-          placeholder="نص المعيار الجديد المخصص لهذه الزيارة..."
-          value={newCriterionName}
-          onChange={(e) => setNewCriterionName(e.target.value)}
-          style={{ flex: 1, minWidth: '220px', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '13px' }}
-        />
-        <input
-          type="number"
-          min="1"
-          placeholder="الدرجة"
-          value={newCriterionMax}
-          onChange={(e) => setNewCriterionMax(e.target.value)}
-          style={{ width: '90px', padding: '8px', borderRadius: '8px', border: '1px solid var(--color-border)', textAlign: 'center', fontWeight: 'bold', fontSize: '13px' }}
-        />
-        <button
-          type="button"
-          onClick={handleAddCustomCriterion}
-          className="btn"
-          style={{ background: '#0f172a', color: 'white', fontWeight: 'bold', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-        >
-          <Plus size={16} /> إضافة معيار
-        </button>
-      </div>
+        {/* 2. جوانب التطوير وخطة الدعم والمساندة */}
+        <div style={{ padding: '16px', borderBottom: '1px solid #cbd5e1' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>
+              جوانب التطوير وخطة الدعم والمساندة:
+            </h4>
+            <button
+              type="button"
+              onClick={handleAddPlanRow}
+              className="btn"
+              style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: 'bold', padding: '4px 10px', borderRadius: '6px' }}
+            >
+              + إضافة خطة دعم
+            </button>
+          </div>
 
-      {/* Notes & Summary KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
-        <div>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>
-            التوصيات والملاحظات الختامية للمقيم:
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontSize: '12px', color: '#475569' }}>
+                  <th style={{ padding: '8px', width: '30px' }}>م</th>
+                  <th style={{ padding: '8px' }}>الكفايات التي تحتاج إلى تطوير</th>
+                  <th style={{ padding: '8px' }}>محور التركيز</th>
+                  <th style={{ padding: '8px', width: '160px' }}>الأسلوب الإشرافي</th>
+                  <th style={{ padding: '8px', width: '140px' }}>الأسبوع / التاريخ المقترح</th>
+                  <th style={{ padding: '8px', textAlign: 'center', width: '50px' }}>حذف</th>
+                </tr>
+              </thead>
+              <tbody style={{ fontSize: '12px' }}>
+                {developmentPlan.map((row, idx) => (
+                  <tr key={row.id || idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '8px', fontWeight: 'bold', color: '#64748b' }}>{idx + 1}</td>
+                    <td style={{ padding: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="الكفاية المستهدفة..."
+                        value={row.competency}
+                        onChange={(e) => {
+                          const up = [...developmentPlan];
+                          up[idx].competency = e.target.value;
+                          setDevelopmentPlan(up);
+                        }}
+                        style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                      />
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="محور التركيز..."
+                        value={row.focusArea}
+                        onChange={(e) => {
+                          const up = [...developmentPlan];
+                          up[idx].focusArea = e.target.value;
+                          setDevelopmentPlan(up);
+                        }}
+                        style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                      />
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <select
+                        value={row.supervisoryMethod}
+                        onChange={(e) => {
+                          const up = [...developmentPlan];
+                          up[idx].supervisoryMethod = e.target.value;
+                          setDevelopmentPlan(up);
+                        }}
+                        style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: 'white' }}
+                      >
+                        <option value="حصة تطبيقية">حصة تطبيقية</option>
+                        <option value="ورشة عمل تدريبية">ورشة عمل تدريبية</option>
+                        <option value="قراءة موجهة ونقاش">قراءة موجهة ونقاش</option>
+                        <option value="تدريب الأقران والزيارة المتبادلة">تدريب الأقران وزيارة متبادلة</option>
+                        <option value="جلسة إرشاد فردي">جلسة إرشاد فردي</option>
+                      </select>
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="الأسبوع المقترح..."
+                        value={row.suggestedWeek}
+                        onChange={(e) => {
+                          const up = [...developmentPlan];
+                          up[idx].suggestedWeek = e.target.value;
+                          setDevelopmentPlan(up);
+                        }}
+                        style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                      />
+                    </td>
+                    <td style={{ padding: '8px', textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePlanRow(idx)}
+                        style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px' }}
+                        title="حذف البند (مع التحذير مرتين)"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* 3. ملاحظات ومرئيات عامة */}
+        <div style={{ padding: '16px', borderBottom: '1px solid #cbd5e1' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', color: '#1e293b' }}>
+            ملاحظات ومرئيات عامة:
           </label>
           <textarea
             rows="3"
             value={evaluatorNotes}
             onChange={(e) => setEvaluatorNotes(e.target.value)}
-            placeholder="اكتب التوجيهات التربوية والتغذية الراجعة للمعلم..."
-            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid var(--color-border)', fontSize: '13px', resize: 'vertical' }}
+            placeholder="اكتب التوصيات والملاحظات الختامية للزيارة..."
+            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
           />
         </div>
 
-        <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: 'white', padding: '20px', borderRadius: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>النتيجة الإجمالية المحتسبة:</div>
-            <div style={{ fontSize: '28px', fontWeight: 900, color: '#facc15', marginTop: '4px' }}>
-              {totalEarned} <span style={{ fontSize: '15px', color: '#94a3b8', fontWeight: 'normal' }}>/ {totalMax}</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px', marginTop: '10px' }}>
-            <span style={{ fontSize: '13px', color: '#cbd5e1' }}>النسبة المئوية:</span>
-            <span style={{ fontSize: '20px', fontWeight: 900, color: '#4ade80' }}>{percentage}%</span>
-          </div>
+        {/* 4. ملحوظة وزارية وإلزامية */}
+        <div style={{ background: '#fef3c7', padding: '10px 16px', color: '#92400e', fontSize: '12px', fontWeight: 'bold' }}>
+          ملحوظة: تُجرى المداولة الإشرافية عقب الزيارة الصفية مباشرةً أو خلال اليوم الدراسي نفسه، ويُمنع تأجيلها.
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
+      {/* Action Buttons: Draft vs Submit */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--color-border)', paddingTop: '16px', flexWrap: 'wrap' }}>
         <button
           type="button"
           disabled={isSubmitting}
@@ -273,7 +753,7 @@ export default function EvaluatorView({ visit, initialEvaluation, currentUser, o
           className="btn btn-primary"
           style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: 'white', fontWeight: 'bold', padding: '10px 24px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
         >
-          <Send size={16} /> إرسال واعتماد التقييم
+          <Send size={16} /> إرسال واعتماد التقييم للمعلم
         </button>
       </div>
     </div>
