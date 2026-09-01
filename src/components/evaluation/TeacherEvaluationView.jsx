@@ -10,7 +10,7 @@ export default function TeacherEvaluationView({ evaluation, currentUser, onDecis
   // Auto-log read timestamp in background on mount
   useEffect(() => {
     if (evaluation?.id && currentUser?.uid && !evaluation.readAt && evaluation.status !== 'draft') {
-      trackTeacherReadReceipt(evaluation.id, currentUser.uid)
+      trackTeacherReadReceipt(evaluation.id, currentUser.uid, evaluation)
         .then(() => console.log('Read receipt logged successfully'))
         .catch(err => console.error('Error logging read receipt:', err));
     }
@@ -20,7 +20,7 @@ export default function TeacherEvaluationView({ evaluation, currentUser, onDecis
     if (!window.confirm('هل أنت متأكد من موافقتك واعتماد نتيجة التقييم؟')) return;
     try {
       setIsProcessing(true);
-      await handleTeacherDecision(evaluation.id, currentUser.uid, 'approved');
+      await handleTeacherDecision(evaluation.id, currentUser?.uid, 'approved', '', evaluation);
       alert('تم اعتماد نتيجة التقييم بنجاح.');
       if (onDecisionMade) onDecisionMade('approved');
     } catch (err) {
@@ -39,7 +39,7 @@ export default function TeacherEvaluationView({ evaluation, currentUser, onDecis
 
     try {
       setIsProcessing(true);
-      await handleTeacherDecision(evaluation.id, currentUser.uid, 'rejected', rejectionReason);
+      await handleTeacherDecision(evaluation.id, currentUser?.uid, 'rejected', rejectionReason, evaluation);
       setShowRejectModal(false);
       alert('تم رفع أسباب عدم الموافقة للإدارة التعليمية للنظر فيها.');
       if (onDecisionMade) onDecisionMade('rejected');

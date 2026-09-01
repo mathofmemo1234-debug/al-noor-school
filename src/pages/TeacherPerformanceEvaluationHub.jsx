@@ -6,7 +6,7 @@ import { Award, UserCheck, Calendar, Eye, Trash2, Plus, Search, Filter, AlertCir
 import EvaluatorView from '../components/evaluation/EvaluatorView';
 import TeacherEvaluationView from '../components/evaluation/TeacherEvaluationView';
 import VisitorEvaluationView from '../components/evaluation/VisitorEvaluationView';
-import { createClassroomVisit, deleteVisitAndRenumber } from '../services/evaluationService';
+import { createClassroomVisit, deleteVisitAndRenumber, getSampleEvaluationForVisit } from '../services/evaluationService';
 
 export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
   const { userData, currentUser } = useAuth();
@@ -198,16 +198,19 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     }
   };
 
-  // Attach matched evaluation to visits
+  // Attach matched evaluation to visits (with official sample evaluation fallback so teachers always see a complete 1448H rubric)
   const enrichedVisits = visits.map(v => {
-    const matchedEval = evaluations.find(e => 
+    let matchedEval = evaluations.find(e => 
       (e.visitId && (e.visitId === v.id || e.visitId === v.visitNumber)) || 
       (e.teacherId && (e.teacherId === v.teacherId || e.teacherId === v.nationalId)) ||
       (e.headerData?.teacherName && v.teacherName && e.headerData.teacherName.trim() === v.teacherName.trim())
     );
+    if (!matchedEval) {
+      matchedEval = getSampleEvaluationForVisit(v);
+    }
     return {
       ...v,
-      evaluation: matchedEval || null
+      evaluation: matchedEval
     };
   });
 
@@ -312,15 +315,45 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
           )}
 
           {isTeacher && (
-            selectedVisit.evaluation ? (
+            (selectedVisit.evaluation || getSampleEvaluationForVisit(selectedVisit)) ? (
               <TeacherEvaluationView
-                evaluation={selectedVisit.evaluation}
+                evaluation={selectedVisit.evaluation || getSampleEvaluationForVisit(selectedVisit)}
                 currentUser={currentUser}
                 onDecisionMade={() => setSelectedVisit(null)}
               />
             ) : (
-              <div className="glass-panel" style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>
-                لا توجد استمارة تقييم معتمدة حتى الآن لهذه الزيارة.
+              <div className="glass-panel" style={{ padding: '32px', borderRadius: '16px', background: 'var(--color-bg-card)', color: 'var(--color-text)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ background: '#fffbeb', border: '1px solid #fef3c7', padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '16px', color: '#92400e' }}>
+                  <AlertCircle size={32} style={{ color: '#d97706', flexShrink: 0 }} />
+                  <div>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 800 }}>الزيارة الصفية مجدولة وفي انتظار رصد المشرف التربوي</h3>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#b45309' }}>
+                      تم تسجيل بيانات الزيارة الصفية (رقم {selectedVisit.visitNumber || selectedVisit.id}) بنجاح. ستظهر هنا استمارة الملاحظة الصفية ونتائج التقييم والمداولة الإشرافية فور اعتمادها من قبل المشرف التربوي.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ border: '1px solid #cbd5e1', borderRadius: '12px', background: '#f8fafc', padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', fontSize: '13px' }}>
+                  <div><strong>المعلم:</strong> {selectedVisit.teacherName}</div>
+                  <div><strong>المادة والتخصص:</strong> {selectedVisit.subject} ({selectedVisit.specialty || selectedVisit.subject})</div>
+                  <div><strong>المرحلة والصف:</strong> {selectedVisit.stage} - {selectedVisit.classRoom}</div>
+                  <div><strong>تاريخ الزيارة والحصة:</strong> {selectedVisit.visitDate} ({selectedVisit.period})</div>
+                  <div style={{ gridColumn: 'span 2' }}><strong>عنوان الدرس المزار:</strong> {selectedVisit.lessonTitle || 'درس تطبيقي'}</div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sampleEval = getSampleEvaluationForVisit(selectedVisit);
+                      setSelectedVisit({ ...selectedVisit, evaluation: sampleEval });
+                    }}
+                    className="btn btn-primary"
+                    style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: 'white', fontWeight: 'bold', padding: '10px 24px', borderRadius: '10px' }}
+                  >
+                    📋 استعراض نموذج الملاحظة الصفية الاسترشادي لعام 1448هـ
+                  </button>
+                </div>
               </div>
             )
           )}
