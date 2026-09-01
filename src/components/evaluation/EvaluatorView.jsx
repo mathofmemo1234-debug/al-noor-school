@@ -213,27 +213,47 @@ export default function EvaluatorView({ visit, initialEvaluation, currentUser, o
 
           {/* Status badge */}
           <div style={{ background: 'rgba(0,0,0,0.03)', padding: '8px 14px', borderRadius: '12px', border: '1px solid var(--color-border)', textAlign: 'center' }}>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>حالة التقييم:</div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>حالة التقييم وقرار المعلم:</div>
             <div style={{ fontSize: '13px', fontWeight: 800 }}>
-              {initialEvaluation?.status === 'draft' && <span style={{ color: '#d97706' }}>📝 مسودة</span>}
-              {initialEvaluation?.status === 'sent' && <span style={{ color: '#2563eb' }}>📨 مُرسل للمعلم</span>}
-              {initialEvaluation?.status === 'approved' && <span style={{ color: '#16a34a' }}>✅ معتمد من المعلم</span>}
-              {initialEvaluation?.status === 'rejected' && <span style={{ color: '#dc2626' }}>❌ مرفوض من المعلم</span>}
-              {!initialEvaluation && <span style={{ color: '#94a3b8' }}>جديد قيد الإعداد</span>}
+              {(initialEvaluation?.status === 'approved' || initialEvaluation?.teacherDecision === 'approved') ? (
+                <span style={{ color: '#16a34a', background: '#dcfce7', padding: '4px 10px', borderRadius: '8px' }}>✅ معتمد من المعلم</span>
+              ) : (initialEvaluation?.status === 'rejected' || initialEvaluation?.teacherDecision === 'rejected') ? (
+                <span style={{ color: '#dc2626', background: '#fee2e2', padding: '4px 10px', borderRadius: '8px' }}>❌ مرفوض من المعلم</span>
+              ) : initialEvaluation?.status === 'draft' ? (
+                <span style={{ color: '#d97706', background: '#fef3c7', padding: '4px 10px', borderRadius: '8px' }}>📝 مسودة</span>
+              ) : initialEvaluation?.status === 'sent' ? (
+                <span style={{ color: '#2563eb', background: '#dbeafe', padding: '4px 10px', borderRadius: '8px' }}>📨 مُرسل للمعلم (بانتظار الرد)</span>
+              ) : (
+                <span style={{ color: '#94a3b8' }}>جديد قيد الإعداد</span>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* If rejected, show teacher's reasons */}
-      {initialEvaluation?.status === 'rejected' && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px', color: '#991b1b' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '14px' }}>
-            <AlertCircle size={18} /> تحفظات وأسباب عدم موافقة المعلم على التقييم:
+      {/* If approved, show teacher confirmation banner to supervisor/admin */}
+      {(initialEvaluation?.status === 'approved' || initialEvaluation?.teacherDecision === 'approved') && (
+        <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '12px', padding: '16px', color: '#166534', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <CheckCircle size={24} style={{ color: '#16a34a', flexShrink: 0 }} />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '15px' }}>✅ تم اعتماد هذا التقييم والموافقة عليه رسمياً من قِبل المعلم</div>
+            <div style={{ fontSize: '12px', color: '#15803d', marginTop: '2px' }}>
+              اطلع المعلم على درجات الملاحظة الصفية ونتائج المداولة الإشرافية وتم إغلاق سجل الزيارة بنجاح.
+            </div>
           </div>
-          <p style={{ margin: '8px 0 0 0', fontSize: '13px', background: 'white', padding: '10px 14px', borderRadius: '8px', border: '1px solid #fee2e2', lineHeight: '1.6' }}>
-            {initialEvaluation.rejectionReason}
-          </p>
+        </div>
+      )}
+
+      {/* If rejected, show teacher's reasons to supervisor/admin */}
+      {(initialEvaluation?.status === 'rejected' || initialEvaluation?.teacherDecision === 'rejected') && (
+        <div style={{ background: '#fef2f2', border: '2px solid #f87171', borderRadius: '12px', padding: '16px', color: '#991b1b' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '15px' }}>
+            <AlertCircle size={20} style={{ color: '#dc2626' }} /> ❌ إشعار: لم يوافق المعلم على هذا التقييم (مرفوض مع تسجيل مبررات)
+          </div>
+          <div style={{ margin: '10px 0 0 0', fontSize: '13px', background: 'white', padding: '12px 16px', borderRadius: '8px', border: '1px solid #fecaca', lineHeight: '1.6', color: '#1e293b' }}>
+            <strong style={{ color: '#dc2626' }}>أسباب وتحفظات المعلم المرفوعة للإدارة:</strong>
+            <p style={{ margin: '6px 0 0 0', fontWeight: 600 }}>{initialEvaluation.rejectionReason || 'لم يتم إدخال تفاصيل إضافية.'}</p>
+          </div>
         </div>
       )}
 

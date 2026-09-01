@@ -38,14 +38,15 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
   const isTeacher = role === 'teacher';
   const isVisitor = role === 'visitor';
 
-  // 1. Fetch Teachers for Dropdown & Mapping (With or without schoolId filter)
+  // 1. Fetch Teachers for Dropdown & Mapping
   useEffect(() => {
-    const q = schoolId 
-      ? query(collection(db, 'teachers'), where('schoolId', '==', schoolId))
-      : collection(db, 'teachers');
-
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const unsub = onSnapshot(collection(db, 'teachers'), (snap) => {
+      const allTeachers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let list = allTeachers;
+      if (schoolId && schoolId !== 'ALL') {
+        const filtered = allTeachers.filter(t => !t.schoolId || t.schoolId === schoolId || t.schoolId === 'school_001' || t.schoolId === 'default_school_1');
+        if (filtered.length > 0) list = filtered;
+      }
       setTeachers(list);
       if (list.length > 0 && !selectedTeacherId) {
         setSelectedTeacherId(list[0].id || list[0].nationalId);
@@ -60,26 +61,23 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     return () => unsub();
   }, [schoolId]);
 
-  // 2. Fetch Evaluations
+  // 2. Fetch Evaluations Live from Firestore
   useEffect(() => {
-    const q = schoolId 
-      ? query(collection(db, 'evaluations'), where('schoolId', '==', schoolId))
-      : collection(db, 'evaluations');
-
-    const unsub = onSnapshot(q, (snap) => {
-      setEvaluations(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsub = onSnapshot(collection(db, 'evaluations'), (snap) => {
+      const allEvals = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setEvaluations(allEvals);
     });
     return () => unsub();
-  }, [schoolId]);
+  }, []);
 
   // 3. Fetch Live Visits from Firestore & Auto-initialize if empty
   useEffect(() => {
-    const q = schoolId 
-      ? query(collection(db, 'classroom_visits'), where('schoolId', '==', schoolId))
-      : collection(db, 'classroom_visits');
-
-    const unsub = onSnapshot(q, async (snap) => {
-      const dbVisits = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const unsub = onSnapshot(collection(db, 'classroom_visits'), async (snap) => {
+      let dbVisits = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (schoolId && schoolId !== 'ALL') {
+        const filtered = dbVisits.filter(v => !v.schoolId || v.schoolId === schoolId || v.schoolId === 'school_001' || v.schoolId === 'default_school_1');
+        if (filtered.length > 0) dbVisits = filtered;
+      }
       
       // If DB has visits, sort and use them
       if (dbVisits.length > 0) {
@@ -201,7 +199,8 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
   // Attach matched evaluation to visits (with official sample evaluation fallback so teachers always see a complete 1448H rubric)
   const enrichedVisits = visits.map(v => {
     let matchedEval = evaluations.find(e => 
-      (e.visitId && (e.visitId === v.id || e.visitId === v.visitNumber)) || 
+      (e.id && (e.id === `eval_${v.id}` || e.id === `eval_${v.visitNumber}` || e.id === v.id || e.id === v.visitNumber)) ||
+      (e.visitId && (e.visitId === v.id || e.visitId === v.visitNumber || String(e.visitId) === String(v.seqNumber))) || 
       (e.teacherId && (e.teacherId === v.teacherId || e.teacherId === v.nationalId)) ||
       (e.headerData?.teacherName && v.teacherName && e.headerData.teacherName.trim() === v.teacherName.trim())
     );
@@ -238,8 +237,17 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     
     // Status filter
     if (statusFilter !== 'all') {
-      const evStatus = v.evaluation?.status || 'none';
-      if (statusFilter !== evStatus) return false;
+      const isApproved = v.evaluation?.status === 'approved' || v.evaluation?.teacherDecision === 'approved';
+      const isRejected = v.evaluation?.status === 'rejected' || v.evaluation?.teacherDecision === 'rejected';
+      const isDraft = v.evaluation?.status === 'draft';
+      const isSent = v.evaluation?.status === 'sent' && !isApproved && !isRejected;
+      const isNone = !v.evaluation || v.evaluation?.status === 'none';
+
+      if (statusFilter === 'approved' && !isApproved) return false;
+      if (statusFilter === 'rejected' && !isRejected) return false;
+      if (statusFilter === 'draft' && !isDraft) return false;
+      if (statusFilter === 'sent' && !isSent) return false;
+      if (statusFilter === 'none' && !isNone) return false;
     }
 
     // Search query
@@ -411,14 +419,57 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                 style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '13px', background: 'white' }}
               >
                 <option value="all">جميع حالات التقييم</option>
-                <option value="draft">مسودة (Draft)</option>
-                <option value="sent">مُرسل للمعلم (Sent)</option>
                 <option value="approved">معتمد من المعلم (Approved)</option>
                 <option value="rejected">مرفوض من المعلم (Rejected)</option>
+                <option value="sent">مُرسل وبانتظار رد المعلم (Sent)</option>
+                <option value="draft">مسودة (Draft)</option>
                 <option value="none">غير مقيم بعد</option>
               </select>
             </div>
           </div>
+
+          {/* Quick Metrics Bar for Supervisor & Admin */}
+          {isEvaluator && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>إجمالي الزيارات:</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>{filteredVisits.length}</div>
+                </div>
+                <div style={{ background: '#e2e8f0', padding: '8px', borderRadius: '10px', color: '#334155', fontWeight: 'bold' }}>📋</div>
+              </div>
+
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '14px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: '#166534', fontWeight: 'bold' }}>معتمدة من المعلمين:</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: '#16a34a' }}>
+                    {filteredVisits.filter(v => v.evaluation?.status === 'approved' || v.evaluation?.teacherDecision === 'approved').length}
+                  </div>
+                </div>
+                <div style={{ background: '#dcfce7', padding: '8px', borderRadius: '10px', color: '#16a34a', fontWeight: 'bold' }}>✅</div>
+              </div>
+
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '14px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: '#991b1b', fontWeight: 'bold' }}>مرفوضة مع تحفظات:</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: '#dc2626' }}>
+                    {filteredVisits.filter(v => v.evaluation?.status === 'rejected' || v.evaluation?.teacherDecision === 'rejected').length}
+                  </div>
+                </div>
+                <div style={{ background: '#fee2e2', padding: '8px', borderRadius: '10px', color: '#dc2626', fontWeight: 'bold' }}>❌</div>
+              </div>
+
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '14px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 'bold' }}>بانتظار رد المعلم:</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: '#2563eb' }}>
+                    {filteredVisits.filter(v => v.evaluation?.status === 'sent' && v.evaluation?.teacherDecision !== 'approved' && v.evaluation?.teacherDecision !== 'rejected').length}
+                  </div>
+                </div>
+                <div style={{ background: '#dbeafe', padding: '8px', borderRadius: '10px', color: '#2563eb', fontWeight: 'bold' }}>📨</div>
+              </div>
+            </div>
+          )}
 
           {/* Visits Table */}
           <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px', background: 'var(--color-bg-card)' }}>
@@ -453,7 +504,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                       <th style={{ padding: '12px 10px' }}>تاريخ الزيارة</th>
                       <th style={{ padding: '12px 10px', textAlign: 'center' }}>الدرجة والنسبة</th>
                       <th style={{ padding: '12px 10px', textAlign: 'center' }}>التقدير العام</th>
-                      <th style={{ padding: '12px 10px', textAlign: 'center' }}>حالة التقييم</th>
+                      <th style={{ padding: '12px 10px', textAlign: 'center' }}>حالة التقييم والاعتماد</th>
                       <th style={{ padding: '12px 10px', textAlign: 'center' }}>مؤشر القراءة</th>
                       <th style={{ padding: '12px 10px', textAlign: 'center', width: '140px' }}>الإجراء</th>
                     </tr>
@@ -462,6 +513,11 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                     {filteredVisits.map((v) => {
                       const ev = v.evaluation;
                       const vNum = v.visitNumber || `VIS-${v.seqNumber || 1}`;
+                      const isApproved = ev && (ev.status === 'approved' || ev.teacherDecision === 'approved');
+                      const isRejected = ev && (ev.status === 'rejected' || ev.teacherDecision === 'rejected');
+                      const isDraft = ev && ev.status === 'draft';
+                      const isSent = ev && ev.status === 'sent' && !isApproved && !isRejected;
+
                       return (
                         <tr key={v.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                           <td style={{ padding: '12px 10px', textAlign: 'center', fontWeight: 900, color: '#0284c7' }}>
@@ -496,10 +552,26 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                           </td>
                           <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                             {!ev && <span style={{ color: '#94a3b8', fontSize: '12px' }}>غير مقيم</span>}
-                            {ev?.status === 'draft' && <span style={{ color: '#d97706', background: '#fef3c7', padding: '3px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold' }}>مسودة</span>}
-                            {ev?.status === 'sent' && <span style={{ color: '#2563eb', background: '#dbeafe', padding: '3px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold' }}>مُرسل</span>}
-                            {ev?.status === 'approved' && <span style={{ color: '#16a34a', background: '#dcfce7', padding: '3px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold' }}>معتمد</span>}
-                            {ev?.status === 'rejected' && <span style={{ color: '#dc2626', background: '#fee2e2', padding: '3px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold' }}>مرفوض</span>}
+                            {isApproved && (
+                              <span style={{ color: '#16a34a', background: '#dcfce7', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                ✅ معتمد
+                              </span>
+                            )}
+                            {isRejected && (
+                              <span style={{ color: '#dc2626', background: '#fee2e2', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title={ev.rejectionReason || 'رفض المعلم التقييم'}>
+                                ❌ مرفوض
+                              </span>
+                            )}
+                            {isDraft && (
+                              <span style={{ color: '#d97706', background: '#fef3c7', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold' }}>
+                                📝 مسودة
+                              </span>
+                            )}
+                            {isSent && (
+                              <span style={{ color: '#2563eb', background: '#dbeafe', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold' }}>
+                                📨 بانتظار الرد
+                              </span>
+                            )}
                           </td>
                           <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                             {ev?.readAt ? (
