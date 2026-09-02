@@ -1,16 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db, auth } from '../firebase';
-import { collection, query, where, onSnapshot, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { 
   Users, BookOpen, FileText, CheckCircle, AlertTriangle, Calendar, Award, 
   BarChart2, Search, Filter, Printer, Download, Eye, Edit, Save, X, 
   ChevronRight, ChevronLeft, Star, Sparkles, CheckSquare, Clock, AlertCircle, 
-  ArrowUpDown, TrendingUp, ShieldCheck, UserCheck, RefreshCw
+  ArrowUpDown, TrendingUp, ShieldCheck, UserCheck, RefreshCw, Settings,
+  PlusCircle, Trash2, Sliders, ToggleLeft, ToggleRight, Check, Plus
 } from 'lucide-react';
 import GamificationBadge from '../components/GamificationBadge';
 import { calculateStudentActivity } from '../utils/gamificationEngine';
+
+const DEFAULT_CRITERIA = [
+  { id: 'attendance', name: 'الحضور والانتظام', maxScore: 10, isActive: true, isBuiltIn: true },
+  { id: 'assignments', name: 'الواجبات والتطبيقات', maxScore: 15, isActive: true, isBuiltIn: true },
+  { id: 'electronic_exams', name: 'الاختبارات الإلكترونية', maxScore: 15, isActive: true, isBuiltIn: true },
+  { id: 'period1', name: 'اختبار الفترة الأولى', maxScore: 15, isActive: true, isBuiltIn: true },
+  { id: 'period2', name: 'اختبار الفترة الثانية', maxScore: 15, isActive: true, isBuiltIn: true },
+  { id: 'participation', name: 'المشاركة والتفاعل الصفي', maxScore: 10, isActive: true, isBuiltIn: true },
+  { id: 'midterm', name: 'اختبار منتصف الفصل', maxScore: 15, isActive: true, isBuiltIn: true },
+  { id: 'final', name: 'الاختبار النهائي', maxScore: 40, isActive: true, isBuiltIn: true }
+];
 
 export default function ComprehensiveStudentRecord({ role = 'teacher', targetStudentId = null }) {
   const { userData } = useAuth();
@@ -36,8 +48,15 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
   const [assignments, setAssignments] = useState([]);
   const [assignmentResults, setAssignmentResults] = useState([]);
   const [studentActivityMap, setStudentActivityMap] = useState({});
-  const [customEvaluations, setCustomEvaluations] = useState({}); // studentId -> { participationScore, notes }
+  const [customEvaluations, setCustomEvaluations] = useState({}); // studentId -> { participationScore, notes, criteriaScores }
   
+  // Custom Criteria Management State
+  const [customCriteria, setCustomCriteria] = useState(DEFAULT_CRITERIA);
+  const [showCriteriaModal, setShowCriteriaModal] = useState(false);
+  const [newCriterionName, setNewCriterionName] = useState('');
+  const [newCriterionMaxScore, setNewCriterionMaxScore] = useState('10');
+  const [isSavingCriteria, setIsSavingCriteria] = useState(false);
+
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'EXCELLENT' | 'VERY_GOOD' | 'GOOD' | 'NEEDS_SUPPORT' | 'HIGH_ABSENCE'
@@ -51,10 +70,11 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [attendanceEditSuccess, setAttendanceEditSuccess] = useState('');
 
-  // Manual Participation/Evaluation Modal
+  // Manual Participation/Evaluation & Custom Criteria Grading Modal
   const [editingEvaluationStudent, setEditingEvaluationStudent] = useState(null);
   const [manualParticipationScore, setManualParticipationScore] = useState(10);
   const [manualEvaluationNotes, setManualEvaluationNotes] = useState('');
+  const [editingCriteriaScores, setEditingCriteriaScores] = useState({}); // { [criterionId]: score }
   const [isSavingEvaluation, setIsSavingEvaluation] = useState(false);
 
   const [teacherDocId, setTeacherDocId] = useState(null);
@@ -230,6 +250,22 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
       setCustomEvaluations(evalMap);
     });
 
+    // Sync evaluation criteria from Firestore
+    const qCriteria = schoolId === 'ALL'
+      ? collection(db, 'evaluation_criteria')
+      : query(collection(db, 'evaluation_criteria'), where('schoolId', '==', schoolId));
+
+    const unsubCriteria = onSnapshot(qCriteria, snap => {
+      if (!snap.empty) {
+        // Find matching criteria for class or global
+        const classKey = (selectedClass || 'all').replace(/\//g, '-');
+        const matchingDoc = snap.docs.find(d => d.id === `${schoolId}_${classKey}`) || snap.docs[0];
+        if (matchingDoc && matchingDoc.data().criteria) {
+          setCustomCriteria(matchingDoc.data().criteria);
+        }
+      }
+    });
+
     return () => {
       unsubStudents();
       unsubAtt();
@@ -238,8 +274,9 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
       unsubAssign();
       unsubAssignRes();
       unsubEvaluations();
+      unsubCriteria();
     };
-  }, [schoolId]);
+  }, [schoolId, selectedClass]);
 
   // 4. Compute Gamification and Student Activity Map
   useEffect(() => {
@@ -259,6 +296,55 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
     });
     setStudentActivityMap(map);
   }, [students, assignmentResults, examResults, attendanceDocs]);
+
+  // Save Criteria to Firestore
+  const saveCriteriaToFirestore = async (critList) => {
+    try {
+      const classKey = (selectedClass || 'all').replace(/\//g, '-');
+      const docKey = `${schoolId}_${classKey}`;
+      await setDoc(doc(db, 'evaluation_criteria', docKey), {
+        schoolId,
+        className: selectedClass || 'all',
+        criteria: critList,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (err) {
+      console.error('Error saving criteria:', err);
+    }
+  };
+
+  const handleToggleCriterion = async (critId) => {
+    const updated = customCriteria.map(c => c.id === critId ? { ...c, isActive: !c.isActive } : c);
+    setCustomCriteria(updated);
+    await saveCriteriaToFirestore(updated);
+  };
+
+  const handleAddCustomCriterion = async () => {
+    if (!newCriterionName.trim()) {
+      alert('يرجى كتابة اسم المعيار');
+      return;
+    }
+    const max = parseFloat(newCriterionMaxScore) || 10;
+    const newCrit = {
+      id: `crit_${Date.now()}`,
+      name: newCriterionName.trim(),
+      maxScore: max,
+      isActive: true,
+      isBuiltIn: false
+    };
+    const updated = [...customCriteria, newCrit];
+    setCustomCriteria(updated);
+    setNewCriterionName('');
+    setNewCriterionMaxScore('10');
+    await saveCriteriaToFirestore(updated);
+  };
+
+  const handleDeleteCustomCriterion = async (critId) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا المعيار؟')) return;
+    const updated = customCriteria.filter(c => c.id !== critId);
+    setCustomCriteria(updated);
+    await saveCriteriaToFirestore(updated);
+  };
 
   // 5. Build Comprehensive Data Record per Student
   const processedStudentRecords = useMemo(() => {
@@ -402,25 +488,74 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
       
       // Default participation score derived from gamification activity + submissions + attendance, or custom evaluation
       const calculatedParticipation = Math.min(20, Math.max(10, Math.round(10 + (activityData.totalPoints / 20) + (attendanceRate > 90 ? 5 : 2))));
-      const participationScore = customEval?.participationScore !== undefined ? Number(customEval.participationScore) : calculatedParticipation;
 
-      // i) Overall Comprehensive Weighted GPA / Grade Calculation
-      let availableComponents = [];
-      if (attendanceRate !== null) availableComponents.push({ pct: attendanceRate, weight: 10 });
-      if (assignmentAveragePct > 0 || myAssignmentSubmissions.length > 0) availableComponents.push({ pct: assignmentAveragePct, weight: 15 });
-      if (electronicExamAveragePct > 0 || myElectronicExamResults.length > 0) availableComponents.push({ pct: electronicExamAveragePct, weight: 15 });
-      if (period1Pct !== null) availableComponents.push({ pct: period1Pct, weight: 15 });
-      if (period2Pct !== null) availableComponents.push({ pct: period2Pct, weight: 15 });
-      if (midtermPct !== null) availableComponents.push({ pct: midtermPct, weight: 15 });
-      if (finalPct !== null) availableComponents.push({ pct: finalPct, weight: 15 });
-      if (participationScore !== null) availableComponents.push({ pct: (participationScore / 20) * 100, weight: 10 });
+      // =========================================================================
+      // DYNAMIC CRITERIA & ACTUALLY RECORDED CALCULATION
+      // =========================================================================
+      let actualRecordedTotalScore = 0;
+      let actualRecordedMaxScore = 0;
+      const criteriaBreakdown = {};
 
-      let overallPct = 100;
-      if (availableComponents.length > 0) {
-        const totalWeight = availableComponents.reduce((acc, c) => acc + c.weight, 0);
-        const weightedSum = availableComponents.reduce((acc, c) => acc + (c.pct * c.weight), 0);
-        overallPct = Math.round(weightedSum / totalWeight);
-      }
+      customCriteria.forEach(crit => {
+        if (!crit.isActive) return; // Skip inactive criteria
+
+        let earned = null;
+        const max = Number(crit.maxScore) || 10;
+
+        if (crit.id === 'attendance') {
+          if (totalSchoolDays > 0) {
+            earned = Math.round(((attendanceRate / 100) * max) * 10) / 10;
+          }
+        } else if (crit.id === 'assignments') {
+          if (myAssignmentSubmissions.length > 0) {
+            earned = Math.round(((assignmentAveragePct / 100) * max) * 10) / 10;
+          }
+        } else if (crit.id === 'electronic_exams') {
+          if (myElectronicExamResults.length > 0) {
+            earned = Math.round(((electronicExamAveragePct / 100) * max) * 10) / 10;
+          }
+        } else if (crit.id === 'period1') {
+          if (period1Score !== null) {
+            earned = Math.round(((period1Score / period1Max) * max) * 10) / 10;
+          }
+        } else if (crit.id === 'period2') {
+          if (period2Score !== null) {
+            earned = Math.round(((period2Score / period2Max) * max) * 10) / 10;
+          }
+        } else if (crit.id === 'participation') {
+          const pScore = customEval?.participationScore !== undefined ? Number(customEval.participationScore) : calculatedParticipation;
+          earned = Math.round(((pScore / 20) * max) * 10) / 10;
+        } else if (crit.id === 'midterm') {
+          if (midtermScore !== null) {
+            earned = Math.round(((midtermScore / midtermMax) * max) * 10) / 10;
+          }
+        } else if (crit.id === 'final') {
+          if (finalScore !== null) {
+            earned = Math.round(((finalScore / finalMax) * max) * 10) / 10;
+          }
+        } else {
+          // Custom Teacher Criterion
+          const customScore = customEval?.criteriaScores?.[crit.id];
+          if (customScore !== undefined && customScore !== null && customScore !== '') {
+            earned = Number(customScore);
+          }
+        }
+
+        if (earned !== null && !isNaN(earned)) {
+          actualRecordedTotalScore += earned;
+          actualRecordedMaxScore += max;
+          criteriaBreakdown[crit.id] = {
+            score: earned,
+            maxScore: max,
+            pct: Math.round((earned / max) * 100)
+          };
+        }
+      });
+
+      // Overall Percentage based strictly on active & actually recorded components
+      const overallPct = actualRecordedMaxScore > 0
+        ? Math.round((actualRecordedTotalScore / actualRecordedMaxScore) * 100)
+        : 100;
 
       // Grade classification
       let gradeLabel = 'ممتاز مرتفع';
@@ -448,33 +583,44 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
         gradeColor = '#e11d48';
         gradeBg = '#fff1f2';
       } else {
-        gradeLabel = 'يحتاج متابعة وتدخل (F)';
+        gradeLabel = 'يحتاج دعم (F)';
         gradeColor = '#dc2626';
         gradeBg = '#fef2f2';
       }
 
       return {
-        ...student,
+        id: sId,
+        studentDocId: sId,
+        name: student.name || 'طالب',
+        nationalId: sNid,
         class: sClass,
+        schoolId: student.schoolId || schoolId,
+        avatar: student.avatar || null,
+        phone: student.parentPhone || student.phone || '—',
+        email: student.email || '—',
         attendance: {
+          rate: attendanceRate,
           totalDays: totalSchoolDays,
           presentDays,
           absentDays,
           lateDays,
           excusedDays,
-          rate: attendanceRate,
           history: attendanceHistory
         },
         assignments: {
+          averagePct: assignmentAveragePct,
+          totalScore: assignmentTotalScore,
+          maxPossible: assignmentMaxPossible,
           totalAssigned: classAssignments.length,
           totalSubmitted: myAssignmentSubmissions.length,
-          averagePct: assignmentAveragePct,
           submissions: myAssignmentSubmissions
         },
         electronicExams: {
-          totalExams: classElectronicExams.length,
-          totalTaken: myElectronicExamResults.length,
           averagePct: electronicExamAveragePct,
+          totalScore: electronicExamTotalScore,
+          maxPossible: electronicExamMaxPossible,
+          totalAssigned: classElectronicExams.length,
+          totalTaken: myElectronicExamResults.length,
           results: myElectronicExamResults
         },
         period1: {
@@ -502,12 +648,16 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
           result: finalResult
         },
         participation: {
-          score: participationScore,
+          score: customEval?.participationScore !== undefined ? Number(customEval.participationScore) : calculatedParticipation,
           maxScore: 20,
           points: activityData.totalPoints,
           stars: activityData.stars,
           notes: customEval?.notes || ''
         },
+        customCriteriaScores: customEval?.criteriaScores || {},
+        criteriaBreakdown,
+        actualRecordedTotalScore: Math.round(actualRecordedTotalScore * 10) / 10,
+        actualRecordedMaxScore: Math.round(actualRecordedMaxScore * 10) / 10,
         overall: {
           percentage: overallPct,
           label: gradeLabel,
@@ -517,7 +667,7 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
         }
       };
     });
-  }, [students, selectedClass, effectiveRole, userData, attendanceDocs, assignments, assignmentResults, exams, examResults, customEvaluations, studentActivityMap]);
+  }, [students, selectedClass, effectiveRole, userData, attendanceDocs, assignments, assignmentResults, exams, examResults, customEvaluations, studentActivityMap, customCriteria]);
 
   // 6. Filtered Student Records for Table Display
   const filteredRecords = useMemo(() => {
@@ -610,7 +760,7 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
     }
   };
 
-  // 10. Handle Saving Custom Participation / Evaluation
+  // 10. Handle Saving Custom Participation / Evaluation & Custom Criteria Scores
   const handleSaveEvaluation = async (e) => {
     e.preventDefault();
     if (!editingEvaluationStudent) return;
@@ -628,13 +778,14 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
         class: editingEvaluationStudent.class || selectedClass,
         schoolId: targetSchoolId,
         participationScore: Number(manualParticipationScore),
+        criteriaScores: editingCriteriaScores,
         notes: manualEvaluationNotes,
         updatedBy: userData?.name || 'المعلم',
         updatedByRole: effectiveRole,
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
-      alert('تم حفظ تقييم وملاحظات المشاركة بنجاح!');
+      alert('تم حفظ التقييم ومعايير الدرجات بنجاح!');
       setEditingEvaluationStudent(null);
     } catch (err) {
       console.error('Error saving evaluation:', err);
@@ -1052,8 +1203,28 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
                 <BookOpen size={20} /> كشف رصد ومتابعة درجات الفصل: <strong>{selectedClass || 'جميع الفصول'}</strong>
               </h2>
               <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-                البيانات مسحوبة تلقائياً مع إمكانية تعديل حالة الغياب والمشاركة الفردية
+                يتم احتساب المجموع والنسبة المئوية تراكمياً على أساس المعايير المفعلة والمرصودة فعلياً فقط
               </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowCriteriaModal(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  background: 'linear-gradient(135deg, #0e7490, #0284c7)',
+                  border: 'none',
+                  boxShadow: '0 2px 6px rgba(14, 116, 144, 0.25)'
+                }}
+              >
+                <Sliders size={16} /> إدارة وتفعيل معايير التقييم والدرجات ({customCriteria.filter(c => c.isActive).length} مفعل)
+              </button>
             </div>
           </div>
 
@@ -1068,18 +1239,23 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
                 <thead style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1', color: '#334155', fontWeight: 700 }}>
                   <tr>
                     <th style={{ padding: '12px 14px', width: '40px', textAlign: 'center' }}>#</th>
-                    <th style={{ padding: '12px 14px', minWidth: '180px' }}>اسم الطالب</th>
-                    <th style={{ padding: '12px 14px', minWidth: '130px', textAlign: 'center', background: '#f1f5f9' }}>الغياب والحضور</th>
-                    <th style={{ padding: '12px 14px', minWidth: '110px', textAlign: 'center' }}>الواجبات الإلكترونية</th>
-                    <th style={{ padding: '12px 14px', minWidth: '110px', textAlign: 'center' }}>الاختبارات الإلكترونية</th>
-                    <th style={{ padding: '12px 14px', minWidth: '95px', textAlign: 'center' }}>الفترة 1</th>
-                    <th style={{ padding: '12px 14px', minWidth: '95px', textAlign: 'center' }}>الفترة 2</th>
-                    <th style={{ padding: '12px 14px', minWidth: '100px', textAlign: 'center' }}>المشاركة</th>
-                    <th style={{ padding: '12px 14px', minWidth: '95px', textAlign: 'center' }}>منتصف الفصل</th>
-                    <th style={{ padding: '12px 14px', minWidth: '95px', textAlign: 'center' }}>النهائي</th>
-                    <th style={{ padding: '12px 14px', minWidth: '110px', textAlign: 'center', background: '#f0fdf4' }}>المجموع التراكمي</th>
-                    <th style={{ padding: '12px 14px', minWidth: '120px', textAlign: 'center' }}>التقدير العام</th>
-                    <th style={{ padding: '12px 14px', minWidth: '120px', textAlign: 'center' }}>الإجراءات</th>
+                    <th style={{ padding: '12px 14px', minWidth: '170px' }}>اسم الطالب</th>
+                    
+                    {/* Active Criteria Columns */}
+                    {customCriteria.filter(c => c.isActive).map(crit => (
+                      <th key={crit.id} style={{ padding: '12px 14px', minWidth: '105px', textAlign: 'center' }}>
+                        <div>{crit.name}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>({crit.maxScore} درجات)</div>
+                      </th>
+                    ))}
+
+                    <th style={{ padding: '12px 14px', minWidth: '120px', textAlign: 'center', background: '#f0fdf4' }}>
+                      <div>المجموع المرصود</div>
+                      <div style={{ fontSize: '11px', color: '#166534', fontWeight: 'normal' }}>المرصود فعلياً</div>
+                    </th>
+                    <th style={{ padding: '12px 14px', minWidth: '100px', textAlign: 'center', background: '#ecfdf5' }}>النسبة المئوية</th>
+                    <th style={{ padding: '12px 14px', minWidth: '110px', textAlign: 'center' }}>التقدير العام</th>
+                    <th style={{ padding: '12px 14px', minWidth: '130px', textAlign: 'center' }}>الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1114,143 +1290,77 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
                           </div>
                         </td>
 
-                        {/* 3. Attendance Status & Quick Edit */}
-                        <td style={{ padding: '10px 14px', textAlign: 'center', background: isEven ? '#f8fafc' : '#f1f5f9' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{
-                                padding: '2px 8px',
-                                borderRadius: '12px',
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                background: record.attendance.rate >= 90 ? '#dcfce7' : (record.attendance.rate >= 75 ? '#fef3c7' : '#fee2e2'),
-                                color: record.attendance.rate >= 90 ? '#15803d' : (record.attendance.rate >= 75 ? '#b45309' : '#b91c1c')
-                              }}>
-                                {record.attendance.rate}% حضور
-                              </span>
-                              {record.attendance.absentDays > 0 && (
-                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626' }}>
-                                  ({record.attendance.absentDays} غ)
+                        {/* Active Criteria Cells */}
+                        {customCriteria.filter(c => c.isActive).map(crit => {
+                          const critData = record.criteriaBreakdown[crit.id];
+
+                          if (crit.id === 'attendance') {
+                            return (
+                              <td key={crit.id} style={{ padding: '10px 14px', textAlign: 'center', background: isEven ? '#f8fafc' : '#f1f5f9' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ fontWeight: 700, color: '#0f766e' }}>
+                                      {critData ? `${critData.score} / ${crit.maxScore}` : `${record.attendance.rate}%`}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setEditingAttendanceStudent(record);
+                                      setAttendanceEditDate(new Date().toISOString().split('T')[0]);
+                                      setAttendanceEditStatus('present');
+                                      setAttendanceEditNote('');
+                                    }}
+                                    className="btn"
+                                    style={{
+                                      background: '#ffffff',
+                                      border: '1px solid #cbd5e1',
+                                      padding: '2px 8px',
+                                      fontSize: '11px',
+                                      borderRadius: '6px',
+                                      color: '#0e7490',
+                                      fontWeight: 700,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px',
+                                      cursor: 'pointer'
+                                    }}
+                                    title="تعديل حالة الحضور والغياب للطالب"
+                                  >
+                                    <Edit size={12} /> تعديل الغياب
+                                  </button>
+                                </div>
+                              </td>
+                            );
+                          }
+
+                          return (
+                            <td key={crit.id} style={{ padding: '12px 14px', textAlign: 'center' }}>
+                              {critData ? (
+                                <span style={{ fontWeight: 700, color: critData.pct >= 60 ? '#166534' : '#991b1b' }}>
+                                  {critData.score} <span style={{ fontSize: '11px', color: '#64748b' }}>/ {crit.maxScore}</span>
                                 </span>
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontSize: '12px' }}>غير مرصود</span>
                               )}
-                            </div>
-                            <button
-                              onClick={() => {
-                                setEditingAttendanceStudent(record);
-                                setAttendanceEditDate(new Date().toISOString().split('T')[0]);
-                                setAttendanceEditStatus('present');
-                                setAttendanceEditNote('');
-                              }}
-                              className="btn"
-                              style={{
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                padding: '2px 8px',
-                                fontSize: '11px',
-                                borderRadius: '6px',
-                                color: '#0e7490',
-                                fontWeight: 700,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                                cursor: 'pointer'
-                              }}
-                              title="تعديل حالة الحضور والغياب للطالب"
-                            >
-                              <Edit size={12} /> تعديل الغياب
-                            </button>
-                          </div>
+                            </td>
+                          );
+                        })}
+
+                        {/* Total Actually Recorded Score */}
+                        <td style={{ padding: '12px 14px', textAlign: 'center', background: isEven ? '#f0fdf4' : '#ecfdf5' }}>
+                          <span style={{ fontSize: '14px', fontWeight: 800, color: '#166534' }}>
+                            {record.actualRecordedTotalScore} <span style={{ fontSize: '12px', color: '#64748b' }}>/ {record.actualRecordedMaxScore}</span>
+                          </span>
                         </td>
 
-                        {/* 4. Electronic Assignments */}
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{record.assignments.averagePct}%</div>
-                          <div style={{ fontSize: '11px', color: '#64748b' }}>
-                            {record.assignments.totalSubmitted} من {record.assignments.totalAssigned || record.assignments.totalSubmitted}
-                          </div>
-                        </td>
-
-                        {/* 5. Electronic Exams */}
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{record.electronicExams.averagePct}%</div>
-                          <div style={{ fontSize: '11px', color: '#64748b' }}>
-                            {record.electronicExams.totalTaken} اختبار
-                          </div>
-                        </td>
-
-                        {/* 6. Period 1 */}
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          {record.period1.score !== null ? (
-                            <span style={{ fontWeight: 700, color: record.period1.pct >= 60 ? '#166534' : '#991b1b' }}>
-                              {record.period1.score} <span style={{ fontSize: '11px', color: '#64748b' }}>/ {record.period1.maxScore}</span>
-                            </span>
-                          ) : (
-                            <span style={{ color: '#94a3b8' }}>—</span>
-                          )}
-                        </td>
-
-                        {/* 7. Period 2 */}
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          {record.period2.score !== null ? (
-                            <span style={{ fontWeight: 700, color: record.period2.pct >= 60 ? '#166534' : '#991b1b' }}>
-                              {record.period2.score} <span style={{ fontSize: '11px', color: '#64748b' }}>/ {record.period2.maxScore}</span>
-                            </span>
-                          ) : (
-                            <span style={{ color: '#94a3b8' }}>—</span>
-                          )}
-                        </td>
-
-                        {/* 8. Participation & Classroom Activities */}
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                            <span style={{ fontWeight: 700, color: '#b45309' }}>
-                              {record.participation.score}
-                            </span>
-                            <span style={{ fontSize: '11px', color: '#64748b' }}>/ 20</span>
-                            <button
-                              onClick={() => {
-                                setEditingEvaluationStudent(record);
-                                setManualParticipationScore(record.participation.score);
-                                setManualEvaluationNotes(record.participation.notes || '');
-                              }}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
-                              title="تعديل درجات وملاحظات المشاركة"
-                            >
-                              <Edit size={12} />
-                            </button>
-                          </div>
-                        </td>
-
-                        {/* 9. Midterm Exam */}
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          {record.midterm.score !== null ? (
-                            <span style={{ fontWeight: 700, color: record.midterm.pct >= 60 ? '#166534' : '#991b1b' }}>
-                              {record.midterm.score} <span style={{ fontSize: '11px', color: '#64748b' }}>/ {record.midterm.maxScore}</span>
-                            </span>
-                          ) : (
-                            <span style={{ color: '#94a3b8' }}>—</span>
-                          )}
-                        </td>
-
-                        {/* 10. Final Exam */}
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          {record.finalExam.score !== null ? (
-                            <span style={{ fontWeight: 700, color: record.finalExam.pct >= 60 ? '#166534' : '#991b1b' }}>
-                              {record.finalExam.score} <span style={{ fontSize: '11px', color: '#64748b' }}>/ {record.finalExam.maxScore}</span>
-                            </span>
-                          ) : (
-                            <span style={{ color: '#94a3b8' }}>—</span>
-                          )}
-                        </td>
-
-                        {/* 11. Cumulative Percentage */}
+                        {/* Overall Percentage */}
                         <td style={{ padding: '12px 14px', textAlign: 'center', background: isEven ? '#f0fdf4' : '#ecfdf5' }}>
                           <span style={{ fontSize: '15px', fontWeight: 800, color: record.overall.color }}>
                             {record.overall.percentage}%
                           </span>
                         </td>
 
-                        {/* 12. Overall Grade */}
+                        {/* Overall Grade */}
                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                           <span style={{
                             padding: '3px 10px',
@@ -1266,25 +1376,48 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
                           </span>
                         </td>
 
-                        {/* 13. Actions */}
+                        {/* Actions */}
                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          <button
-                            onClick={() => {
-                              setSelectedStudentForDossier(record);
-                              setActiveView('student_dossier');
-                            }}
-                            className="btn btn-outline"
-                            style={{
-                              padding: '4px 10px',
-                              fontSize: '12px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              borderRadius: '8px'
-                            }}
-                          >
-                            <Eye size={13} /> الملف الشامل
-                          </button>
+                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                            <button
+                              onClick={() => {
+                                setEditingEvaluationStudent(record);
+                                setManualParticipationScore(record.participation.score);
+                                setManualEvaluationNotes(record.participation.notes || '');
+                                setEditingCriteriaScores(record.customCriteriaScores || {});
+                              }}
+                              className="btn btn-outline"
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                borderRadius: '8px',
+                                color: '#0e7490'
+                              }}
+                              title="رصد وتقييم الطالب في المعايير المخصصة والمشاركة"
+                            >
+                              <Edit size={12} /> رصد وتقييم
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedStudentForDossier(record);
+                                setActiveView('student_dossier');
+                              }}
+                              className="btn btn-outline"
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                borderRadius: '8px'
+                              }}
+                            >
+                              <Eye size={12} /> الملف
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1653,6 +1786,31 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
                   )}
                 </div>
 
+                {/* Card: المعايير المخصصة المرصودة */}
+                {customCriteria.filter(c => !c.isBuiltIn && c.isActive).length > 0 && (
+                  <div className="glass-panel" style={{ padding: '20px', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                      <h3 style={{ margin: 0, fontSize: '15px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Sliders size={18} color="#0e7490" /> درجات المعايير المخصصة
+                      </h3>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                      {customCriteria.filter(c => !c.isBuiltIn && c.isActive).map(crit => {
+                        const critData = selectedStudentForDossier.criteriaBreakdown[crit.id];
+                        return (
+                          <div key={crit.id} style={{ background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{crit.name}</div>
+                            <div style={{ fontSize: '16px', fontWeight: 800, color: critData ? '#0e7490' : '#94a3b8' }}>
+                              {critData ? `${critData.score} / ${crit.maxScore}` : 'غير مرصود'}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Card 6: التوصيات الأكاديمية والتوجيهات */}
                 <div className="glass-panel" style={{ padding: '20px', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
                   <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
@@ -1941,11 +2099,11 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 2: MANUAL PARTICIPATION & EVALUATION EDITOR */}
+      {/* MODAL 2: MANUAL PARTICIPATION & CUSTOM CRITERIA EVALUATION EDITOR */}
       {/* ========================================================================= */}
       {editingEvaluationStudent && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div className="glass-panel" style={{ background: '#ffffff', width: '450px', maxWidth: '100%', borderRadius: '16px', padding: '24px', position: 'relative', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}>
+          <div className="glass-panel" style={{ background: '#ffffff', width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', borderRadius: '16px', padding: '24px', position: 'relative', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}>
             <button 
               onClick={() => setEditingEvaluationStudent(null)} 
               style={{ position: 'absolute', top: '16px', left: isRTL ? '16px' : 'auto', right: isRTL ? 'auto' : '16px', background: 'none', border: 'none', cursor: 'pointer' }}
@@ -1954,13 +2112,15 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
             </button>
 
             <h3 style={{ margin: '0 0 6px 0', color: 'var(--color-primary-dark, #0e7490)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '17px' }}>
-              <Star size={18} color="#eab308" /> رصد درجة وملاحظات المشاركة الصفية
+              <Star size={18} color="#eab308" /> رصد تقييم ودرجات الطالب
             </h3>
             <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748b' }}>
-              الطالب: <strong>{editingEvaluationStudent.name}</strong>
+              الطالب: <strong>{editingEvaluationStudent.name}</strong> ({editingEvaluationStudent.class || selectedClass})
             </p>
 
             <form onSubmit={handleSaveEvaluation} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              
+              {/* Participation Score */}
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: '#334155' }}>
                   درجة المشاركة والتفاعل الصفي (من 20):
@@ -1969,22 +2129,58 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
                   type="number"
                   min="0"
                   max="20"
+                  step="0.5"
                   className="input-field"
                   value={manualParticipationScore}
                   onChange={(e) => setManualParticipationScore(e.target.value)}
                   required
-                  style={{ width: '100%', marginBottom: 0, fontWeight: 700, fontSize: '16px' }}
+                  style={{ width: '100%', marginBottom: 0, fontWeight: 700, fontSize: '15px' }}
                 />
               </div>
 
+              {/* Active Custom Criteria Grading Inputs */}
+              {customCriteria.filter(c => !c.isBuiltIn && c.isActive).length > 0 && (
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                  <label style={{ display: 'block', marginBottom: '10px', fontSize: '13px', fontWeight: 800, color: '#0e7490' }}>
+                    درجات المعايير المخصصة المفعلة:
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {customCriteria.filter(c => !c.isBuiltIn && c.isActive).map(crit => (
+                      <div key={crit.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                          {crit.name} (من {crit.maxScore}):
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          max={crit.maxScore}
+                          step="0.5"
+                          placeholder="الدرجة"
+                          className="input-field"
+                          value={editingCriteriaScores[crit.id] !== undefined ? editingCriteriaScores[crit.id] : ''}
+                          onChange={(e) => {
+                            setEditingCriteriaScores(prev => ({
+                              ...prev,
+                              [crit.id]: e.target.value
+                            }));
+                          }}
+                          style={{ width: '100px', marginBottom: 0, fontWeight: 700, textAlign: 'center' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Teacher Notes */}
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: '#334155' }}>
-                  ملاحظات وتوجيهات المعلم السلوكية:
+                  ملاحظات وتوجيهات المعلم (اختياري):
                 </label>
                 <textarea
                   className="input-field"
                   rows="3"
-                  placeholder="اكتب توجيهاتك للطالب أو ولي الأمر حول المشاركة الصفية والواجبات..."
+                  placeholder="اكتب توجيهاتك للطالب أو ولي الأمر..."
                   value={manualEvaluationNotes}
                   onChange={(e) => setManualEvaluationNotes(e.target.value)}
                   style={{ width: '100%', marginBottom: 0, resize: 'none' }}
@@ -1998,7 +2194,7 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
                   disabled={isSavingEvaluation}
                   style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                 >
-                  <Save size={16} /> {isSavingEvaluation ? 'جاري الحفظ...' : 'حفظ التقييم والملاحظات'}
+                  <Save size={16} /> {isSavingEvaluation ? 'جاري الحفظ...' : 'حفظ التقييم والدرجات'}
                 </button>
                 <button
                   type="button"
@@ -2009,6 +2205,153 @@ export default function ComprehensiveStudentRecord({ role = 'teacher', targetStu
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: EVALUATION CRITERIA & SCORE WEIGHTS MANAGER */}
+      {/* ========================================================================= */}
+      {showCriteriaModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div className="glass-panel" style={{ background: '#ffffff', width: '620px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', borderRadius: '16px', padding: '24px', position: 'relative', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}>
+            <button 
+              onClick={() => setShowCriteriaModal(false)} 
+              style={{ position: 'absolute', top: '16px', left: isRTL ? '16px' : 'auto', right: isRTL ? 'auto' : '16px', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <X size={20} color="#64748b" />
+            </button>
+
+            <h3 style={{ margin: '0 0 6px 0', color: 'var(--color-primary-dark, #0e7490)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px' }}>
+              <Sliders size={20} color="#0e7490" /> إدارة وتفعيل معايير التقييم والمتابعة
+            </h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748b' }}>
+              يمكنك كتابة معايير خاصة بك، وتحديد درجتها، وتفعيلها أو تعطيلها. <strong>يتم احتساب المجموع والنسبة المئوية على أساس المرصود فعلياً من المعايير المفعلة فقط دون التأثير سلباً على الطالب.</strong>
+            </p>
+
+            {/* Notification Callout */}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', fontSize: '12px', color: '#166534', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle size={18} color="#16a34a" />
+              <span>المجموع الكلي للمعيار يُحتسب فقط عند رصده وتفعيله، وتستثنى المعايير المعطلة أو غير المرصودة من المقام تلقائياً.</span>
+            </div>
+
+            {/* Add New Custom Criterion Form */}
+            <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <PlusCircle size={16} color="#0e7490" /> إضافة معيار مخصص جديد
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px auto', gap: '10px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="اسم المعيار (مثال: المهام الأدائية، كشكول المادة...)"
+                  value={newCriterionName}
+                  onChange={(e) => setNewCriterionName(e.target.value)}
+                  style={{ marginBottom: 0, fontSize: '13px' }}
+                />
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  className="input-field"
+                  placeholder="الدرجة العظمى"
+                  value={newCriterionMaxScore}
+                  onChange={(e) => setNewCriterionMaxScore(e.target.value)}
+                  style={{ marginBottom: 0, fontSize: '13px', textAlign: 'center' }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCustomCriterion}
+                  className="btn btn-primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '9px 14px', fontSize: '13px' }}
+                >
+                  <Plus size={15} /> إضافة
+                </button>
+              </div>
+            </div>
+
+            {/* Criteria List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, color: '#64748b', padding: '0 8px' }}>
+                <span>المعيار وحالته</span>
+                <span>الدرجة العظمى / الإجراء</span>
+              </div>
+
+              {customCriteria.map((crit) => (
+                <div 
+                  key={crit.id} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    padding: '10px 14px', 
+                    borderRadius: '10px', 
+                    border: crit.isActive ? '1px solid #cbd5e1' : '1px dashed #cbd5e1', 
+                    background: crit.isActive ? '#ffffff' : '#f8fafc',
+                    opacity: crit.isActive ? 1 : 0.65,
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCriterion(crit.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      title={crit.isActive ? 'تعطيل المعيار' : 'تفعيل المعيار'}
+                    >
+                      {crit.isActive ? (
+                        <ToggleRight size={26} color="#059669" />
+                      ) : (
+                        <ToggleLeft size={26} color="#94a3b8" />
+                      )}
+                    </button>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: crit.isActive ? '#0f172a' : '#64748b' }}>
+                        {crit.name} {!crit.isBuiltIn && <span style={{ fontSize: '11px', color: '#0e7490', fontWeight: 600 }}>(معيار مخصص)</span>}
+                      </div>
+                      <div style={{ fontSize: '11px', color: crit.isActive ? '#059669' : '#dc2626' }}>
+                        {crit.isActive ? '✓ مفعل في الحساب التراكمي' : '✕ معطل (مستثنى من الحساب)'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ 
+                      padding: '4px 10px', 
+                      borderRadius: '8px', 
+                      background: crit.isActive ? '#f0fdf4' : '#f1f5f9', 
+                      color: crit.isActive ? '#166534' : '#64748b', 
+                      fontWeight: 700, 
+                      fontSize: '13px' 
+                    }}>
+                      {crit.maxScore} درجات
+                    </span>
+
+                    {!crit.isBuiltIn && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCustomCriterion(crit.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: '4px' }}
+                        title="حذف هذا المعيار المخصص"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: '20px', textAlign: 'left' }}>
+              <button
+                type="button"
+                onClick={() => setShowCriteriaModal(false)}
+                className="btn btn-primary"
+                style={{ padding: '8px 24px' }}
+              >
+                إغلاق
+              </button>
+            </div>
           </div>
         </div>
       )}

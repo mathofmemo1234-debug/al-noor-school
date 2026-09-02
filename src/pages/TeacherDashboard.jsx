@@ -639,6 +639,7 @@ function Assignments() {
   const [currentAssignment, setCurrentAssignment] = useState(null);
 
   // Form State
+  const [assignmentType, setAssignmentType] = useState('electronic'); // 'electronic' | 'manual'
   const [title, setTitle] = useState('');
   const [targetClass, setTargetClass] = useState('');
   const [subject, setSubject] = useState('');
@@ -646,6 +647,13 @@ function Assignments() {
   const [allowedAttempts, setAllowedAttempts] = useState('2'); // '1' | '2' | '3' | 'unlimited'
   const [numQuestions, setNumQuestions] = useState(1);
   const [questions, setQuestions] = useState([]);
+  
+  // Manual Assignment Specific State
+  const [bookPage, setBookPage] = useState('');
+  const [exerciseNumbers, setExerciseNumbers] = useState('');
+  const [instructions, setInstructions] = useState('');
+  const [maxScore, setMaxScore] = useState('5');
+  const [submissionMethod, setSubmissionMethod] = useState('notebook'); // 'notebook' | 'upload' | 'both'
   const [isSaving, setIsSaving] = useState(false);
   const [showQuestionBankModal, setShowQuestionBankModal] = useState(false);
 
@@ -654,6 +662,11 @@ function Assignments() {
   const [studentsCache, setStudentsCache] = useState({});
   const [studentActivityMap, setStudentActivityMap] = useState({});
   const [viewingSubmission, setViewingSubmission] = useState(null);
+  
+  // Manual Grading Roster State
+  const [manualClassStudents, setManualClassStudents] = useState([]);
+  const [manualGrades, setManualGrades] = useState({}); // { [studentId]: { score, isSubmitted, note } }
+  const [isSavingManualGrades, setIsSavingManualGrades] = useState(false);
 
   // Fetch teacher ID & subjects
   useEffect(() => {
@@ -788,6 +801,7 @@ function Assignments() {
 
   const resetForm = () => {
     setCurrentAssignment(null);
+    setAssignmentType('electronic');
     setTitle('');
     setTargetClass(classesList[0] || '');
     setSubject(subjectsList[0] || '');
@@ -795,18 +809,33 @@ function Assignments() {
     setAllowedAttempts('2');
     setNumQuestions(1);
     setQuestions([]);
+    setBookPage('');
+    setExerciseNumbers('');
+    setInstructions('');
+    setMaxScore('5');
+    setSubmissionMethod('notebook');
     setActiveView('list');
     setAssignmentResults([]);
     setViewingSubmission(null);
+    setManualClassStudents([]);
+    setManualGrades({});
   };
 
   const handleEdit = (assignment) => {
     setCurrentAssignment(assignment);
+    const isMan = assignment.type === 'manual' || assignment.isInteractive === false;
+    setAssignmentType(isMan ? 'manual' : 'electronic');
     setTitle(assignment.title || '');
     setTargetClass(assignment.targetClass || assignment.className || '');
     setSubject(assignment.subject || '');
     setDueDate(assignment.dueDate || '');
     setAllowedAttempts(String(assignment.allowedAttempts || '2'));
+    setBookPage(assignment.bookPage || '');
+    setExerciseNumbers(assignment.exerciseNumbers || '');
+    setInstructions(assignment.instructions || '');
+    setMaxScore(String(assignment.maxScore || assignment.totalQuestions || '5'));
+    setSubmissionMethod(assignment.submissionMethod || 'notebook');
+
     const qs = assignment.questions || [];
     setNumQuestions(qs.length || 1);
     setQuestions(qs);
@@ -816,16 +845,92 @@ function Assignments() {
   const handleViewResults = async (assignment) => {
     setCurrentAssignment(assignment);
     setActiveView('results');
+
+    const schoolId = userData?.schoolId || 'default_school_1';
     const q = query(collection(db, 'assignment_results'), where('assignmentId', '==', assignment.id));
     const snap = await getDocs(q);
     const results = [];
-    snap.forEach(d => results.push({ id: d.id, ...d.data() }));
+    const gradesMap = {};
+    snap.forEach(d => {
+      const data = d.data();
+      results.push({ id: d.id, ...data });
+      if (data.studentId) {
+        gradesMap[data.studentId] = {
+          score: data.score !== undefined ? data.score : '',
+          isSubmitted: data.isSubmitted !== undefined ? data.isSubmitted : true,
+          note: data.note || ''
+        };
+      }
+    });
     results.sort((a, b) => new Date(b.timestamp?.toDate ? b.timestamp.toDate() : b.timestamp) - new Date(a.timestamp?.toDate ? a.timestamp.toDate() : a.timestamp));
     setAssignmentResults(results);
+
+    // If manual assignment, fetch all students of target class to facilitate grading roster
+    if (assignment.type === 'manual' || assignment.isInteractive === false) {
+      const qStudents = schoolId === 'ALL'
+        ? collection(db, 'students')
+        : query(collection(db, 'students'), where('schoolId', '==', schoolId));
+      
+      const studentsSnap = await getDocs(qStudents);
+      const sList = [];
+      const target = (assignment.targetClass || assignment.className || '').trim();
+      studentsSnap.forEach(d => {
+        const data = d.data();
+        const sClass = (data.class || data.className || '').trim();
+        if (!target || sClass === target || sClass.includes(target) || target.includes(sClass)) {
+          sList.push({ id: d.id, ...data });
+        }
+      });
+      sList.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+      setManualClassStudents(sList);
+      setManualGrades(gradesMap);
+    }
+  };
+
+  const handleSaveManualGrades = async () => {
+    if (!currentAssignment) return;
+    setIsSavingManualGrades(true);
+    try {
+      const max = parseFloat(currentAssignment.maxScore || maxScore) || 5;
+      const schoolId = userData?.schoolId || 'default_school_1';
+
+      for (const student of manualClassStudents) {
+        const gradeInfo = manualGrades[student.id];
+        if (gradeInfo && (gradeInfo.score !== '' || gradeInfo.note || gradeInfo.isSubmitted !== undefined)) {
+          const docKey = `${currentAssignment.id}_${student.id}`;
+          const numScore = gradeInfo.score !== '' ? Math.min(max, Math.max(0, parseFloat(gradeInfo.score) || 0)) : 0;
+          
+          await setDoc(doc(db, 'assignment_results', docKey), {
+            assignmentId: currentAssignment.id,
+            assignmentTitle: currentAssignment.title,
+            studentId: student.id,
+            studentName: student.name || 'طالب',
+            nationalId: student.nationalId || '',
+            className: currentAssignment.targetClass || currentAssignment.className,
+            subject: currentAssignment.subject || 'عام',
+            isManual: true,
+            isSubmitted: gradeInfo.isSubmitted !== false,
+            score: numScore,
+            totalQuestions: max,
+            maxScore: max,
+            note: gradeInfo.note || '',
+            schoolId,
+            timestamp: new Date().toISOString()
+          }, { merge: true });
+        }
+      }
+      alert('تم حفظ ورصد درجات الواجب اليدوي لجميع الطلاب بنجاح!');
+      handleViewResults(currentAssignment);
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء حفظ درجات الواجب اليدوي: ' + err.message);
+    } finally {
+      setIsSavingManualGrades(false);
+    }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا الواجب الإلكتروني؟')) {
+    if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا الواجب؟')) {
       await deleteDoc(doc(db, 'assignments', id));
     }
   };
@@ -835,15 +940,17 @@ function Assignments() {
     const tid = teacherDocId || auth.currentUser?.uid;
     if (!tid) return;
 
-    for (let i = 0; i < questions.length; i++) {
-      if (!questions[i].text) {
-        alert(`يرجى كتابة نص السؤال رقم ${i + 1}`);
-        return;
-      }
-      for (let j = 0; j < 4; j++) {
-        if (!questions[i].options[j]) {
-          alert(`يرجى تعبئة الخيار رقم ${j + 1} للسؤال رقم ${i + 1}`);
+    if (assignmentType === 'electronic') {
+      for (let i = 0; i < questions.length; i++) {
+        if (!questions[i].text) {
+          alert(`يرجى كتابة نص السؤال رقم ${i + 1}`);
           return;
+        }
+        for (let j = 0; j < 4; j++) {
+          if (!questions[i].options[j]) {
+            alert(`يرجى تعبئة الخيار رقم ${j + 1} للسؤال رقم ${i + 1}`);
+            return;
+          }
         }
       }
     }
@@ -854,17 +961,30 @@ function Assignments() {
       teacherName: userData?.name || 'معلم',
       teacherEmail: auth.currentUser?.email || '',
       title,
+      type: assignmentType,
       targetClass,
       className: targetClass,
       subject,
       dueDate,
-      allowedAttempts: allowedAttempts === 'unlimited' ? 'unlimited' : parseInt(allowedAttempts),
-      isInteractive: true,
-      questions,
       schoolId: userData?.schoolId || 'default_school_1',
       schoolName: userData?.schoolName || '',
       updatedAt: new Date().toISOString()
     };
+
+    if (assignmentType === 'electronic') {
+      payload.isInteractive = true;
+      payload.allowedAttempts = allowedAttempts === 'unlimited' ? 'unlimited' : parseInt(allowedAttempts);
+      payload.questions = questions;
+      payload.totalQuestions = questions.length;
+    } else {
+      payload.isInteractive = false;
+      payload.bookPage = bookPage;
+      payload.exerciseNumbers = exerciseNumbers;
+      payload.instructions = instructions;
+      payload.maxScore = parseFloat(maxScore) || 5;
+      payload.totalQuestions = parseFloat(maxScore) || 5;
+      payload.submissionMethod = submissionMethod;
+    }
 
     try {
       if (activeView === 'edit' && currentAssignment) {
@@ -873,7 +993,7 @@ function Assignments() {
         payload.createdAt = new Date().toISOString();
         await addDoc(collection(db, 'assignments'), payload);
       }
-      alert('تم حفظ الواجب الإلكتروني بنجاح!');
+      alert(assignmentType === 'manual' ? 'تم حفظ الواجب اليدوي بنجاح!' : 'تم حفظ الواجب الإلكتروني بنجاح!');
       resetForm();
     } catch (err) {
       console.error(err);
@@ -909,99 +1029,254 @@ function Assignments() {
 
   // Render Submissions & Results View
   if (activeView === 'results') {
+    const isManual = currentAssignment?.type === 'manual' || currentAssignment?.isInteractive === false;
+    const maxScoreVal = currentAssignment?.maxScore || currentAssignment?.totalQuestions || 5;
+
     return (
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <h2 style={{ margin: '0 0 4px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <BarChart2 /> تسليمات ودرجات واجب: {currentAssignment?.title}
+              <BarChart2 /> {isManual ? 'رصد ومتابعة درجات الواجب اليدوي:' : 'تسليمات ودرجات واجب:'} {currentAssignment?.title}
             </h2>
             <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-              الفصل: <strong>{currentAssignment?.targetClass || currentAssignment?.className}</strong> | المادة: <strong>{currentAssignment?.subject}</strong> | آخر موعد: <strong>{currentAssignment?.dueDate}</strong>
+              الفصل: <strong>{currentAssignment?.targetClass || currentAssignment?.className}</strong> | المادة: <strong>{currentAssignment?.subject}</strong> | آخر موعد: <strong>{currentAssignment?.dueDate}</strong> {isManual && `| النهاية العظمى: ${maxScoreVal} درجات`}
             </p>
           </div>
-          <button className="btn btn-outline" onClick={resetForm}>العودة للواجبات</button>
+          
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {isManual && (
+              <button 
+                className="btn btn-primary" 
+                onClick={handleSaveManualGrades}
+                disabled={isSavingManualGrades}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Save size={16} /> {isSavingManualGrades ? 'جاري الحفظ...' : 'حفظ ورصد درجات جميع الطلاب'}
+              </button>
+            )}
+            <button className="btn btn-outline" onClick={resetForm}>العودة للواجبات</button>
+          </div>
         </div>
 
-        {assignmentResults.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
-            لم يقم أي طالب بتسليم هذا الواجب حتى الآن
+        {/* If Manual Homework: Render Student Roster with live grading inputs */}
+        {isManual ? (
+          <div>
+            {/* Information card about manual assignment */}
+            <div style={{ background: '#f0f9ff', padding: '14px 18px', borderRadius: '10px', border: '1px solid #bae6fd', marginBottom: '20px', display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '14px' }}>
+              {currentAssignment.bookPage && <div>📖 رقم الصفحة: <strong>{currentAssignment.bookPage}</strong></div>}
+              {currentAssignment.exerciseNumbers && <div>✏️ التمارين المطلوبة: <strong>{currentAssignment.exerciseNumbers}</strong></div>}
+              <div>🎯 الدرجة العظمى: <strong>{maxScoreVal} درجات</strong></div>
+              <div>📥 طريقة التسليم: <strong>{currentAssignment.submissionMethod === 'notebook' ? 'كراسة الواجب في الصف' : currentAssignment.submissionMethod === 'upload' ? 'تصوير وإرفاق الحل بالمنصة' : 'كراسة الواجب / إرفاق بالمنصة'}</strong></div>
+              {currentAssignment.instructions && (
+                <div style={{ width: '100%', marginTop: '4px', color: '#0369a1' }}>
+                  <strong>تعليمات الحل:</strong> {currentAssignment.instructions}
+                </div>
+              )}
+            </div>
+
+            {manualClassStudents.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
+                لا يوجد طلاب مسجلين في هذا الفصل
+              </div>
+            ) : (
+              <div style={{ background: 'white', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+                  <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                    <tr>
+                      <th style={{ padding: '12px 14px', fontSize: '13px', width: '40px', textAlign: 'center' }}>م</th>
+                      <th style={{ padding: '12px 14px', fontSize: '13px' }}>اسم الطالب / الهوية</th>
+                      <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center' }}>حالة التسليم</th>
+                      <th style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'center', width: '140px' }}>الدرجة المرصودة (من {maxScoreVal})</th>
+                      <th style={{ padding: '12px 14px', fontSize: '13px' }}>ملاحظات المعلم والتغذية الراجعة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {manualClassStudents.map((student, idx) => {
+                      const gradeData = manualGrades[student.id] || { score: '', isSubmitted: false, note: '' };
+                      const isSub = gradeData.isSubmitted;
+
+                      return (
+                        <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : '#fafafa' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: '13px', color: '#64748b' }}>{idx + 1}</td>
+                          <td style={{ padding: '12px 14px' }}>
+                            <div style={{ fontWeight: 'bold', color: '#0f172a' }}>{student.name}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>هوية: {student.nationalId || '—'}</div>
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', color: isSub ? '#166534' : '#64748b' }}>
+                              <input
+                                type="checkbox"
+                                checked={isSub}
+                                onChange={e => {
+                                  const checked = e.target.checked;
+                                  setManualGrades(prev => ({
+                                    ...prev,
+                                    [student.id]: {
+                                      ...prev[student.id],
+                                      isSubmitted: checked,
+                                      score: checked && (prev[student.id]?.score === '' || prev[student.id]?.score === undefined) ? maxScoreVal : prev[student.id]?.score
+                                    }
+                                  }));
+                                }}
+                              />
+                              {isSub ? '✅ تم التسليم' : 'لم يسلم'}
+                            </label>
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                              <input
+                                type="number"
+                                min="0"
+                                max={maxScoreVal}
+                                step="0.5"
+                                value={gradeData.score !== undefined ? gradeData.score : ''}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setManualGrades(prev => ({
+                                    ...prev,
+                                    [student.id]: {
+                                      ...prev[student.id],
+                                      score: val,
+                                      isSubmitted: val !== '' ? true : prev[student.id]?.isSubmitted
+                                    }
+                                  }));
+                                }}
+                                placeholder="—"
+                                style={{
+                                  width: '70px',
+                                  textAlign: 'center',
+                                  padding: '6px',
+                                  borderRadius: '6px',
+                                  border: '1.5px solid #cbd5e1',
+                                  fontWeight: 'bold',
+                                  fontSize: '14px'
+                                }}
+                              />
+                              <span style={{ fontSize: '12px', color: '#64748b' }}>/ {maxScoreVal}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 14px' }}>
+                            <input
+                              type="text"
+                              value={gradeData.note || ''}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setManualGrades(prev => ({
+                                  ...prev,
+                                  [student.id]: {
+                                    ...prev[student.id],
+                                    note: val
+                                  }
+                                }));
+                              }}
+                              placeholder="مثال: ممتاز ومرتب، ينقص تمرين رقم 3..."
+                              style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '13px' }}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleSaveManualGrades}
+                disabled={isSavingManualGrades}
+                style={{ padding: '10px 32px', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Save size={18} /> {isSavingManualGrades ? 'جاري الحفظ...' : 'حفظ ورصد درجات جميع الطلاب'}
+              </button>
+            </div>
           </div>
         ) : (
-          <div style={{ background: 'white', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-              <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                <tr>
-                  <th style={{ padding: '12px 16px', fontSize: '13px' }}>اسم الطالب</th>
-                  <th style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>الدرجة</th>
-                  <th style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>النسبة</th>
-                  <th style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>رقم المحاولة</th>
-                  <th style={{ padding: '12px 16px', fontSize: '13px' }}>وقت التسليم</th>
-                  <th style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>حالة التسليم</th>
-                  <th style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>الإجابات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {assignmentResults.map((res, idx) => {
-                  const pct = Math.round((res.score / res.totalQuestions) * 100);
-                  const isPass = pct >= 50;
-                  const dateStr = res.timestamp?.toDate ? res.timestamp.toDate().toLocaleString('ar-SA') : (res.timestamp ? new Date(res.timestamp).toLocaleString('ar-SA') : '—');
-                  
-                  return (
-                    <tr key={res.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : '#fafafa' }}>
-                      <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#0f172a' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                          <span>{studentsCache[res.studentId] || res.studentName || 'طالب'}</span>
-                          <GamificationBadge
-                            points={studentActivityMap[res.studentId]?.totalPoints || 0}
-                            stars={studentActivityMap[res.studentId]?.stars || 1}
-                            size="xs"
-                            breakdown={studentActivityMap[res.studentId]?.breakdown}
-                          />
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>
-                        {res.score} / {res.totalQuestions}
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: isPass ? '#166534' : '#991b1b' }}>
-                        {pct}%
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        المحاولة {res.attemptNumber || 1}
-                      </td>
-                      <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '13px' }}>
-                        {dateStr}
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <span style={{
-                          padding: '3px 8px',
-                          borderRadius: '10px',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          background: res.isLate ? '#fee2e2' : '#dcfce7',
-                          color: res.isLate ? '#991b1b' : '#166534'
-                        }}>
-                          {res.isLate ? 'تسليم متأخر' : 'في الموعد'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <button 
-                          className="btn btn-outline" 
-                          style={{ padding: '4px 10px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          onClick={() => setViewingSubmission(res)}
-                        >
-                          <Eye size={14} /> مراجعة الحل
-                        </button>
-                      </td>
+          /* Electronic Homework Results */
+          <div>
+            {assignmentResults.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
+                لم يقم أي طالب بتسليم هذا الواجب حتى الآن
+              </div>
+            ) : (
+              <div style={{ background: 'white', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+                  <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                    <tr>
+                      <th style={{ padding: '12px 16px', fontSize: '13px' }}>اسم الطالب</th>
+                      <th style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>الدرجة</th>
+                      <th style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>النسبة</th>
+                      <th style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>رقم المحاولة</th>
+                      <th style={{ padding: '12px 16px', fontSize: '13px' }}>وقت التسليم</th>
+                      <th style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>حالة التسليم</th>
+                      <th style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>الإجابات</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {assignmentResults.map((res, idx) => {
+                      const pct = Math.round((res.score / res.totalQuestions) * 100);
+                      const isPass = pct >= 50;
+                      const dateStr = res.timestamp?.toDate ? res.timestamp.toDate().toLocaleString('ar-SA') : (res.timestamp ? new Date(res.timestamp).toLocaleString('ar-SA') : '—');
+                      
+                      return (
+                        <tr key={res.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : '#fafafa' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#0f172a' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                              <span>{studentsCache[res.studentId] || res.studentName || 'طالب'}</span>
+                              <GamificationBadge
+                                points={studentActivityMap[res.studentId]?.totalPoints || 0}
+                                stars={studentActivityMap[res.studentId]?.stars || 1}
+                                size="xs"
+                                breakdown={studentActivityMap[res.studentId]?.breakdown}
+                              />
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>
+                            {res.score} / {res.totalQuestions}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: isPass ? '#166534' : '#991b1b' }}>
+                            {pct}%
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            المحاولة {res.attemptNumber || 1}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '13px' }}>
+                            {dateStr}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            <span style={{
+                              padding: '3px 8px',
+                              borderRadius: '10px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              background: res.isLate ? '#fee2e2' : '#dcfce7',
+                              color: res.isLate ? '#991b1b' : '#166534'
+                            }}>
+                              {res.isLate ? 'تسليم متأخر' : 'في الموعد'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            <button 
+                              className="btn btn-outline" 
+                              style={{ padding: '4px 10px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => setViewingSubmission(res)}
+                            >
+                              <Eye size={14} /> مراجعة الحل
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Modal to view student answers */}
+        {/* Modal to view student answers (Electronic) */}
         {viewingSubmission && currentAssignment && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: 'white', padding: '24px', borderRadius: '12px', width: '90%', maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto' }}>
@@ -1065,70 +1340,124 @@ function Assignments() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h2 style={{ margin: '0 0 4px 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <BookOpen /> إدارة الواجبات الإلكترونية التفاعلية
+              <BookOpen /> إدارة الواجبات (الإلكترونية واليدوية)
             </h2>
             <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-              إنشاء واجبات إلكترونية تفاعلية بدون توقيت، مع صلاحية تحديد عدد مرات الحل وإظهار الإجابات الصحيحة والتغذية الراجعة
+              إنشاء ومتابعة الواجبات الإلكترونية التفاعلية والواجبات اليدوية / كراسة الواجب ورصد درجات الطلاب بكل سهولة
             </p>
           </div>
-          <button 
-            className="btn btn-primary" 
-            onClick={() => {
-              setTargetClass(classesList[0] || '');
-              setSubject(subjectsList[0] || '');
-              setActiveView('create');
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <Plus size={18} /> إنشاء واجب إلكتروني جديد
-          </button>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button 
+              className="btn btn-primary" 
+              onClick={() => {
+                setTargetClass(classesList[0] || '');
+                setSubject(subjectsList[0] || '');
+                setAssignmentType('electronic');
+                setActiveView('create');
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Plus size={18} /> واجب إلكتروني تفاعلي
+            </button>
+            <button 
+              className="btn" 
+              onClick={() => {
+                setTargetClass(classesList[0] || '');
+                setSubject(subjectsList[0] || '');
+                setAssignmentType('manual');
+                setActiveView('create');
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #0e7490, #0284c7)',
+                color: 'white',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 18px',
+                fontWeight: 'bold',
+                boxShadow: '0 2px 6px rgba(14, 116, 144, 0.25)'
+              }}
+            >
+              <FileSpreadsheet size={18} /> 📝 واجب يدوي / كراسة الواجب
+            </button>
+          </div>
         </div>
 
         {assignments.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
-            لا توجد واجبات إلكترونية مسجلة حالياً
+            لا توجد واجبات مسجلة حالياً
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-            {assignments.map(a => (
-              <div key={a.id} style={{ background: 'rgba(255,255,255,0.85)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{a.title}</h3>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '14px', color: '#475569' }}>
-                  <div><Users size={15} style={{ display: 'inline', marginInlineEnd: '6px' }}/> الفصل: <strong>{a.targetClass || a.className}</strong></div>
-                  <div><BookOpen size={15} style={{ display: 'inline', marginInlineEnd: '6px' }}/> المادة: <strong>{a.subject || 'عام'}</strong></div>
-                  <div><Calendar size={15} style={{ display: 'inline', marginInlineEnd: '6px' }}/> آخر موعد للتسليم: <strong>{a.dueDate}</strong></div>
-                  <div><RotateCcw size={15} style={{ display: 'inline', marginInlineEnd: '6px' }}/> عدد المحاولات المسموحة: <strong>{a.allowedAttempts === 'unlimited' ? 'غير محدود' : `${a.allowedAttempts || 1} محاولات`}</strong></div>
-                  <div><FileText size={15} style={{ display: 'inline', marginInlineEnd: '6px' }}/> عدد الأسئلة: <strong>{a.questions?.length || 0} أسئلة</strong></div>
-                </div>
+            {assignments.map(a => {
+              const isMan = a.type === 'manual' || a.isInteractive === false;
 
-                <div style={{ display: 'flex', gap: '8px', marginTop: 'auto', paddingTop: '10px' }}>
-                  <button 
-                    className="btn btn-primary" 
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                    onClick={() => handleViewResults(a)}
-                  >
-                    <BarChart2 size={16} /> كشف التسليمات والدرجات
-                  </button>
-                  <button 
-                    className="btn btn-outline" 
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 12px' }}
-                    onClick={() => handleEdit(a)}
-                    title="تعديل الواجب"
-                  >
-                    <Edit size={16} />
-                  </button>
-                  <button 
-                    className="btn btn-outline" 
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', borderColor: '#fca5a5', padding: '8px 12px' }}
-                    onClick={() => handleDelete(a.id)}
-                    title="حذف الواجب"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+              return (
+                <div key={a.id} style={{ background: 'rgba(255,255,255,0.85)', padding: '20px', borderRadius: '12px', border: isMan ? '1.5px solid #67e8f9' : '1px solid rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>{a.title}</h3>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      whiteSpace: 'nowrap',
+                      background: isMan ? '#e0f2fe' : 'rgba(37, 211, 102, 0.1)',
+                      color: isMan ? '#0369a1' : '#166534',
+                      border: `1px solid ${isMan ? '#bae6fd' : '#bbf7d0'}`
+                    }}>
+                      {isMan ? '📝 واجب يدوي' : '💻 واجب إلكتروني'}
+                    </span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '14px', color: '#475569' }}>
+                    <div><Users size={15} style={{ display: 'inline', marginInlineEnd: '6px' }}/> الفصل: <strong>{a.targetClass || a.className}</strong></div>
+                    <div><BookOpen size={15} style={{ display: 'inline', marginInlineEnd: '6px' }}/> المادة: <strong>{a.subject || 'عام'}</strong></div>
+                    <div><Calendar size={15} style={{ display: 'inline', marginInlineEnd: '6px' }}/> آخر موعد للتسليم: <strong>{a.dueDate}</strong></div>
+                    
+                    {isMan ? (
+                      <div style={{ background: '#f0f9ff', padding: '8px', borderRadius: '6px', border: '1px solid #e0f2fe', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: '#0369a1' }}>
+                        {a.bookPage && <div>📖 الكتاب: <strong>{a.bookPage}</strong></div>}
+                        {a.exerciseNumbers && <div>✏️ التمارين: <strong>{a.exerciseNumbers}</strong></div>}
+                        <div>🎯 الدرجة: <strong>{a.maxScore || a.totalQuestions || 5} درجات</strong></div>
+                      </div>
+                    ) : (
+                      <>
+                        <div><RotateCcw size={15} style={{ display: 'inline', marginInlineEnd: '6px' }}/> المحاولات: <strong>{a.allowedAttempts === 'unlimited' ? 'غير محدود' : `${a.allowedAttempts || 1} محاولات`}</strong></div>
+                        <div><FileText size={15} style={{ display: 'inline', marginInlineEnd: '6px' }}/> عدد الأسئلة: <strong>{a.questions?.length || 0} أسئلة</strong></div>
+                      </>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', marginTop: 'auto', paddingTop: '10px' }}>
+                    <button 
+                      className="btn btn-primary" 
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
+                      onClick={() => handleViewResults(a)}
+                    >
+                      <BarChart2 size={16} /> {isMan ? 'رصد ومتابعة الدرجات' : 'كشف التسليمات والدرجات'}
+                    </button>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 12px' }}
+                      onClick={() => handleEdit(a)}
+                      title="تعديل الواجب"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', borderColor: '#fca5a5', padding: '8px 12px' }}
+                      onClick={() => handleDelete(a.id)}
+                      title="حذف الواجب"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -1138,16 +1467,74 @@ function Assignments() {
   // Render Create / Edit Form
   return (
     <div className="glass-panel" style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '16px' }}>
-        <h2>{activeView === 'create' ? 'إنشاء واجب إلكتروني تفاعلي' : 'تعديل الواجب الإلكتروني'}</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+        <h2>
+          {activeView === 'create' 
+            ? (assignmentType === 'manual' ? 'إضافة واجب يدوي / منزلي / كراسة الواجب' : 'إنشاء واجب إلكتروني تفاعلي')
+            : (assignmentType === 'manual' ? 'تعديل الواجب اليدوي' : 'تعديل الواجب الإلكتروني')}
+        </h2>
         <button className="btn btn-outline" onClick={resetForm}>العودة للقائمة</button>
+      </div>
+
+      {/* Assignment Type Selector Tabs */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+        <button
+          type="button"
+          onClick={() => setAssignmentType('electronic')}
+          style={{
+            flex: 1,
+            padding: '12px',
+            borderRadius: '10px',
+            border: assignmentType === 'electronic' ? '2px solid #0e7490' : '1px solid #cbd5e1',
+            background: assignmentType === 'electronic' ? '#eff6ff' : '#f8fafc',
+            color: assignmentType === 'electronic' ? '#0e7490' : '#64748b',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          💻 واجب إلكتروني تفاعلي (أسئلة واختيارات)
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setAssignmentType('manual')}
+          style={{
+            flex: 1,
+            padding: '12px',
+            borderRadius: '10px',
+            border: assignmentType === 'manual' ? '2px solid #0e7490' : '1px solid #cbd5e1',
+            background: assignmentType === 'manual' ? '#eff6ff' : '#f8fafc',
+            color: assignmentType === 'manual' ? '#0e7490' : '#64748b',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          📝 واجب يدوي / منزلي / كراسة الواجب (صفحات وتمارين الكتاب)
+        </button>
       </div>
 
       <form onSubmit={handleSave}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          <div className="form-group">
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
             <label>عنوان الواجب</label>
-            <input type="text" className="input-field" value={title} onChange={e => setTitle(e.target.value)} required placeholder="مثال: واجب الدرس الأول - الحركة في بعد واحد" />
+            <input 
+              type="text" 
+              className="input-field" 
+              value={title} 
+              onChange={e => setTitle(e.target.value)} 
+              required 
+              placeholder={assignmentType === 'manual' ? "مثال: واجب تمارين ص ٤٥ - الحركة في بعد واحد" : "مثال: واجب الدرس الأول - الحركة في بعد واحد"} 
+            />
           </div>
 
           <div className="form-group">
@@ -1171,134 +1558,182 @@ function Assignments() {
             <input type="date" className="input-field" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
           </div>
 
-          <div className="form-group">
-            <label>عدد مرات إجراء الواجب (المحاولات)</label>
-            <select className="input-field" value={allowedAttempts} onChange={e => setAllowedAttempts(e.target.value)} required>
-              <option value="1">محاولة واحدة فقط (1)</option>
-              <option value="2">محاولتان (2)</option>
-              <option value="3">3 محاولات</option>
-              <option value="5">5 محاولات</option>
-              <option value="unlimited">غير محدود (مفتوح للتكرار)</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>عدد الأسئلة</label>
-            <input type="number" min="1" max="30" className="input-field" value={numQuestions} onChange={e => setNumQuestions(e.target.value)} required />
-          </div>
-        </div>
-
-        {/* Central Question Bank Import Banner */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          background: 'linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%)',
-          padding: '16px 20px',
-          borderRadius: '14px',
-          border: '1.5px dashed #0d9488',
-          margin: '10px 0 24px 0',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              background: '#0d9488',
-              color: '#ffffff',
-              padding: '10px',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <BookOpen size={24} />
-            </div>
-            <div>
-              <strong style={{ fontSize: '1.05rem', color: '#0f766e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                بنك الأسئلة المركزي المشترك (كافة المدارس)
-                <span style={{ fontSize: '0.75rem', background: '#ccfbf1', color: '#0f766e', padding: '2px 8px', borderRadius: '12px' }}>
-                  متاح الآن
-                </span>
-              </strong>
-              <span style={{ fontSize: '0.86rem', color: '#475569', display: 'block', marginTop: '3px' }}>
-                ابحث واستورد أسئلة جاهزة من واجبات واختبارات المدارس الأخرى مع إمكانية تعديلها بحرية تامة دون التأثير على الأصل
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowQuestionBankModal(true)}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '10px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
-              color: '#ffffff',
-              fontWeight: 'bold',
-              fontSize: '0.92rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            <Plus size={18} />
-            تصفح واستيراد من بنك الأسئلة
-          </button>
-        </div>
-
-        {/* Questions Builder */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-          {questions.map((q, qIndex) => (
-            <div key={q.id || qIndex} style={{ background: 'rgba(255,255,255,0.6)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)' }}>
-              <h3 style={{ margin: '0 0 16px 0', borderBottom: '2px solid var(--color-primary-light)', paddingBottom: '8px', display: 'inline-block' }}>
-                السؤال رقم {qIndex + 1}
-              </h3>
-
-              <MarkdownInput 
-                label="نص السؤال (يدعم صياغة المعادلات والنصوص المنسقة)"
-                value={q.text}
-                onChange={(val) => updateQuestion(qIndex, 'text', val)}
-                placeholder="اكتب نص السؤال هنا..."
-                height="130px"
-              />
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
-                {[0, 1, 2, 3].map(optIndex => (
-                  <div key={optIndex} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: q.correctOption === optIndex ? 'rgba(37, 211, 102, 0.1)' : 'transparent', padding: '12px', borderRadius: '8px', border: q.correctOption === optIndex ? '2px solid #25D366' : '1px solid var(--color-border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label style={{ margin: 0, fontWeight: 'bold' }}>الخيار {optIndex + 1}</label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0, cursor: 'pointer', color: q.correctOption === optIndex ? '#25D366' : 'inherit' }}>
-                        <input 
-                          type="radio" 
-                          name={`hw_correct_${qIndex}`} 
-                          checked={q.correctOption === optIndex} 
-                          onChange={() => updateQuestion(qIndex, 'correctOption', optIndex)}
-                        />
-                        الإجابة الصحيحة
-                      </label>
-                    </div>
-                    <MarkdownInput 
-                      label=""
-                      value={q.options[optIndex]}
-                      onChange={(val) => updateOption(qIndex, optIndex, val)}
-                      placeholder={`نص الخيار ${optIndex + 1}...`}
-                      height="90px"
-                    />
-                  </div>
-                ))}
+          {/* Electronic Specific Fields */}
+          {assignmentType === 'electronic' && (
+            <>
+              <div className="form-group">
+                <label>عدد مرات إجراء الواجب (المحاولات)</label>
+                <select className="input-field" value={allowedAttempts} onChange={e => setAllowedAttempts(e.target.value)} required>
+                  <option value="1">محاولة واحدة فقط (1)</option>
+                  <option value="2">محاولتان (2)</option>
+                  <option value="3">3 محاولات</option>
+                  <option value="5">5 محاولات</option>
+                  <option value="unlimited">غير محدود (مفتوح للتكرار)</option>
+                </select>
               </div>
-            </div>
-          ))}
+
+              <div className="form-group">
+                <label>عدد الأسئلة</label>
+                <input type="number" min="1" max="30" className="input-field" value={numQuestions} onChange={e => setNumQuestions(e.target.value)} required />
+              </div>
+            </>
+          )}
+
+          {/* Manual Specific Fields */}
+          {assignmentType === 'manual' && (
+            <>
+              <div className="form-group">
+                <label>رقم الصفحة في الكتاب المدرسي</label>
+                <input type="text" className="input-field" value={bookPage} onChange={e => setBookPage(e.target.value)} placeholder="مثال: ص ٤٥ - ٤٦" />
+              </div>
+
+              <div className="form-group">
+                <label>أرقام التمارين / المسائل المطلوبة</label>
+                <input type="text" className="input-field" value={exerciseNumbers} onChange={e => setExerciseNumbers(e.target.value)} placeholder="مثال: التمارين ١، ٣، ٥، ٨" />
+              </div>
+
+              <div className="form-group">
+                <label>الدرجة العظمى المخصصة للواجب</label>
+                <input type="number" min="1" max="100" className="input-field" value={maxScore} onChange={e => setMaxScore(e.target.value)} required />
+              </div>
+
+              <div className="form-group">
+                <label>طريقة تسليم الواجب</label>
+                <select className="input-field" value={submissionMethod} onChange={e => setSubmissionMethod(e.target.value)}>
+                  <option value="notebook">تسليم كراسة الواجب في الصف للمعلم</option>
+                  <option value="upload">تصوير الحل وإرفاقه عبر المنصة</option>
+                  <option value="both">كلاهما متاح (كراسة الواجب أو إرفاق صورة بالمنصة)</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <MarkdownInput
+                  label="تعليمات وإرشادات إضافية للحل (اختياري - تدعم الصور المرفقة المضغوطة)"
+                  value={instructions}
+                  onChange={setInstructions}
+                  placeholder="اكتب هنا أي تعليمات إضافية للطالب بخصوص حل التمارين أو الرسم أو المطلوب..."
+                  height="120px"
+                />
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Central Question Bank Import Banner (Electronic only) */}
+        {assignmentType === 'electronic' && (
+          <>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%)',
+              padding: '16px 20px',
+              borderRadius: '14px',
+              border: '1.5px dashed #0d9488',
+              margin: '10px 0 24px 0',
+              gap: '16px',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  background: '#0d9488',
+                  color: '#ffffff',
+                  padding: '10px',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <BookOpen size={24} />
+                </div>
+                <div>
+                  <strong style={{ fontSize: '1.05rem', color: '#0f766e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    بنك الأسئلة المركزي المشترك (كافة المدارس)
+                    <span style={{ fontSize: '0.75rem', background: '#ccfbf1', color: '#0f766e', padding: '2px 8px', borderRadius: '12px' }}>
+                      متاح الآن
+                    </span>
+                  </strong>
+                  <span style={{ fontSize: '0.86rem', color: '#475569', display: 'block', marginTop: '3px' }}>
+                    ابحث واستورد أسئلة جاهزة من واجبات واختبارات المدارس الأخرى مع إمكانية تعديلها بحرية تامة دون التأثير على الأصل
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowQuestionBankModal(true)}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Plus size={18} />
+                تصفح واستيراد من بنك الأسئلة
+              </button>
+            </div>
+
+            {/* Questions Builder */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              {questions.map((q, qIndex) => (
+                <div key={q.id || qIndex} style={{ background: 'rgba(255,255,255,0.6)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)' }}>
+                  <h3 style={{ margin: '0 0 16px 0', borderBottom: '2px solid var(--color-primary-light)', paddingBottom: '8px', display: 'inline-block' }}>
+                    السؤال رقم {qIndex + 1}
+                  </h3>
+
+                  <MarkdownInput 
+                    label="نص السؤال (يدعم صياغة المعادلات والنصوص المنسقة والصور المضغوطة)"
+                    value={q.text}
+                    onChange={(val) => updateQuestion(qIndex, 'text', val)}
+                    placeholder="اكتب نص السؤال هنا..."
+                    height="130px"
+                  />
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+                    {[0, 1, 2, 3].map(optIndex => (
+                      <div key={optIndex} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: q.correctOption === optIndex ? 'rgba(37, 211, 102, 0.1)' : 'transparent', padding: '12px', borderRadius: '8px', border: q.correctOption === optIndex ? '2px solid #25D366' : '1px solid var(--color-border)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label style={{ margin: 0, fontWeight: 'bold' }}>الخيار {optIndex + 1}</label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0, cursor: 'pointer', color: q.correctOption === optIndex ? '#25D366' : 'inherit' }}>
+                            <input 
+                              type="radio" 
+                              name={`hw_correct_${qIndex}`} 
+                              checked={q.correctOption === optIndex} 
+                              onChange={() => updateQuestion(qIndex, 'correctOption', optIndex)}
+                            />
+                            الإجابة الصحيحة
+                          </label>
+                        </div>
+                        <MarkdownInput 
+                          label=""
+                          value={q.options[optIndex]}
+                          onChange={(val) => updateOption(qIndex, optIndex, val)}
+                          placeholder={`نص الخيار ${optIndex + 1}...`}
+                          height="90px"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'center' }}>
           <button type="submit" className="btn btn-primary" style={{ padding: '12px 36px', fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }} disabled={isSaving}>
             <Save size={20} />
-            {isSaving ? 'جاري الحفظ...' : 'حفظ ونشر الواجب الإلكتروني'}
+            {isSaving ? 'جاري الحفظ...' : (assignmentType === 'manual' ? 'حفظ ونشر الواجب اليدوي' : 'حفظ ونشر الواجب الإلكتروني')}
           </button>
         </div>
       </form>

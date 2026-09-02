@@ -953,6 +953,7 @@ function StudentAssignments() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
           {assignments.map(a => {
+            const isManual = a.type === 'manual' || a.isInteractive === false;
             const submissions = mySubmissions[a.id] || [];
             const hasSubmitted = submissions.length > 0;
             const latestSub = hasSubmitted ? submissions[0] : null;
@@ -970,67 +971,109 @@ function StudentAssignments() {
                   background: 'white',
                   padding: '20px',
                   borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
+                  border: isManual ? '1.5px solid #67e8f9' : '1px solid #e2e8f0',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '12px',
                   boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <h3 style={{ margin: 0, color: 'var(--color-primary-dark)', fontSize: '16px' }}>{a.title}</h3>
-                  {hasSubmitted && (
-                    <span style={{
-                      padding: '3px 8px',
-                      borderRadius: '10px',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      background: '#dcfce7',
-                      color: '#166534'
-                    }}>
-                      تم الحل ({latestSub.score}/{latestSub.totalQuestions})
-                    </span>
-                  )}
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    whiteSpace: 'nowrap',
+                    background: isManual ? '#e0f2fe' : hasSubmitted ? '#dcfce7' : 'rgba(37, 211, 102, 0.1)',
+                    color: isManual ? '#0369a1' : hasSubmitted ? '#166534' : '#15803d',
+                    border: `1px solid ${isManual ? '#bae6fd' : '#bbf7d0'}`
+                  }}>
+                    {isManual ? '📝 واجب يدوي' : hasSubmitted ? `تم الحل (${latestSub.score}/${latestSub.totalQuestions})` : '💻 واجب إلكتروني'}
+                  </span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#475569' }}>
                   <div>المادة: <strong>{a.subject || 'عام'}</strong></div>
-                  <div>المعلم: <strong>{a.teacherEmail}</strong></div>
+                  <div>المعلم: <strong>{a.teacherName || a.teacherEmail}</strong></div>
                   <div>آخر موعد للتسليم: <strong style={{ color: isLateDeadline ? '#dc2626' : 'inherit' }}>{a.dueDate || 'مفتوح'}</strong></div>
-                  <div>المحاولات المستنفدة: <strong>{submissions.length}</strong> من <strong>{allowed === Infinity ? 'غير محدود' : allowed}</strong></div>
-                  {a.questions && <div>عدد الأسئلة: <strong>{a.questions.length}</strong> أسئلة (بدون توقيت)</div>}
+
+                  {isManual ? (
+                    <div style={{ background: '#f0f9ff', padding: '10px', borderRadius: '8px', border: '1px solid #e0f2fe', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: '#0369a1', marginTop: '4px' }}>
+                      {a.bookPage && <div>📖 رقم الصفحة: <strong>{a.bookPage}</strong></div>}
+                      {a.exerciseNumbers && <div>✏️ التمارين المطلوبة: <strong>{a.exerciseNumbers}</strong></div>}
+                      <div>🎯 الدرجة: <strong>{a.maxScore || a.totalQuestions || 5} درجات</strong></div>
+                      <div>📥 طريقة التسليم: <strong>{a.submissionMethod === 'notebook' ? 'كراسة الواجب في الصف للمعلم' : a.submissionMethod === 'upload' ? 'تصوير وإرفاق الحل بالمنصة' : 'كراسة الواجب / إرفاق بالمنصة'}</strong></div>
+                      {a.instructions && (
+                        <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed #bae6fd' }}>
+                          <span style={{ fontWeight: 'bold' }}>إرشادات الحل: </span>
+                          <MarkdownViewer content={a.instructions} />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div>المحاولات المستنفدة: <strong>{submissions.length}</strong> من <strong>{allowed === Infinity ? 'غير محدود' : allowed}</strong></div>
+                      {a.questions && <div>عدد الأسئلة: <strong>{a.questions.length}</strong> أسئلة (بدون توقيت)</div>}
+                    </>
+                  )}
                 </div>
 
+                {/* Status and Action Buttons */}
                 <div style={{ marginTop: 'auto', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {canAttempt ? (
-                    <button
-                      onClick={() => handleStartHomework(a)}
-                      className="btn btn-primary"
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                    >
-                      <Play size={16} /> {hasSubmitted ? `إعادة محاولة الواجب (${remainingAttempts} متبقية)` : 'بدء حل الواجب'}
-                    </button>
-                  ) : (
-                    <div style={{ background: '#f1f5f9', color: '#64748b', padding: '10px', borderRadius: '8px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold' }}>
-                      استنفدت جميع المحاولات المسموحة ({allowed})
+                  {isManual ? (
+                    <div>
+                      {hasSubmitted && latestSub ? (
+                        <div style={{ background: '#f0fdf4', border: '1px solid #86efac', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                          <div style={{ color: '#166534', fontWeight: 'bold', fontSize: '14px', marginBottom: '2px' }}>
+                            ✅ تم رصد الدرجة: {latestSub.score} من {latestSub.totalQuestions || a.maxScore || 5}
+                          </div>
+                          {latestSub.note && (
+                            <div style={{ fontSize: '12px', color: '#15803d' }}>
+                              💬 ملاحظة المعلم: {latestSub.note}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ background: '#f8fafc', color: '#64748b', padding: '10px', borderRadius: '8px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold', border: '1px solid #e2e8f0' }}>
+                          ⏳ يرجى تسليم الواجب للمعلم بالصف للرصد
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ) : (
+                    <>
+                      {canAttempt ? (
+                        <button
+                          onClick={() => handleStartHomework(a)}
+                          className="btn btn-primary"
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                        >
+                          <Play size={16} /> {hasSubmitted ? `إعادة محاولة الواجب (${remainingAttempts} متبقية)` : 'بدء حل الواجب'}
+                        </button>
+                      ) : (
+                        <div style={{ background: '#f1f5f9', color: '#64748b', padding: '10px', borderRadius: '8px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold' }}>
+                          استنفدت جميع المحاولات المسموحة ({allowed})
+                        </div>
+                      )}
 
-                  {hasSubmitted && latestSub && (
-                    <button
-                      onClick={() => setFeedbackView({
-                        score: latestSub.score,
-                        total: latestSub.totalQuestions,
-                        isLate: latestSub.isLate,
-                        answers: latestSub.answers || {},
-                        assignment: a,
-                        attemptNumber: latestSub.attemptNumber || 1
-                      })}
-                      className="btn btn-outline"
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
-                    >
-                      <CheckCircle2 size={14} color="#059669" /> مراجعة الإجابات الصحيحة والتغذية الراجعة
-                    </button>
+                      {hasSubmitted && latestSub && (
+                        <button
+                          onClick={() => setFeedbackView({
+                            score: latestSub.score,
+                            total: latestSub.totalQuestions,
+                            isLate: latestSub.isLate,
+                            answers: latestSub.answers || {},
+                            assignment: a,
+                            attemptNumber: latestSub.attemptNumber || 1
+                          })}
+                          className="btn btn-outline"
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
+                        >
+                          <CheckCircle2 size={14} color="#059669" /> مراجعة الإجابات الصحيحة والتغذية الراجعة
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

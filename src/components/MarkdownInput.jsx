@@ -4,11 +4,13 @@ import { storage } from '../firebase';
 import MarkdownViewer from './MarkdownViewer';
 import { Image as ImageIcon, Loader } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { compressImage } from '../utils/imageCompressor';
 
 export default function MarkdownInput({ label, value, onChange, placeholder, height = '200px' }) {
   const { t } = useLanguage();
   const textareaRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [compressNotice, setCompressNotice] = useState('');
 
   const insertTextAtCursor = (textToInsert) => {
     const textarea = textareaRef.current;
@@ -30,22 +32,28 @@ export default function MarkdownInput({ label, value, onChange, placeholder, hei
 
   const uploadImage = async (file) => {
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      alert(t('markdownInput.imageSizeError'));
-      return;
-    }
 
     setIsUploading(true);
+    setCompressNotice('جاري ضغط وتحسين جودة الصورة...');
     try {
-      const storageRef = ref(storage, `inline_images/${Date.now()}_${file.name || 'image.png'}`);
-      await uploadBytes(storageRef, file);
+      // Automatically compress image client-side to save space while preserving crystal-clear clarity
+      const optimizedFile = await compressImage(file, {
+        maxWidth: 1400,
+        maxHeight: 1400,
+        quality: 0.84
+      });
+
+      setCompressNotice('جاري رفع الصورة المحسنة...');
+      const storageRef = ref(storage, `inline_images/${Date.now()}_${optimizedFile.name || 'image.jpg'}`);
+      await uploadBytes(storageRef, optimizedFile);
       const url = await getDownloadURL(storageRef);
       insertTextAtCursor(`\n![${t('markdownInput.image')}](${url})\n`);
     } catch (error) {
       console.error('Error uploading inline image:', error);
-      alert('حدث خطأ أثناء الرفع');
+      alert('حدث خطأ أثناء معالجة ورفع الصورة');
     } finally {
       setIsUploading(false);
+      setCompressNotice('');
     }
   };
 
@@ -100,10 +108,10 @@ export default function MarkdownInput({ label, value, onChange, placeholder, hei
             placeholder={placeholder + "\n" + t('markdownInput.pasteImageHint')}
           />
           {isUploading && (
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10, borderRadius: '8px' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(2px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10, borderRadius: '8px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--color-primary)' }}>
-                <Loader className="spin" size={24} style={{ marginBottom: '8px' }} />
-                <span style={{ fontWeight: 'bold' }}>{t('markdownInput.uploading')}</span>
+                <Loader className="spin" size={26} style={{ marginBottom: '8px' }} />
+                <span style={{ fontWeight: 'bold', fontSize: '13px' }}>{compressNotice || t('markdownInput.uploading')}</span>
               </div>
             </div>
           )}

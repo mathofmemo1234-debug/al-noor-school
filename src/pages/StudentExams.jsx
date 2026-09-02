@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, getDocs, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { FileText, Clock, Play, CheckCircle, Printer, Wifi, WifiOff, Download, AlertTriangle, RotateCcw, Check, Save } from 'lucide-react';
 import MarkdownViewer from '../components/MarkdownViewer';
 import { useLanguage } from '../contexts/LanguageContext';
 import PrintExamModal from '../components/PrintExamModal';
+import { parseExamDateTime, formatArabicTime, calculateDefaultCutoff } from '../utils/dateTimeUtils';
 
 export default function StudentExams() {
   const { t } = useLanguage();
@@ -26,10 +27,31 @@ export default function StudentExams() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
-  // Network Online/Offline Listeners
+  // Network Online/Offline Listeners & Live Session status sync
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (activeExam && studentDocId) {
+        setDoc(doc(db, 'exam_sessions', `${activeExam.id}_${studentDocId}`), {
+          status: 'in_progress',
+          isOnline: true,
+          lastHeartbeat: new Date().toISOString(),
+          updatedAt: serverTimestamp()
+        }, { merge: true }).catch(() => {});
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      if (activeExam && studentDocId) {
+        setDoc(doc(db, 'exam_sessions', `${activeExam.id}_${studentDocId}`), {
+          status: 'interrupted',
+          isOnline: false,
+          lastHeartbeat: new Date().toISOString(),
+          updatedAt: serverTimestamp()
+        }, { merge: true }).catch(() => {});
+      }
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -38,7 +60,25 @@ export default function StudentExams() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [activeExam, studentDocId]);
+
+  // Periodic Heartbeat while exam is in progress
+  useEffect(() => {
+    if (!activeExam || !studentDocId) return;
+
+    const hbInterval = setInterval(() => {
+      if (navigator.onLine) {
+        setDoc(doc(db, 'exam_sessions', `${activeExam.id}_${studentDocId}`), {
+          status: 'in_progress',
+          isOnline: true,
+          lastHeartbeat: new Date().toISOString(),
+          updatedAt: serverTimestamp()
+        }, { merge: true }).catch(() => {});
+      }
+    }, 15000);
+
+    return () => clearInterval(hbInterval);
+  }, [activeExam, studentDocId]);
 
   // 1-second live clock for reactive countdown & automatic unlocking
   useEffect(() => {
@@ -122,8 +162,12 @@ export default function StudentExams() {
     const unsub = onSnapshot(q, snap => {
       const data = [];
       snap.forEach(d => data.push({ id: d.id, ...d.data() }));
-      // Sort by date descending
-      data.sort((a, b) => new Date(`${b.examDate}T${b.startTime}`) - new Date(`${a.examDate}T${a.startTime}`));
+      // Sort by date descending using robust datetime parser
+      data.sort((a, b) => {
+        const timeB = parseExamDateTime(b.examDate, b.startTime)?.getTime() || 0;
+        const timeA = parseExamDateTime(a.examDate, a.startTime)?.getTime() || 0;
+        return timeB - timeA;
+      });
       setExams(data);
     });
     return () => unsub();
@@ -144,33 +188,31 @@ export default function StudentExams() {
     return () => unsub();
   }, [studentDocId]);
 
-  const calculateDefaultCutoff = (timeStr) => {
-    if (!timeStr) return '';
-    const parts = timeStr.split(':').map(Number);
-    if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return '';
-    const totalMins = parts[0] * 60 + parts[1] + 30;
-    const newH = Math.floor(totalMins / 60) % 24;
-    const newM = totalMins % 60;
-    return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
-  };
-
   const getExamTimeDetails = (exam) => {
+    const cutoffStr = exam.entryDeadline || calculateDefaultCutoff(exam.startTime);
     if (examResults[exam.id]) {
-      return { status: 'taken', cutoffTime: exam.entryDeadline || calculateDefaultCutoff(exam.startTime), diffSeconds: 0, formattedCountdown: '' };
+      return { status: 'taken', cutoffTime: cutoffStr, diffSeconds: 0, formattedCountdown: '' };
     }
 
-    const examStart = new Date(`${exam.examDate}T${exam.startTime}`);
-    const cutoffStr = exam.entryDeadline || calculateDefaultCutoff(exam.startTime);
-    const examCutoff = new Date(`${exam.examDate}T${cutoffStr}`);
+    const examStart = parseExamDateTime(exam.examDate, exam.startTime);
+    const examCutoff = parseExamDateTime(exam.examDate, cutoffStr);
     
-    const diffMs = examStart.getTime() - currentTime.getTime();
+    if (!examStart || !examCutoff) {
+      return { status: 'open', cutoffTime: cutoffStr, diffSeconds: 0, formattedCountdown: '' };
+    }
+
+    const nowTime = currentTime.getTime();
+    const startTimeMs = examStart.getTime();
+    const cutoffTimeMs = examCutoff.getTime();
+    
+    const diffMs = startTimeMs - nowTime;
     const diffSeconds = Math.floor(diffMs / 1000);
 
-    if (currentTime > examCutoff) {
+    if (nowTime > cutoffTimeMs) {
       return { status: 'expired', cutoffTime: cutoffStr, diffSeconds: 0, formattedCountdown: '' };
     }
 
-    if (currentTime >= examStart && currentTime <= examCutoff) {
+    if (nowTime >= startTimeMs && nowTime <= cutoffTimeMs) {
       return { status: 'open', cutoffTime: cutoffStr, diffSeconds: 0, formattedCountdown: '' };
     }
 
@@ -189,7 +231,7 @@ export default function StudentExams() {
     return getExamTimeDetails(exam).status === 'open';
   };
 
-  const startExam = (exam) => {
+  const startExam = async (exam) => {
     if (!canTakeExam(exam)) {
       alert(t('studentExams.cannotEnterNow'));
       return;
@@ -197,6 +239,30 @@ export default function StudentExams() {
 
     setActiveExam(exam);
     setScoreView(null);
+
+    // Register active session in Firestore for live teacher monitoring
+    if (studentDocId) {
+      const now = new Date();
+      const sessionId = `${exam.id}_${studentDocId}`;
+      try {
+        await setDoc(doc(db, 'exam_sessions', sessionId), {
+          examId: exam.id,
+          studentId: studentDocId,
+          studentName: userData?.name || 'طالب',
+          nationalId: userData?.nationalId || '',
+          className: studentClass,
+          schoolId: userData?.schoolId || 'default_school_1',
+          status: 'in_progress',
+          enteredAt: now.toISOString(),
+          enteredAtArabic: formatArabicTime(now),
+          lastHeartbeat: now.toISOString(),
+          isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (err) {
+        console.error("Error creating exam session:", err);
+      }
+    }
 
     // Check for previous checkpoint
     const checkpointKey = `exam_checkpoint_${exam.id}_${studentDocId}`;
@@ -260,6 +326,7 @@ export default function StudentExams() {
       }
     });
 
+    const now = new Date();
     const resultData = {
       examId: activeExam.id,
       studentId: studentDocId,
@@ -272,6 +339,19 @@ export default function StudentExams() {
 
     try {
       await addDoc(collection(db, 'exam_results'), resultData);
+      
+      // Update session to 'submitted' for teacher live monitoring
+      const sessionId = `${activeExam.id}_${studentDocId}`;
+      await setDoc(doc(db, 'exam_sessions', sessionId), {
+        status: 'submitted',
+        submittedAt: now.toISOString(),
+        submittedAtArabic: formatArabicTime(now),
+        score: correctCount,
+        totalQuestions: activeExam.questions.length,
+        isOnline: true,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
       // Remove local checkpoint
       localStorage.removeItem(`exam_checkpoint_${activeExam.id}_${studentDocId}`);
       
@@ -454,8 +534,12 @@ export default function StudentExams() {
           </div>
         </div>
 
-        {/* Questions List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        {/* Questions List with Image Protection */}
+        <div 
+          className="no-save-image" 
+          onContextMenu={(e) => e.preventDefault()} 
+          style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}
+        >
           {activeExam.questions.map((q, qIndex) => (
             <div key={q.id || qIndex} style={{ background: '#fff', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
               <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
