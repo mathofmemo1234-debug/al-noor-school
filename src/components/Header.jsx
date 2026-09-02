@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Bell, Globe, Mail, Award, Building2, Sparkles } from 'lucide-react';
+import { Bell, Globe, Mail, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import AboutSchoolModal from './AboutSchoolModal';
 
 export default function Header({ title, role }) {
   const { currentUser, userRole, userData } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
-  const [showAboutModal, setShowAboutModal] = useState(false);
   
   // Format role & extra info for display
   const effectiveRole = role || userRole;
@@ -149,26 +147,6 @@ export default function Header({ title, role }) {
           <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
         </button>
 
-        {/* About School Button (من نحن - فلاش يومض) */}
-        <button
-          className="btn btn-flash-about"
-          onClick={() => setShowAboutModal(true)}
-          style={{
-            borderRadius: '20px',
-            padding: '6px 14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '13px'
-          }}
-          title="عن شركة المدارس المتقدمة - من نحن"
-        >
-          <span className="flash-dot-indicator" />
-          <Building2 size={16} className="flash-icon" />
-          <span>من نحن</span>
-          <Sparkles size={14} color="#713f12" />
-        </button>
-
         {/* Electronic Portfolio Quick Button */}
         <button
           className="btn"
@@ -257,12 +235,6 @@ export default function Header({ title, role }) {
           </div>
         </div>
       </div>
-
-      {/* About School Modal */}
-      <AboutSchoolModal 
-        isOpen={showAboutModal} 
-        onClose={() => setShowAboutModal(false)} 
-      />
     </header>
   );
 }

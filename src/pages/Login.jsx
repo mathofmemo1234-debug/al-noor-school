@@ -458,7 +458,7 @@ export default function Login() {
             <span className="flash-dot-indicator" />
             <Building2 size={15} className="flash-icon" />
             <span>من نحن</span>
-            <Sparkles size={13} color="#713f12" />
+            <Sparkles size={13} color="#38bdf8" />
           </button>
 
           <div className="login-header">

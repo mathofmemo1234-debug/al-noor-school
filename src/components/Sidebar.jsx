@@ -1,17 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare, Globe, Mail, Award, ClipboardList, Building2, Sparkles } from 'lucide-react';
+import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare, Globe, Mail, Award, ClipboardList } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import AboutSchoolModal from './AboutSchoolModal';
 
 export default function Sidebar({ role }) {
   const navigate = useNavigate();
   const { userData } = useAuth();
   const { t } = useLanguage();
-  const [showAboutModal, setShowAboutModal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -164,44 +162,11 @@ export default function Sidebar({ role }) {
       </nav>
 
       <div className="sidebar-footer">
-        {/* About School Button (من نحن - فلاش يومض) */}
-        <button 
-          className="nav-item btn-flash-about" 
-          onClick={() => setShowAboutModal(true)} 
-          style={{ 
-            width: '100%', 
-            borderRadius: '12px',
-            marginBottom: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '10px 14px',
-            fontWeight: 800
-          }}
-          title="عن شركة المدارس المتقدمة (MSC)"
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="flash-dot-indicator" />
-            <Building2 size={19} className="flash-icon" color="#713f12" />
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'start' }}>
-              <span style={{ fontSize: '13px', color: '#713f12', fontWeight: 800 }}>من نحن</span>
-              <span style={{ fontSize: '10px', color: '#854d0e', fontWeight: 600 }}>مدارس المتقدمة (MSC)</span>
-            </div>
-          </div>
-          <Sparkles size={16} color="#713f12" />
-        </button>
-
         <button className="nav-item" onClick={handleLogout} style={{ width: '100%', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.15)', cursor: 'pointer', color: '#dc2626', borderRadius: '10px' }}>
           <LogOut size={19} />
           <span>{t('sidebar.logout')}</span>
         </button>
       </div>
-
-      {/* About School Modal */}
-      <AboutSchoolModal 
-        isOpen={showAboutModal} 
-        onClose={() => setShowAboutModal(false)} 
-      />
     </div>
   );
 }
