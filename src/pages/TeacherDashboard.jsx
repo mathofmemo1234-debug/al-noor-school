@@ -2,7 +2,7 @@ import Settings from './Settings';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Calendar, FileText, Users, X, Edit, Trash2, CheckSquare, Square, Plus, Save, Award, AlertCircle, CheckCircle, BarChart2, Clock, BookOpen, Eye, RotateCcw, Check, ClipboardList } from 'lucide-react';
+import { Calendar, FileText, Users, X, Edit, Trash2, CheckSquare, Square, Plus, Save, Award, AlertCircle, CheckCircle, BarChart2, Clock, BookOpen, Eye, RotateCcw, Check, ClipboardList, FileSpreadsheet } from 'lucide-react';
 import { db, auth } from '../firebase';
 import TeacherSchedule from './TeacherSchedule';
 import { doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, deleteDoc, updateDoc, getDocs, serverTimestamp } from 'firebase/firestore';
