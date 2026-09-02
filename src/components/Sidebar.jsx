@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare, Globe, Mail, Award, ClipboardList, Building2 } from 'lucide-react';
+import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare, Globe, Mail, Award, ClipboardList, Building2, Sparkles } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
@@ -164,31 +164,31 @@ export default function Sidebar({ role }) {
       </nav>
 
       <div className="sidebar-footer">
-        {/* About School Button */}
+        {/* About School Button (من نحن - فلاش يومض) */}
         <button 
-          className="nav-item" 
+          className="nav-item btn-flash-about" 
           onClick={() => setShowAboutModal(true)} 
           style={{ 
             width: '100%', 
-            background: 'linear-gradient(135deg, rgba(14, 116, 144, 0.07), rgba(99, 178, 198, 0.15))', 
-            border: '1px solid rgba(14, 116, 144, 0.2)', 
-            cursor: 'pointer', 
-            color: '#0e7490', 
-            borderRadius: '10px',
-            marginBottom: '8px',
+            borderRadius: '12px',
+            marginBottom: '10px',
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            justifyContent: 'space-between',
             padding: '10px 14px',
-            fontWeight: 700
+            fontWeight: 800
           }}
           title="عن شركة المدارس المتقدمة (MSC)"
         >
-          <Building2 size={19} color="#0e7490" />
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'start' }}>
-            <span style={{ fontSize: '13px' }}>من نحن</span>
-            <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'normal' }}>مدارس المتقدمة (MSC)</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="flash-dot-indicator" />
+            <Building2 size={19} className="flash-icon" color="#713f12" />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'start' }}>
+              <span style={{ fontSize: '13px', color: '#713f12', fontWeight: 800 }}>من نحن</span>
+              <span style={{ fontSize: '10px', color: '#854d0e', fontWeight: 600 }}>مدارس المتقدمة (MSC)</span>
+            </div>
           </div>
+          <Sparkles size={16} color="#713f12" />
         </button>
 
         <button className="nav-item" onClick={handleLogout} style={{ width: '100%', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.15)', cursor: 'pointer', color: '#dc2626', borderRadius: '10px' }}>

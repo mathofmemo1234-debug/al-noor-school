@@ -236,18 +236,76 @@ export default function AboutSchoolModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Coverage & Cities */}
-        <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0e7490', fontWeight: 700, fontSize: '13px' }}>
-            <MapPin size={16} /> فروع المدارس بالمملكة:
+        {/* Coverage & Cities Comprehensive Grid */}
+        <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '22px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0e7490', fontWeight: 800, fontSize: '14px' }}>
+              <MapPin size={18} color="#0e7490" /> فروع ومجمعات المدارس في مدن ومناطق المملكة:
+            </div>
+            <div style={{ fontSize: '11px', color: '#059669', fontWeight: 700, background: '#ecfdf5', padding: '2px 8px', borderRadius: '10px' }}>
+              توسع شامل ومستمر
+            </div>
           </div>
-          <div style={{ fontSize: '12px', color: '#475569', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ background: '#ffffff', padding: '2px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>📍 الرياض</span>
-            <span style={{ background: '#ffffff', padding: '2px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>📍 الأحساء</span>
-            <span style={{ background: '#ffffff', padding: '2px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>📍 الخرج</span>
-            <span style={{ background: '#ffffff', padding: '2px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>📍 المدينة المنورة</span>
-            <span style={{ background: '#ffffff', padding: '2px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>📍 الجوف</span>
-            <span style={{ background: '#ffffff', padding: '2px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>📍 الجبيل</span>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '8px', fontSize: '12px' }}>
+            <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>📍</span>
+              <div>
+                <strong style={{ color: '#0f172a' }}>جدة:</strong>
+                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>مدارس المتقدمة للتعلم الذكي (حي الزهراء)</span>
+              </div>
+            </div>
+
+            <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>📍</span>
+              <div>
+                <strong style={{ color: '#0f172a' }}>الرياض:</strong>
+                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>الملقا، حطين، النرجس، قرطبة، الصحافة، الغدير...</span>
+              </div>
+            </div>
+
+            <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>📍</span>
+              <div>
+                <strong style={{ color: '#0f172a' }}>المنطقة الشرقية:</strong>
+                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>مجمعات الدمام، الخبر، والجبيل</span>
+              </div>
+            </div>
+
+            <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>📍</span>
+              <div>
+                <strong style={{ color: '#0f172a' }}>الأحساء:</strong>
+                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>مجمعات تعليمية كبرى (بنين وبنات)</span>
+              </div>
+            </div>
+
+            <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>📍</span>
+              <div>
+                <strong style={{ color: '#0f172a' }}>المدينة المنورة ومكة:</strong>
+                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>مجمعات أجيال المتقدمة وتحفيظ القرآن</span>
+              </div>
+            </div>
+
+            <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>📍</span>
+              <div>
+                <strong style={{ color: '#0f172a' }}>الخرج والجوف وينبع:</strong>
+                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>مجمعات المتقدمة بمختلف المسارات</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Unified Call Center Number */}
+          <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', fontSize: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569' }}>
+              <Phone size={15} color="#0e7490" />
+              <span>الرقم الموحد لخدمة العملاء: <strong style={{ color: '#0e7490', letterSpacing: '0.5px' }} dir="ltr">920012991</strong></span>
+            </div>
+            <div style={{ color: '#64748b', fontSize: '11px' }}>
+              بوابة التسجيل: <strong style={{ color: '#0284c7' }}>crm.msc.edu.sa</strong>
+            </div>
           </div>
         </div>
 
@@ -257,7 +315,7 @@ export default function AboutSchoolModal({ isOpen, onClose }) {
             href="https://www.msc.edu.sa/"
             target="_blank"
             rel="noopener noreferrer"
-            className="btn btn-primary"
+            className="btn btn-flash-about"
             style={{
               flex: 1,
               minWidth: '220px',
@@ -268,16 +326,13 @@ export default function AboutSchoolModal({ isOpen, onClose }) {
               padding: '12px 20px',
               fontSize: '14px',
               fontWeight: 800,
-              background: 'linear-gradient(135deg, #0e7490, #0284c7)',
-              border: 'none',
               borderRadius: '12px',
-              color: '#ffffff',
               textDecoration: 'none',
-              boxShadow: '0 4px 12px rgba(14, 116, 144, 0.25)'
+              boxShadow: '0 4px 14px rgba(234, 179, 8, 0.4)'
             }}
           >
             <Globe size={18} />
-            <span>زيارة الموقع الرسمي للمدارس (msc.edu.sa)</span>
+            <span>زيارة الموقع الرسمي لشركة المدارس المتقدمة (msc.edu.sa)</span>
             <ExternalLink size={15} />
           </a>
 

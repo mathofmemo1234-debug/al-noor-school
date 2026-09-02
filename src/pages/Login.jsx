@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, AlertCircle, Building2 } from 'lucide-react';
+import { LogIn, AlertCircle, Building2, Sparkles } from 'lucide-react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -436,33 +436,29 @@ export default function Login() {
       <div className="login-container relative min-h-screen flex items-center justify-center overflow-hidden">
         <div className="login-card glass-panel" style={{ maxWidth: '480px', width: '100%', position: 'relative', zIndex: 10 }}>
           
-          {/* About Us Button in Login Card */}
+          {/* About Us Button in Login Card (من نحن - فلاش يومض) */}
           <button
             type="button"
             onClick={() => setShowAboutModal(true)}
+            className="btn btn-flash-about"
             style={{
               position: 'absolute',
               top: '16px',
               left: '16px',
-              background: 'linear-gradient(135deg, rgba(14, 116, 144, 0.08), rgba(99, 178, 198, 0.15))',
-              border: '1px solid rgba(14, 116, 144, 0.25)',
               borderRadius: '20px',
               padding: '6px 14px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              cursor: 'pointer',
-              fontWeight: '700',
               fontSize: '12px',
-              color: '#0e7490',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
               zIndex: 20
             }}
             title="عن شركة المدارس المتقدمة (MSC) - من نحن"
           >
-            <Building2 size={15} color="#0e7490" />
+            <span className="flash-dot-indicator" />
+            <Building2 size={15} className="flash-icon" />
             <span>من نحن</span>
+            <Sparkles size={13} color="#713f12" />
           </button>
 
           <div className="login-header">
