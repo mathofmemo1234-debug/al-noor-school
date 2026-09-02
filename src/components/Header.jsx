@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Bell, Globe, Mail, Award } from 'lucide-react';
+import { Bell, Globe, Mail, Award, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import AboutSchoolModal from './AboutSchoolModal';
 
 export default function Header({ title, role }) {
   const { currentUser, userRole, userData } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
+  const [showAboutModal, setShowAboutModal] = useState(false);
   
   // Format role & extra info for display
   const effectiveRole = role || userRole;
@@ -147,6 +149,31 @@ export default function Header({ title, role }) {
           <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
         </button>
 
+        {/* About School Button (من نحن) */}
+        <button
+          className="btn"
+          onClick={() => setShowAboutModal(true)}
+          style={{
+            background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(202, 138, 4, 0.2))',
+            border: '1px solid rgba(202, 138, 4, 0.35)',
+            borderRadius: '20px',
+            padding: '6px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            fontWeight: '700',
+            fontSize: '13px',
+            color: '#b45309',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+          }}
+          title="عن مدارس المتقدمة - من نحن"
+        >
+          <Building2 size={16} color="#d97706" />
+          <span>من نحن</span>
+        </button>
+
         {/* Electronic Portfolio Quick Button */}
         <button
           className="btn"
@@ -235,6 +262,12 @@ export default function Header({ title, role }) {
           </div>
         </div>
       </div>
+
+      {/* About School Modal */}
+      <AboutSchoolModal 
+        isOpen={showAboutModal} 
+        onClose={() => setShowAboutModal(false)} 
+      />
     </header>
   );
 }

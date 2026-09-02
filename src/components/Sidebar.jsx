@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare, Globe, Mail, Award, ClipboardList } from 'lucide-react';
+import { LogOut, Users, BookOpen, Calendar, Home, Settings, FileText, Star, UserCheck, ShieldCheck, CheckSquare, Globe, Mail, Award, ClipboardList, Building2 } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import AboutSchoolModal from './AboutSchoolModal';
 
 export default function Sidebar({ role }) {
   const navigate = useNavigate();
   const { userData } = useAuth();
   const { t } = useLanguage();
+  const [showAboutModal, setShowAboutModal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -162,11 +164,44 @@ export default function Sidebar({ role }) {
       </nav>
 
       <div className="sidebar-footer">
+        {/* About School Button */}
+        <button 
+          className="nav-item" 
+          onClick={() => setShowAboutModal(true)} 
+          style={{ 
+            width: '100%', 
+            background: 'linear-gradient(135deg, rgba(14, 116, 144, 0.07), rgba(99, 178, 198, 0.15))', 
+            border: '1px solid rgba(14, 116, 144, 0.2)', 
+            cursor: 'pointer', 
+            color: '#0e7490', 
+            borderRadius: '10px',
+            marginBottom: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '10px 14px',
+            fontWeight: 700
+          }}
+          title="عن شركة المدارس المتقدمة (MSC)"
+        >
+          <Building2 size={19} color="#0e7490" />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'start' }}>
+            <span style={{ fontSize: '13px' }}>من نحن</span>
+            <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'normal' }}>مدارس المتقدمة (MSC)</span>
+          </div>
+        </button>
+
         <button className="nav-item" onClick={handleLogout} style={{ width: '100%', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.15)', cursor: 'pointer', color: '#dc2626', borderRadius: '10px' }}>
           <LogOut size={19} />
           <span>{t('sidebar.logout')}</span>
         </button>
       </div>
+
+      {/* About School Modal */}
+      <AboutSchoolModal 
+        isOpen={showAboutModal} 
+        onClose={() => setShowAboutModal(false)} 
+      />
     </div>
   );
 }

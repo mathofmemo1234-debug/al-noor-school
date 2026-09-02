@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, AlertCircle } from 'lucide-react';
+import { LogIn, AlertCircle, Building2 } from 'lucide-react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import AboutSchoolModal from '../components/AboutSchoolModal';
 import './Login.css';
 
 export default function Login() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { currentUser, userRole, loading: authLoading, setLoginRole } = useAuth();
+  const [showAboutModal, setShowAboutModal] = useState(false);
   
   // Auto-redirect already authenticated users
   React.useEffect(() => {
@@ -433,6 +435,36 @@ export default function Login() {
     <main role="main">
       <div className="login-container relative min-h-screen flex items-center justify-center overflow-hidden">
         <div className="login-card glass-panel" style={{ maxWidth: '480px', width: '100%', position: 'relative', zIndex: 10 }}>
+          
+          {/* About Us Button in Login Card */}
+          <button
+            type="button"
+            onClick={() => setShowAboutModal(true)}
+            style={{
+              position: 'absolute',
+              top: '16px',
+              left: '16px',
+              background: 'linear-gradient(135deg, rgba(14, 116, 144, 0.08), rgba(99, 178, 198, 0.15))',
+              border: '1px solid rgba(14, 116, 144, 0.25)',
+              borderRadius: '20px',
+              padding: '6px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              fontWeight: '700',
+              fontSize: '12px',
+              color: '#0e7490',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              zIndex: 20
+            }}
+            title="عن شركة المدارس المتقدمة (MSC) - من نحن"
+          >
+            <Building2 size={15} color="#0e7490" />
+            <span>من نحن</span>
+          </button>
+
           <div className="login-header">
             <div className="logo-container" style={{ width: '100px', height: '100px', background: 'transparent', boxShadow: 'none' }}>
               <img 
@@ -658,8 +690,14 @@ export default function Login() {
                 </button>
               </form>
             )}
-          </div>
         </div>
+      </div>
+
+      {/* About School Modal */}
+      <AboutSchoolModal 
+        isOpen={showAboutModal} 
+        onClose={() => setShowAboutModal(false)} 
+      />
     </main>
   );
 }
