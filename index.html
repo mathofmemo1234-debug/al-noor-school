@@ -14,6 +14,37 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
     <title>School Management System</title>
+    <script>
+      // Global catcher for legacy cached chunks / dynamic import fetch failures
+      (function() {
+        function handleChunkError(errStr) {
+          if (
+            typeof errStr === 'string' &&
+            (errStr.indexOf('Failed to fetch dynamically imported module') !== -1 ||
+             errStr.indexOf('error loading dynamically imported module') !== -1 ||
+             errStr.indexOf('Loading chunk') !== -1 ||
+             errStr.indexOf('ChunkLoadError') !== -1)
+          ) {
+            var last = sessionStorage.getItem('chunk_err_auto_reload');
+            var now = Date.now();
+            if (!last || (now - parseInt(last, 10)) > 10000) {
+              sessionStorage.setItem('chunk_err_auto_reload', now.toString());
+              window.location.reload();
+            }
+          }
+        }
+
+        window.addEventListener('error', function(e) {
+          var msg = (e && (e.message || (e.error && e.error.message))) || '';
+          handleChunkError(msg);
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+          var msg = (e && e.reason && (e.reason.message || e.reason.toString())) || '';
+          handleChunkError(msg);
+        });
+      })();
+    </script>
   </head>
   <body class="notranslate">
     <div id="root"></div>
