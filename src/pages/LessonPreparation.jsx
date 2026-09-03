@@ -122,11 +122,18 @@ export default function LessonPreparation() {
   // Saving state
   const [isSaving, setIsSaving] = useState(false);
   const [prepDocId, setPrepDocId] = useState(null);
+  const [customSubjectsList, setCustomSubjectsList] = useState([]);
 
-  // 1. Detect School and Curriculum Type
+  // 1. Detect School and Curriculum Type & Custom Subjects
   useEffect(() => {
     const schoolId = userData?.schoolId || 'default_school_1';
     if (!schoolId) return;
+
+    // Load custom subjects for this school
+    const qCustSubs = query(collection(db, 'subjects'), where('schoolId', '==', schoolId));
+    const unsubCustSubs = onSnapshot(qCustSubs, snap => {
+      setCustomSubjectsList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
 
     const fetchSchoolInfo = async () => {
       try {
@@ -406,7 +413,7 @@ export default function LessonPreparation() {
     }
 
     const effectiveSubjectParam = showAllStageLessons ? '__ALL__' : selectedSubject;
-    const lessons = getLessonsForSubject(curriculumType, selectedSemester, effectiveSubjectParam, selectedClass, selectedStage);
+    const lessons = getLessonsForSubject(curriculumType, selectedSemester, effectiveSubjectParam, selectedClass, selectedStage, customSubjectsList);
     setAvailableLessons(lessons);
 
     if (lessons.length > 0) {
@@ -420,7 +427,7 @@ export default function LessonPreparation() {
     } else {
       setLessonObjectives([]);
     }
-  }, [curriculumType, selectedSemester, selectedSubject, selectedClass, selectedStage, isCustomLesson, selectedLesson, showAllStageLessons]);
+  }, [curriculumType, selectedSemester, selectedSubject, selectedClass, selectedStage, isCustomLesson, selectedLesson, showAllStageLessons, customSubjectsList]);
 
   // 8. Handle Lesson Selection Change
   const handleLessonChange = (e) => {

@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Calendar, Printer } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import PrintScheduleModal from '../components/PrintScheduleModal';
+import { getSubjectColorTheme } from '../data/subjectThemes';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 const dayMap = {
@@ -213,27 +214,30 @@ export default function StudentSchedule() {
                     const cell = scheduleData[key];
                     
                     return (
-                      <td key={period} style={{ padding: '12px', textAlign: 'center', height: '60px' }}>
-                        {cell && cell.subject ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(99,178,198,0.1)', padding: '8px', borderRadius: '8px' }}>
-                            <span style={{ fontWeight: 'bold', color: 'var(--color-primary-dark)' }}>{cell.subject}</span>
-                            <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                              {t('studentSchedule.mr')} {teachers[cell.teacherId]?.name || t('studentSchedule.unspecified')}
-                            </span>
-                            {teachers[cell.teacherId]?.whatsapp && (
-                              <a href={`https://wa.me/${teachers[cell.teacherId].whatsapp}`} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: '#25D366', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '4px', background: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #25D366' }}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"/><path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1"/></svg>
-                                {t('studentSchedule.contact')}
-                              </a>
-                            )}
-                            {cell.virtualLink && (
-                              <a href={cell.virtualLink} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: '#3b82f6', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '4px', background: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #3b82f6' }}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                                {t('studentSchedule.lessonLink')}
-                              </a>
-                            )}
-                          </div>
-                        ) : (
+                      <td key={period} style={{ padding: '8px', textAlign: 'center', height: '70px' }}>
+                        {cell && cell.subject ? (() => {
+                          const theme = getSubjectColorTheme(cell.subject);
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: theme.bg, border: `1px solid ${theme.border}`, padding: '8px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.03)' }}>
+                              <span style={{ fontWeight: 'bold', color: theme.text, fontSize: '13px' }}>{cell.subject}</span>
+                              <span style={{ fontSize: '11px', color: theme.badgeText, background: theme.badgeBg, padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                {t('studentSchedule.mr')} {teachers[cell.teacherId]?.name || t('studentSchedule.unspecified')}
+                              </span>
+                              {teachers[cell.teacherId]?.whatsapp && (
+                                <a href={`https://wa.me/${teachers[cell.teacherId].whatsapp}`} target="_blank" rel="noreferrer" style={{ fontSize: '11px', color: '#16a34a', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '2px', background: '#fff', padding: '3px', borderRadius: '4px', border: '1px solid #16a34a', fontWeight: 'bold' }}>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"/><path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1"/></svg>
+                                  {t('studentSchedule.contact')}
+                                </a>
+                              )}
+                              {cell.virtualLink && (
+                                <a href={cell.virtualLink} target="_blank" rel="noreferrer" style={{ fontSize: '11px', color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '2px', background: '#fff', padding: '3px', borderRadius: '4px', border: '1px solid #2563eb', fontWeight: 'bold' }}>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                  {t('studentSchedule.lessonLink')}
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })() : (
                           <span style={{ color: '#ccc' }}>-</span>
                         )}
                       </td>

@@ -142,20 +142,67 @@ export function matchSubjectKey(rawSubject = '', availableKeys = []) {
 
   // 3. Subject aliases & keywords map
   const SUBJECT_KEYWORDS = {
-    'الرياضيات 1-1': ['رياضيات 1-1', 'رياضيات 1', 'رياضيات1-1', '1-1', 'رياضيات 1ث', 'رياضيات 1ث ف1', 'رياضيات', 'الرياضيات', 'الرياضيات 1-1', 'math 1-1', 'math 1', 'math', 'maths', 'mathematics'],
-    'الرياضيات': ['رياضيات 1-1', 'رياضيات 1', 'رياضيات1-1', '1-1', 'رياضيات 1ث', 'رياضيات 1ث ف1', 'رياضيات', 'الرياضيات', 'الرياضيات 1-1', 'math 1-1', 'math 1', 'math', 'maths', 'mathematics'],
+    // Secondary Pathways Specific Subjects
+    'الرياضيات 1-1': ['رياضيات 1-1', 'رياضيات 1', 'رياضيات1-1', '1-1', 'رياضيات 1ث ف1', 'الرياضيات 1-1', 'math 1-1', 'math 1'],
+    'الرياضيات 1-2': ['رياضيات 1-2', 'رياضيات1-2', '1-2', 'رياضيات 1ث ف2', 'الرياضيات 1-2', 'math 1-2'],
+    'الرياضيات 2-1': ['رياضيات 2-1', 'رياضيات 2', 'رياضيات2-1', '2-1', 'رياضيات 2ث ف1', 'الرياضيات 2-1', 'math 2-1', 'math 2'],
+    'الرياضيات 2-2': ['رياضيات 2-2', 'رياضيات2-2', '2-2', 'رياضيات 2ث ف2', 'الرياضيات 2-2', 'math 2-2'],
+    'الرياضيات': ['رياضيات', 'الرياضيات', 'math', 'maths', 'mathematics', 'حساب'],
+
+    'الكفايات اللغوية 1-1': ['كفايات 1-1', 'كفايات 1', 'الكفايات اللغوية 1-1', 'كفايات 1ث ف1', 'عربي 1-1'],
+    'الكفايات اللغوية 1-2': ['كفايات 1-2', 'الكفايات اللغوية 1-2', 'كفايات 1ث ف2', 'عربي 1-2'],
+    'الكفايات اللغوية': ['كفايات', 'الكفايات', 'الكفايات اللغوية'],
+    'لغتي الجميلة': ['لغتي الجميلة', 'لغتي ابتدائى', 'لغتي صفوف أولية', 'لغتي'],
+    'لغتي الخالدة': ['لغتي الخالدة', 'لغتي متوسط', 'لغتي'],
+    'اللغة العربية': ['لغة عربية', 'اللغة العربية', 'عربي', 'نحو', 'إملاء', 'املاء', 'قراءة', 'arabic', 'ela'],
+
+    'الفيزياء 1': ['فيزياء 1', 'فيزياء 1-1', 'الفيزياء 1', 'physics 1'],
+    'الفيزياء 2-1': ['فيزياء 2-1', 'فيزياء 2', 'الفيزياء 2-1', 'physics 2-1'],
+    'الفيزياء 2-2': ['فيزياء 2-2', 'الفيزياء 2-2', 'physics 2-2'],
+    'الفيزياء': ['فيزياء', 'الفيزياء', 'physics'],
+
+    'الكيمياء 1': ['كيمياء 1', 'كيمياء 1-1', 'الكيمياء 1', 'chemistry 1'],
+    'الكيمياء 2-1': ['كيمياء 2-1', 'كيمياء 2', 'الكيمياء 2-1', 'chemistry 2-1'],
+    'الكيمياء 2-2': ['كيمياء 2-2', 'الكيمياء 2-2', 'chemistry 2-2'],
+    'الكيمياء': ['كيمياء', 'الكيمياء', 'chemistry'],
+
+    'الأحياء 2-1': ['أحياء 2-1', 'احياء 2-1', 'الأحياء 2-1', 'biology 2-1'],
+    'الأحياء 2-2': ['أحياء 2-2', 'احياء 2-2', 'الأحياء 2-2', 'biology 2-2'],
     'الأحياء': ['أحياء', 'احياء', 'الأحياء', 'الاحياء', 'biology', 'علم الأحياء', 'life science'],
-    'الفيزياء': ['فيزياء', 'الفيزياء', 'physics', 'فيزيائية'],
-    'الكيمياء': ['كيمياء', 'الكيمياء', 'chemistry', 'كيميائية'],
-    'علم البيئة': ['بيئة', 'البيئة', 'علم البيئة', 'ecology', 'environmental'],
-    'علوم الأرض والفضاء': ['علوم الأرض', 'علوم الارض', 'فضاء', 'الفضاء', 'جيولوجيا', 'earth science', 'astronomy', 'earth & space'],
-    'الكفايات اللغوية (اللغة العربية)': ['كفايات', 'الكفايات', 'الكفايات اللغوية', 'لغتي', 'لغتي الخالدة', 'لغتي الجميلة', 'لغة عربية', 'اللغة العربية', 'عربي', 'نحو', 'إملاء', 'املاء', 'بلاغة', 'أدب', 'ادب', 'قراءة', 'arabic', 'ela'],
-    'التقنية الرقمية (الحاسب والبرمجة)': ['تقنية', 'التقنية', 'تقنية رقمية', 'التقنية الرقمية', 'مهارات رقمية', 'المهارات الرقمية', 'حاسب', 'حاسب آلي', 'الحاسب الآلي', 'حاسوب', 'الحاسوب', 'برمجة', 'بايثون', 'python', 'computer', 'ict', 'it', 'digital skills'],
-    'القرآن الكريم والدراسات الإسلامية': ['دراسات إسلامية', 'الدراسات الإسلامية', 'دراسات اسلامية', 'إسلاميات', 'اسلاميات', 'تربية إسلامية', 'التربية الإسلامية', 'دين', 'القرآن', 'القرآن الكريم', 'قرآن', 'توحيد', 'التوحيد', 'فقه', 'الفقه', 'حديث', 'الحديث', 'تفسير', 'التفسير', 'تجويد', 'islamic'],
-    'الدراسات الاجتماعية': ['اجتماعيات', 'الاجتماعيات', 'دراسات اجتماعية', 'الدراسات الاجتماعية', 'تاريخ', 'التاريخ', 'جغرافيا', 'الجغرافيا', 'وطنية', 'تربية وطنية', 'social studies', 'history', 'geography'],
+
+    'علم البيئة 1-1': ['علم البيئة 1-1', 'بيئة 1-1', 'علم البيئة', 'بيئة', 'البيئة', 'ecology', 'environmental'],
+    'علوم الأرض والفضاء': ['علوم الأرض', 'علوم الارض', 'فضاء', 'الفضاء', 'جيولوجيا', 'earth science', 'astronomy', 'earth & space', 'جيولوجيا وفلك'],
+
+    'التقنية الرقمية 1-1': ['تقنية رقمية 1-1', 'تقنية 1-1', 'التقنية الرقمية 1-1', 'حاسب 1-1'],
+    'التقنية الرقمية 1-2': ['تقنية رقمية 1-2', 'تقنية 1-2', 'التقنية الرقمية 1-2', 'حاسب 1-2'],
+    'التقنية الرقمية 2-1': ['تقنية رقمية 2-1', 'تقنية 2-1', 'التقنية الرقمية 2-1', 'حاسب 2-1'],
+    'التقنية الرقمية': ['تقنية', 'التقنية', 'تقنية رقمية', 'التقنية الرقمية', 'حاسب', 'حاسب آلي', 'حاسوب', 'computer', 'ict', 'it', 'digital skills'],
+    'المهارات الرقمية': ['مهارات رقمية', 'المهارات الرقمية', 'حاسب ابتدائي', 'حاسب متوسط', 'حاسوب', 'برمجة', 'سكراتش', 'scratch'],
+
+    'الذكاء الاصطناعي 1-1 وعلم البيانات': ['ذكاء اصطناعي', 'الذكاء الاصطناعي', 'علم البيانات', 'بيانات وذكاء', 'ai', 'data science', 'artificial intelligence'],
+    'مبادئ الإدارة والأعمال': ['إدارة أعمال', 'مبادئ الإدارة', 'ادارة اعمال', 'إدارة', 'اعمال', 'business', 'management'],
+    'مبادئ العلوم الصحية': ['علوم صحية', 'العلوم الصحية', 'صحة وحياة', 'صحة', 'health science', 'health'],
+    'الهندسة البرمجية وإنترنت الأشياء': ['هندسة برمجية', 'إنترنت الأشياء', 'انترنت الاشياء', 'iot', 'software engineering'],
+    'أنظمة جسم الإنسان والرعاية الصحية': ['أنظمة جسم الإنسان', 'انظمة جسم الانسان', 'رعاية صحية', 'تشريح', 'human body', 'anatomy'],
+    'المحاسبة والمالية والقانون': ['محاسبة', 'مالية', 'قانون', 'المحاسبة', 'accounting', 'finance', 'law'],
+    'الدراسات البلاغية والنقدية والقرآنية': ['بلاغة ونقد', 'دراسات بلاغية', 'أصول فقه', 'اصول الفقه', 'بلاغة'],
+
+    'اللغة الإنجليزية 1-1': ['انجليزي 1-1', 'إنجليزي 1-1', 'mega goal 1.1', 'mega goal 1', 'english 1-1', 'اللغة الإنجليزية 1-1'],
+    'اللغة الإنجليزية 1-2': ['انجليزي 1-2', 'إنجليزي 1-2', 'mega goal 1.2', 'english 1-2', 'اللغة الإنجليزية 1-2'],
+    'اللغة الإنجليزية 2-1': ['انجليزي 2-1', 'إنجليزي 2-1', 'mega goal 2.1', 'mega goal 2', 'english 2-1', 'اللغة الإنجليزية 2-1'],
+    'اللغة الإنجليزية 2-2': ['انجليزي 2-2', 'إنجليزي 2-2', 'mega goal 2.2', 'english 2-2', 'اللغة الإنجليزية 2-2'],
     'اللغة الإنجليزية': ['إنجليزي', 'انجليزي', 'الانجليزي', 'الإنجليزي', 'اللغة الإنجليزية', 'اللغة الانجليزية', 'english', 'mega goal', 'super goal', 'we can', 'top goal'],
+
+    'الدراسات الإسلامية 1-1': ['دراسات إسلامية 1-1', 'إسلاميات 1-1', 'دين 1-1', 'الدراسات الإسلامية 1-1'],
+    'الدراسات الإسلامية التخصصية': ['دراسات إسلامية تخصصية', 'توحيد 2', 'حديث 2', 'علوم شرعية', 'تخصصي شرعي'],
+    'القرآن الكريم والدراسات الإسلامية': ['دراسات إسلامية', 'الدراسات الإسلامية', 'دراسات اسلامية', 'إسلاميات', 'تربية إسلامية', 'دين', 'القرآن', 'القرآن الكريم', 'قرآن', 'توحيد', 'فقه', 'حديث', 'تفسير', 'تجويد', 'islamic'],
+
+    'التاريخ والدراسات الاجتماعية': ['تاريخ واجتماعيات', 'تاريخ ثانوي', 'تاريخ', 'التاريخ والدراسات الاجتماعية'],
+    'الدراسات الاجتماعية': ['اجتماعيات', 'الاجتماعيات', 'دراسات اجتماعية', 'الدراسات الاجتماعية', 'تاريخ', 'التاريخ', 'جغرافيا', 'الجغرافيا', 'وطنية', 'تربية وطنية', 'social studies', 'history', 'geography'],
+
     'العلوم': ['علوم', 'العلوم', 'science', 'general science', 'physical science'],
     'التفكير الناقد': ['تفكير ناقد', 'التفكير الناقد', 'critical thinking'],
+    'التربية الصحية والبدنية 1-1': ['تربية صحية وبدنية', 'صحي وبدني', 'بدنية 1-1', 'التربية الصحية والبدنية 1-1'],
     'التربية البدنية والدفاع عن النفس': ['بدنية', 'البدنية', 'تربية بدنية', 'التربية البدنية', 'دفاع عن النفس', 'رياضة', 'pe', 'physical education', 'sports'],
     'التربية الفنية': ['فنية', 'الفنية', 'تربية فنية', 'التربية الفنية', 'رسم', 'الرسم', 'art', 'arts', 'fine arts'],
     'المهارات الحياتية والأسرية': ['مهارات حياتية', 'المهارات الحياتية', 'مهارات أسرية', 'المهارات الأسرية', 'تربية أسرية', 'life skills', 'home economics']
@@ -178,6 +225,37 @@ export function matchSubjectKey(rawSubject = '', availableKeys = []) {
 }
 
 /**
+ * الكشف والمطابقة الذكية للفصل الدراسي لدعم كافة التنسيقات (ف1، ف2، الفصل الأول، الفصل الثاني، إلخ)
+ */
+export function matchSemesterKey(semester = '', availableSemesterKeys = []) {
+  if (!availableSemesterKeys || availableSemesterKeys.length === 0) return 'الفصل الدراسي الأول';
+  const semClean = (semester || '').toLowerCase().trim();
+  
+  if (
+    semClean.includes('ثان') || 
+    semClean.includes('ف2') || 
+    semClean.includes('ف 2') || 
+    semClean.includes('term 2') || 
+    semClean.includes('semester 2') || 
+    semClean.includes('2') || 
+    semClean.includes('second') || 
+    semClean.includes('2nd')
+  ) {
+    const matchedSecond = availableSemesterKeys.find(k => 
+      k.includes('ثان') || k.includes('2') || k.toLowerCase().includes('second')
+    );
+    if (matchedSecond) return matchedSecond;
+  }
+  
+  const matchedFirst = availableSemesterKeys.find(k => 
+    k.includes('أول') || k.includes('ف1') || k.includes('ف 1') || k.includes('1') || k.toLowerCase().includes('first')
+  );
+  if (matchedFirst) return matchedFirst;
+
+  return availableSemesterKeys[0];
+}
+
+/**
  * استخراج قائمة المواد المتاحة لفصل دراسي ومرحلة معينة بدقة صارمة
  */
 export function getAvailableCurriculumSubjects(curriculumType, semester, className = '', explicitStage = null) {
@@ -187,24 +265,47 @@ export function getAvailableCurriculumSubjects(curriculumType, semester, classNa
   const stageData = data[stage];
   if (!stageData) return [];
 
-  // Match Semester
-  const matchedSemesterKey = Object.keys(stageData).find(s => s.includes(semester) || semester.includes(s)) || Object.keys(stageData)[0];
+  // Match Semester with intelligent flexibility
+  const matchedSemesterKey = matchSemesterKey(semester, Object.keys(stageData));
   if (!matchedSemesterKey || !stageData[matchedSemesterKey]) return [];
 
   return Object.keys(stageData[matchedSemesterKey]);
 }
 
+import { getSubjectColorTheme, SUBJECT_COLOR_PALETTES } from './subjectThemes';
+
 /**
- * استخراج الدروس المعتمدة لمادة معينة في فصل دراسي ومرحلة محددة مع التمييز الواضح التام للمواد
+ * استخراج الدروس المعتمدة لمادة معينة في فصل دراسي ومرحلة محددة مع دعم المواد المخصصة
  */
-export function getLessonsForSubject(curriculumType, semester, subjectName = '', className = '', explicitStage = null) {
+export function getLessonsForSubject(curriculumType, semester, subjectName = '', className = '', explicitStage = null, customSubjectsList = []) {
+  // 1. Check custom subjects list first
+  if (subjectName && Array.isArray(customSubjectsList) && customSubjectsList.length > 0) {
+    const custom = customSubjectsList.find(cs => cs.name?.trim() === subjectName.trim() || cs.name?.toLowerCase().trim() === subjectName.toLowerCase().trim());
+    if (custom && Array.isArray(custom.lessons) && custom.lessons.length > 0) {
+      return custom.lessons.map(item => {
+        const lessonTitle = typeof item === 'string' ? item : (item.lesson || item.title || '');
+        const unitTitle = typeof item === 'object' && item.unit ? item.unit : 'وحدة تعليمية';
+        const objs = typeof item === 'object' && Array.isArray(item.objectives) ? item.objectives : [];
+        return {
+          subject: custom.name,
+          grade: custom.grade || custom.stage || 'مادة مخصصة',
+          unit: unitTitle,
+          lesson: lessonTitle,
+          displayTitle: `[${custom.name}] ${lessonTitle} (${unitTitle})`,
+          shortTitle: `${lessonTitle}`,
+          objectives: objs
+        };
+      });
+    }
+  }
+
   const data = getCurriculumData(curriculumType);
   const stage = explicitStage || detectStageFromClassName(className, curriculumType);
   
   const stageData = data[stage];
   if (!stageData) return [];
 
-  const matchedSemesterKey = Object.keys(stageData).find(s => s.includes(semester) || semester.includes(s)) || Object.keys(stageData)[0];
+  const matchedSemesterKey = matchSemesterKey(semester, Object.keys(stageData));
   const semesterData = stageData[matchedSemesterKey] || {};
   const availableSubjectKeys = Object.keys(semesterData);
 
@@ -264,8 +365,8 @@ export function groupLessonsBySubject(lessons = []) {
 /**
  * استخراج أهداف درس معين
  */
-export function getObjectivesForLesson(curriculumType, semester, subjectName, lessonTitle, className = '') {
-  const lessons = getLessonsForSubject(curriculumType, semester, subjectName, className);
+export function getObjectivesForLesson(curriculumType, semester, subjectName, lessonTitle, className = '', customSubjectsList = []) {
+  const lessons = getLessonsForSubject(curriculumType, semester, subjectName, className, null, customSubjectsList);
   const found = lessons.find(l => l.lesson === lessonTitle || l.displayTitle === lessonTitle || lessonTitle.includes(l.lesson));
   return found ? found.objectives : [];
 }
@@ -297,5 +398,12 @@ export function formatResourcesToMarkdown(selectedResources = [], customResource
   return all.map(r => `- ${r}`).join('\n');
 }
 
-export { POPULAR_TEACHING_STRATEGIES, POPULAR_LEARNING_RESOURCES, SAUDI_STAGES, AMERICAN_STAGES };
+export { 
+  POPULAR_TEACHING_STRATEGIES, 
+  POPULAR_LEARNING_RESOURCES, 
+  SAUDI_STAGES, 
+  AMERICAN_STAGES,
+  getSubjectColorTheme,
+  SUBJECT_COLOR_PALETTES
+};
 
