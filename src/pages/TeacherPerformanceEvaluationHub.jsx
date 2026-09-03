@@ -44,13 +44,13 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     lessonTitle: ''
   });
 
-  // Request Access Modal State (Principal -> Supervisor)
+  // Request Access Modal State (Principal <-> Supervisor)
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [targetVisitForRequest, setTargetVisitForRequest] = useState(null);
   const [requestNote, setRequestNote] = useState('');
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
-  // Supervisor Responding State
+  // Supervisor / Principal Responding State
   const [isProcessingResponse, setIsProcessingResponse] = useState(false);
 
   const schoolId = userData?.schoolId || currentUser?.schoolId || '';
@@ -135,9 +135,9 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     }
     const foundTeacher = teachers.find(t => t.id === selectedTeacherId || t.nationalId === selectedTeacherId);
 
-    const determinedVisitType = isSupervisor ? 'supervisor' : (isAdmin ? 'principal' : (newVisitForm.visitType || 'principal'));
-    const determinedRole = isSupervisor ? 'supervisor' : 'admin';
-    const evaluatorTitle = isSupervisor ? 'المشرف التربوي' : 'مدير المدرسة';
+    const determinedVisitType = newVisitForm.visitType || (isSupervisor ? 'supervisor' : 'principal');
+    const determinedRole = determinedVisitType === 'supervisor' ? 'supervisor' : 'admin';
+    const evaluatorTitle = determinedVisitType === 'supervisor' ? 'المشرف التربوي' : 'مدير المدرسة';
 
     try {
       setIsSavingVisit(true);
@@ -211,11 +211,18 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     });
   }, [visits, evaluations]);
 
-  // Compute Pending Access Requests for Supervisor
+  // Compute Pending Access Requests (Relevant to the Logged-in User's Role)
   const pendingRequestsList = useMemo(() => {
     const list = [];
     visits.forEach(v => {
-      if (Array.isArray(v.accessRequests)) {
+      const isSupVisit = v.visitType === 'supervisor' || v.evaluatorRole === 'supervisor';
+      const isPrincVisit = !isSupVisit;
+
+      // If logged-in as Supervisor, look at requests on Supervisor visits (from Principal)
+      // If logged-in as Admin/Principal, look at requests on Principal visits (from Supervisor)
+      const isRelevantToMe = isSupervisor ? isSupVisit : (isAdmin ? isPrincVisit : true);
+
+      if (isRelevantToMe && Array.isArray(v.accessRequests)) {
         v.accessRequests.forEach(req => {
           if (req.status === 'pending') {
             list.push({ ...req, visit: v });
@@ -224,26 +231,37 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
       }
     });
     return list;
-  }, [visits]);
+  }, [visits, isSupervisor, isAdmin]);
 
-  // Check if current user has view permission for a visit
+  // Check if current user has view permission for a visit (Mutual Isolation)
   const checkCanViewVisit = (v) => {
-    // 1. If teacher, can view their own visits
+    // 1. Teacher can view all their own visits
     if (isTeacher) return true;
 
-    // 2. If visitor, can view
+    // 2. Visitor can view
     if (isVisitor) return true;
 
-    // 3. If supervisor, can view all supervisor visits or their own
-    if (isSupervisor) return true;
+    const isSupVisit = v.visitType === 'supervisor' || v.evaluatorRole === 'supervisor';
+    const isPrincVisit = !isSupVisit;
 
-    // 4. If Principal / Admin:
+    // 3. Supervisor viewing
+    if (isSupervisor) {
+      // Supervisor visits -> fully accessible
+      if (isSupVisit) return true;
+      // Principal visits -> LOCKED by default unless approved by Principal
+      const approved = Array.isArray(v.approvedViewers) && (
+        v.approvedViewers.includes(currentUserId) ||
+        v.approvedViewers.includes(userData?.id) ||
+        v.approvedViewers.includes(userData?.uid)
+      );
+      return approved;
+    }
+
+    // 4. Principal / Admin viewing
     if (isAdmin) {
-      // If it's a principal visit -> full access
-      if (v.visitType === 'principal' || v.evaluatorRole === 'admin') {
-        return true;
-      }
-      // If it's a supervisor visit -> check approvedViewers
+      // Principal visits -> fully accessible
+      if (isPrincVisit) return true;
+      // Supervisor visits -> LOCKED by default unless approved by Supervisor
       const approved = Array.isArray(v.approvedViewers) && (
         v.approvedViewers.includes(currentUserId) ||
         v.approvedViewers.includes(userData?.id) ||
@@ -255,8 +273,8 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     return true;
   };
 
-  // Get Access Request Status for current Admin user
-  const getAdminRequestStatus = (v) => {
+  // Get Access Request Status for current user
+  const getUserRequestStatus = (v) => {
     if (!Array.isArray(v.accessRequests) || v.accessRequests.length === 0) return 'none';
     const req = v.accessRequests.find(r => 
       r.requesterId === currentUserId || 
@@ -266,7 +284,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     return req ? req.status : 'none';
   };
 
-  // Send Access Request Handler (Principal -> Supervisor)
+  // Send Access Request Handler (Mutual: Principal <-> Supervisor)
   const handleOpenRequestModal = (v) => {
     setTargetVisitForRequest(v);
     setRequestNote('');
@@ -278,16 +296,21 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     if (!targetVisitForRequest) return;
 
     setIsSubmittingRequest(true);
+    const myRole = isSupervisor ? 'supervisor' : 'admin';
+    const myName = userData?.name || (isSupervisor ? 'المشرف التربوي' : 'مدير المدرسة');
+    const isTargetSupervisorVisit = targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor';
+
     try {
       await requestVisitAccess(targetVisitForRequest.id, {
         id: currentUserId,
         uid: currentUserId,
-        name: userData?.name || 'مدير المدرسة',
-        role: 'admin'
+        name: myName,
+        role: myRole
       }, requestNote);
 
       setShowRequestModal(false);
-      alert('✓ تم إرسال طلب مشاهدة تقرير الزيارة إلى المشرف التربوي بنجاح. سيتم إشعارك فور اعتماده.');
+      const recipientTitle = isTargetSupervisorVisit ? 'المشرف التربوي' : 'مدير المدرسة';
+      alert(`✓ تم إرسال طلب مشاهدة تقرير الزيارة إلى ${recipientTitle} بنجاح. سيتم إشعارك فور اعتماده.`);
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء إرسال الطلب: ' + err.message);
@@ -296,16 +319,18 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
     }
   };
 
-  // Supervisor Decision on Access Request Handler
-  const handleSupervisorRespond = async (visitId, requestId, decision) => {
+  // Supervisor / Principal Decision on Access Request Handler
+  const handleRespondToRequest = async (visitId, requestId, decision) => {
     setIsProcessingResponse(true);
+    const responderName = userData?.name || (isSupervisor ? 'المشرف التربوي' : 'مدير المدرسة');
+
     try {
       await respondToVisitAccessRequest(visitId, requestId, decision, {
         id: currentUserId,
-        name: userData?.name || 'المشرف التربوي'
+        name: responderName
       });
       alert(decision === 'approved' 
-        ? '✓ تمت الموافقة وإتاحة تقرير الزيارة لمدير المدرسة بنجاح.' 
+        ? '✓ تمت الموافقة وإتاحة تقرير الزيارة للطرف الطالب بنجاح.' 
         : '✓ تم تسجيل رفض طلب المشاهدة بنجاح.'
       );
     } catch (err) {
@@ -387,7 +412,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
               </h1>
             </div>
             <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-              شركة المدارس المتقدمة • عزل زيارات المدير والمشرف التربوي مع نظام طلب وموافقة المشاهدة المعتمد
+              شركة المدارس المتقدمة • نظام العزل المتبادل لزيارات المدير والمشرف التربوي مع ميزة طلب المشاهدة والموافقة المعتمدة
             </p>
           </div>
 
@@ -403,9 +428,9 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                   setShowAddModal(true);
                 }}
                 className="btn btn-primary"
-                style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: 'white', fontWeight: 'bold', padding: '10px 20px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                style={{ background: isSupervisor ? 'linear-gradient(135deg, #7e22ce 0%, #6b21a8 100%)' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: 'white', fontWeight: 'bold', padding: '10px 20px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
               >
-                <Plus size={18} /> {isSupervisor ? 'إضافة زيارة إشرافية جديدة' : 'إضافة زيارة صفية (مدير)'}
+                <Plus size={18} /> {isSupervisor ? 'إضافة زيارة إشرافية جديدة (مشرف)' : 'إضافة زيارة صفية (مدير)'}
               </button>
             )}
             <span style={{ fontSize: '13px', fontWeight: 'bold', padding: '6px 14px', borderRadius: '20px', background: isSupervisor ? '#faf5ff' : isAdmin ? '#eff6ff' : isTeacher ? '#f0fdf4' : '#faf5ff', color: isSupervisor ? '#7e22ce' : isAdmin ? '#1d4ed8' : isTeacher ? '#15803d' : '#7e22ce', border: '1px solid currentColor' }}>
@@ -473,7 +498,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
             🎓 زيارات المشرف التربوي ({enrichedVisits.filter(v => v.visitType === 'supervisor' || v.evaluatorRole === 'supervisor').length})
           </button>
 
-          {isSupervisor && (
+          {isEvaluator && (
             <button
               type="button"
               onClick={() => setVisitTypeTab('requests')}
@@ -491,7 +516,10 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                 gap: '6px'
               }}
             >
-              <Bell size={16} /> طلبات المشاهدة من المدير ({pendingRequestsList.length})
+              <Bell size={16} /> 
+              {isSupervisor 
+                ? `طلبات المشاهدة من المدير (${pendingRequestsList.length})` 
+                : `طلبات المشاهدة من المشرف (${pendingRequestsList.length})`}
             </button>
           )}
         </div>
@@ -553,18 +581,20 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
             />
           )}
         </div>
-      ) : visitTypeTab === 'requests' && isSupervisor ? (
+      ) : visitTypeTab === 'requests' && isEvaluator ? (
         
-        /* 4. Dedicated Requests View for Supervisor */
+        /* 4. Dedicated Requests View for Supervisor & Principal */
         <div className="glass-panel" style={{ padding: '24px', borderRadius: '16px', background: 'white' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
             <Bell size={24} color="#f59e0b" />
             <div>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#0f172a' }}>
-                طلبات مدير المدرسة لمشاهدة تقارير الزيارات الإشرافية
+                {isSupervisor 
+                  ? 'طلبات مدير المدرسة لمشاهدة تقارير الزيارات الإشرافية' 
+                  : 'طلبات المشرف التربوي لمشاهدة تقارير زيارات مدير المدرسة'}
               </h3>
               <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748b' }}>
-                بموجب سياسة العزل والخصوصية، لا يمكن لمدير المدرسة الاطلاع على تقرير زيارة المشرف إلا بعد موافقتك الصريحة.
+                بموجب سياسة العزل المتبادل، يتم حجب الزيارات ولا يمكن الاطلاع على التقرير والدرجات إلا بعد موافقة الطرف المنفّذ للزيارة.
               </p>
             </div>
           </div>
@@ -573,7 +603,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
             <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
               <CheckCircle2 size={44} color="#16a34a" style={{ margin: '0 auto 10px auto' }} />
               <div style={{ fontWeight: 'bold', fontSize: '15px' }}>لا توجد طلبات مشاهدة معلقة حالياً</div>
-              <p style={{ fontSize: '13px', margin: '4px 0 0 0' }}>كافة تقاريرك الإشرافية مؤمنة ومعزولة بالكامل.</p>
+              <p style={{ fontSize: '13px', margin: '4px 0 0 0' }}>كافة تقارير الزيارات مؤمنة ومعزولة بالكامل وفق الصلاحيات المعتمدة.</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -582,7 +612,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                       <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#92400e' }}>
-                        طلب من: {req.requesterName} (مدير المدرسة)
+                        طلب وارد من: {req.requesterName} ({req.requesterRole === 'supervisor' ? 'مشرف تربوي' : 'مدير مدرسة'})
                       </span>
                       <span style={{ background: '#fef3c7', color: '#b45309', fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '6px' }}>
                         {req.visit?.visitNumber || 'زيارة'}
@@ -593,7 +623,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                     </div>
                     {req.notes && (
                       <div style={{ fontSize: '12px', color: '#451a03', marginTop: '6px', background: 'rgba(255,255,255,0.7)', padding: '6px 10px', borderRadius: '6px' }}>
-                        <strong>ملاحظة المدير:</strong> "{req.notes}"
+                        <strong>مبرر الطلب:</strong> "{req.notes}"
                       </div>
                     )}
                   </div>
@@ -602,7 +632,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                     <button
                       type="button"
                       disabled={isProcessingResponse}
-                      onClick={() => handleSupervisorRespond(req.visit.id, req.requestId, 'rejected')}
+                      onClick={() => handleRespondToRequest(req.visit.id, req.requestId, 'rejected')}
                       style={{ background: '#fee2e2', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
                       <XCircle size={15} /> رفض الطلب
@@ -610,7 +640,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                     <button
                       type="button"
                       disabled={isProcessingResponse}
-                      onClick={() => handleSupervisorRespond(req.visit.id, req.requestId, 'approved')}
+                      onClick={() => handleRespondToRequest(req.visit.id, req.requestId, 'approved')}
                       style={{ background: '#16a34a', border: 'none', color: 'white', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)' }}
                     >
                       <CheckCircle2 size={15} /> ✅ موافقة وإتاحة المشاهدة
@@ -683,7 +713,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                 سجل الزيارات والملاحظة الصفية ({filteredVisits.length})
               </h3>
               <span style={{ fontSize: '12px', color: '#64748b' }}>
-                زيارات المدير والمشرف معزولة بالكامل وفق الصلاحيات المعتمدة
+                زيارات المدير والمشرف معزولة بالكامل وفق الصلاحيات ونظام طلب المشاهدة
               </span>
             </div>
 
@@ -703,7 +733,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                       <th style={{ padding: '12px 10px' }}>تاريخ الزيارة</th>
                       <th style={{ padding: '12px 10px', textAlign: 'center' }}>الدرجة والنسبة</th>
                       <th style={{ padding: '12px 10px', textAlign: 'center' }}>حالة التقييم</th>
-                      <th style={{ padding: '12px 10px', textAlign: 'center', width: '170px' }}>الإجراء والصلاحية</th>
+                      <th style={{ padding: '12px 10px', textAlign: 'center', width: '180px' }}>الإجراء والصلاحية</th>
                     </tr>
                   </thead>
                   <tbody style={{ fontSize: '13px' }}>
@@ -712,12 +742,15 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                       const vNum = v.visitNumber || `VIS-${v.seqNumber || 1}`;
                       const isSupervisorVisit = v.visitType === 'supervisor' || v.evaluatorRole === 'supervisor';
                       const canView = checkCanViewVisit(v);
-                      const adminReqStatus = getAdminRequestStatus(v);
+                      const reqStatus = getUserRequestStatus(v);
 
                       const isApproved = ev && (ev.status === 'approved' || ev.teacherDecision === 'approved');
                       const isRejected = ev && (ev.status === 'rejected' || ev.teacherDecision === 'rejected');
                       const isDraft = ev && ev.status === 'draft';
                       const isSent = ev && ev.status === 'sent' && !isApproved && !isRejected;
+
+                      // Check if current user is viewing the other party's visit with approved access
+                      const isOtherPartyVisit = (isAdmin && isSupervisorVisit) || (isSupervisor && !isSupervisorVisit);
 
                       return (
                         <tr key={v.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -728,12 +761,12 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                           {/* Visit Type Badge */}
                           <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                             {isSupervisorVisit ? (
-                              <span style={{ background: '#f3e8ff', color: '#7e22ce', border: '1px solid #d8b4fe', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                🎓 مشرف تربوي
+                              <span style={{ background: '#f3e8ff', color: '#7e22ce', border: '1px solid #d8b4fe', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                🎓 زيارة مشرف تربوي
                               </span>
                             ) : (
-                              <span style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                👔 مدير مدرسة
+                              <span style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                👔 زيارة مدير مدرسة
                               </span>
                             )}
                           </td>
@@ -748,7 +781,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                             {v.visitDate}
                           </td>
 
-                          {/* Score and Percentage (Masked if Locked from Principal) */}
+                          {/* Score and Percentage (Masked if Locked from Other Party) */}
                           <td style={{ padding: '12px 10px', textAlign: 'center', fontWeight: 'bold' }}>
                             {!canView ? (
                               <span style={{ color: '#94a3b8', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -766,7 +799,9 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                           {/* Status Badge */}
                           <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                             {!canView ? (
-                              <span style={{ color: '#64748b', fontSize: '11px' }}>خاص بالمشرف</span>
+                              <span style={{ color: '#64748b', fontSize: '11px' }}>
+                                {isSupervisorVisit ? 'خاص بالمشرف' : 'خاص بمدير المدرسة'}
+                              </span>
                             ) : !ev ? (
                               <span style={{ color: '#94a3b8', fontSize: '12px' }}>غير مقيم</span>
                             ) : isApproved ? (
@@ -802,20 +837,20 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                                     {isEvaluator ? (ev ? 'عرض / تعديل' : 'تقييم الزيارة') : 'عرض الاستمارة'}
                                   </button>
 
-                                  {/* Authorized Badge for Principal viewing Supervisor Visit */}
-                                  {isAdmin && isSupervisorVisit && (
-                                    <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }} title="مصرح بموافقة المشرف">
+                                  {/* Authorized Badge when viewing other party's visit */}
+                                  {isOtherPartyVisit && (
+                                    <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }} title="مصرح بالمشاهدة بموافقة الطرف المنفذ">
                                       <Unlock size={12} /> مصرح
                                     </span>
                                   )}
                                 </>
                               ) : (
-                                /* Locked from Principal -> Request Flow */
-                                adminReqStatus === 'pending' ? (
+                                /* Locked from current party -> Request Flow */
+                                reqStatus === 'pending' ? (
                                   <span style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                    <Clock size={13} /> بانتظار المشرف
+                                    <Clock size={13} /> {isSupervisorVisit ? 'بانتظار المشرف' : 'بانتظار المدير'}
                                   </span>
-                                ) : adminReqStatus === 'rejected' ? (
+                                ) : reqStatus === 'rejected' ? (
                                   <button
                                     type="button"
                                     onClick={() => handleOpenRequestModal(v)}
@@ -828,14 +863,27 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenRequestModal(v)}
-                                    style={{ background: 'linear-gradient(135deg, #7e22ce, #a855f7)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', boxShadow: '0 2px 6px rgba(126, 34, 206, 0.25)' }}
+                                    style={{ 
+                                      background: isSupervisorVisit ? 'linear-gradient(135deg, #7e22ce, #a855f7)' : 'linear-gradient(135deg, #0284c7, #0ea5e9)', 
+                                      color: 'white', 
+                                      border: 'none', 
+                                      padding: '6px 12px', 
+                                      borderRadius: '8px', 
+                                      fontSize: '11px', 
+                                      fontWeight: 'bold', 
+                                      cursor: 'pointer', 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      gap: '4px', 
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)' 
+                                    }}
                                   >
                                     <Send size={13} /> طلب مشاهدة الزيارة
                                   </button>
                                 )
                               )}
 
-                              {isEvaluator && (canView || !isSupervisorVisit) && (
+                              {isEvaluator && !isOtherPartyVisit && (
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteVisit(v)}
@@ -993,7 +1041,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                   type="submit"
                   disabled={isSavingVisit}
                   className="btn btn-primary"
-                  style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: 'white', fontWeight: 'bold' }}
+                  style={{ background: isSupervisor ? 'linear-gradient(135deg, #7e22ce 0%, #6b21a8 100%)' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: 'white', fontWeight: 'bold' }}
                 >
                   {isSavingVisit ? 'جارٍ الحفظ...' : 'حفظ الزيارة وتثبيتها'}
                 </button>
@@ -1004,13 +1052,24 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
         </div>
       )}
 
-      {/* MODAL 2: Principal Requesting Access to Supervisor Visit */}
+      {/* MODAL 2: Requesting Access (Principal <-> Supervisor) */}
       {showRequestModal && targetVisitForRequest && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div style={{ background: 'white', borderRadius: '16px', maxWidth: '500px', width: '100%', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', borderTop: '6px solid #7e22ce' }} dir="rtl">
+          <div style={{ 
+            background: 'white', 
+            borderRadius: '16px', 
+            maxWidth: '500px', 
+            width: '100%', 
+            padding: '24px', 
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', 
+            borderTop: (targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor') ? '6px solid #7e22ce' : '6px solid #0284c7' 
+          }} dir="rtl">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6b21a8', fontWeight: 900, fontSize: '17px' }}>
-                <Send size={20} color="#7e22ce" /> طلب مشاهدة تقرير زيارة إشرافية
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: (targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor') ? '#6b21a8' : '#0369a1', fontWeight: 900, fontSize: '17px' }}>
+                <Send size={20} color={(targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor') ? '#7e22ce' : '#0284c7'} /> 
+                {(targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor') 
+                  ? 'طلب مشاهدة تقرير زيارة المشرف التربوي' 
+                  : 'طلب مشاهدة تقرير زيارة مدير المدرسة'}
               </div>
               <button
                 type="button"
@@ -1022,10 +1081,19 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
             </div>
 
             <form onSubmit={handleSendAccessRequest}>
-              <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '10px', padding: '12px', marginBottom: '14px', fontSize: '13px', color: '#581c87', lineHeight: '1.6' }}>
+              <div style={{ 
+                background: (targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor') ? '#faf5ff' : '#f0f9ff', 
+                border: (targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor') ? '1px solid #e9d5ff' : '1px solid #bae6fd', 
+                borderRadius: '10px', 
+                padding: '12px', 
+                marginBottom: '14px', 
+                fontSize: '13px', 
+                color: (targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor') ? '#581c87' : '#0369a1', 
+                lineHeight: '1.6' 
+              }}>
                 <div><strong>رقم الزيارة:</strong> {targetVisitForRequest.visitNumber || targetVisitForRequest.id}</div>
-                <div><strong>المعلم:</strong> {targetVisitForRequest.teacherName} ({targetVisitForRequest.subject})</div>
-                <div><strong>المشرف القائم بالزيارة:</strong> {targetVisitForRequest.evaluatorName || 'المشرف التربوي'}</div>
+                <div><strong>المعلم المزار:</strong> {targetVisitForRequest.teacherName} ({targetVisitForRequest.subject})</div>
+                <div><strong>الجهة المنفذة للزيارة:</strong> {targetVisitForRequest.evaluatorName || ((targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor') ? 'المشرف التربوي' : 'مدير المدرسة')}</div>
                 <div><strong>تاريخ الزيارة:</strong> {targetVisitForRequest.visitDate}</div>
               </div>
 
@@ -1036,7 +1104,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                 <textarea
                   rows="3"
                   className="input-field"
-                  placeholder="مثال: متابعة التوصيات الإشرافية وتنفيذ الخطة العلاجية للمعلم..."
+                  placeholder="مثال: متابعة التوصيات الفنية والإشرافية وتنفيذ الخطة التطويرية للمعلم..."
                   value={requestNote}
                   onChange={e => setRequestNote(e.target.value)}
                   style={{ width: '100%', marginBottom: 0, fontSize: '13px' }}
@@ -1044,7 +1112,7 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
               </div>
 
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#64748b' }}>
-                🔒 سيتم إرسال الطلب فوراً إلى المشرف التربوي، وسيتم فتح استمارة وتقرير الزيارة لك بمجرد موافقته.
+                🔒 بموجب سياسة الخصوصية، سيتم إرسال الطلب فوراً إلى الجهة المنفذة للزيارة، وسيتم فتح التقرير لك تلقائياً فور الاعتماد.
               </p>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
@@ -1059,9 +1127,12 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                   type="submit"
                   disabled={isSubmittingRequest}
                   className="btn btn-primary"
-                  style={{ background: 'linear-gradient(135deg, #7e22ce, #9333ea)', borderColor: '#7e22ce' }}
+                  style={{ 
+                    background: (targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor') ? 'linear-gradient(135deg, #7e22ce, #9333ea)' : 'linear-gradient(135deg, #0284c7, #0ea5e9)', 
+                    borderColor: (targetVisitForRequest.visitType === 'supervisor' || targetVisitForRequest.evaluatorRole === 'supervisor') ? '#7e22ce' : '#0284c7' 
+                  }}
                 >
-                  {isSubmittingRequest ? 'جارٍ الإرسال...' : '📨 إرسال الطلب للمشرف'}
+                  {isSubmittingRequest ? 'جارٍ الإرسال...' : '📨 إرسال الطلب للاعتماد'}
                 </button>
               </div>
             </form>
