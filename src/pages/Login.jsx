@@ -212,6 +212,30 @@ export default function Login() {
     } catch (err) {
       console.error("Login Error:", err);
       
+      // Auto-bootstrap first admin on a fresh new database
+      if (role === 'admin' && (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password')) {
+        try {
+          const adminCheck = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin')));
+          if (adminCheck.empty) {
+            const fakeEmail = getFakeEmail(trimmedId);
+            await createUserWithEmailAndPassword(auth, fakeEmail, trimmedPassword);
+            await addDoc(collection(db, 'users'), {
+              nationalId: trimmedId,
+              email: fakeEmail,
+              role: 'admin',
+              name: 'مدير المدرسة',
+              schoolId: 'default_school_1',
+              createdAt: new Date().toISOString()
+            });
+            setLoginRole('admin');
+            navigate('/admin');
+            return;
+          }
+        } catch (bootstrapErr) {
+          console.warn("Admin bootstrap check failed:", bootstrapErr);
+        }
+      }
+
       if (role !== 'admin' && (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-email')) {
         if (trimmedPassword === trimmedId || role === 'parent') {
           const fakeEmail = getFakeEmail(trimmedId);

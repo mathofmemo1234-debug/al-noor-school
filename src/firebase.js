@@ -3,7 +3,22 @@ import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } 
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
-const firebaseConfig = {
+// Determine active school database based on repository/URL context
+const isAlNoor = typeof window !== 'undefined' && (
+  window.location.pathname.toLowerCase().includes('al-noor') ||
+  window.location.hostname.toLowerCase().includes('al-noor') ||
+  window.location.href.toLowerCase().includes('al-noor')
+);
+
+// Database configuration per school
+const firebaseConfig = isAlNoor ? {
+  apiKey: "AIzaSyDoLuzPsKZeMSDfxOGWpE-aBmG2PzKWcTo",
+  authDomain: "al-noor-school-b2d7e.firebaseapp.com",
+  projectId: "al-noor-school-b2d7e",
+  storageBucket: "al-noor-school-b2d7e.firebasestorage.app",
+  messagingSenderId: "907983588153",
+  appId: "1:907983588153:web:aa4f77d5098d208680b6e8"
+} : {
   apiKey: "AIzaSyA-BaaAqrzeFzHiZpmNEwAeEB6Igd6QWKc",
   authDomain: "advanced-smart-learning-3dfbf.firebaseapp.com",
   databaseURL: "https://advanced-smart-learning-3dfbf-default-rtdb.europe-west1.firebasedatabase.app",
