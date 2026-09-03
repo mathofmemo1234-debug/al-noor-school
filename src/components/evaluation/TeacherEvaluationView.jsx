@@ -65,14 +65,27 @@ export default function TeacherEvaluationView({ evaluation, currentUser, onDecis
       {/* Header Banner */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--color-border)', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0284c7' }}>
-            أداة الملاحظة الصفية لعام {header.academicYear || '1448هـ'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0284c7' }}>
+              أداة الملاحظة الصفية لعام {header.academicYear || '1448هـ'}
+            </span>
+
+            {(evaluation.visitType === 'supervisor' || header.visitType === 'supervisor') ? (
+              <span style={{ fontSize: '12px', fontWeight: '900', color: '#7e22ce', background: '#f3e8ff', border: '1px solid #d8b4fe', padding: '3px 10px', borderRadius: '16px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                🎓 تقرير زيارة مشرف تربوي
+              </span>
+            ) : (
+              <span style={{ fontSize: '12px', fontWeight: '900', color: '#0369a1', background: '#e0f2fe', border: '1px solid #7dd3fc', padding: '3px 10px', borderRadius: '16px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                👔 تقرير زيارة مدير المدرسة
+              </span>
+            )}
+          </div>
+
           <h2 style={{ fontSize: '18px', fontWeight: 900, margin: '4px 0 0 0' }}>
             بطاقة تقييم الأداء المهني للمعلم: {header.teacherName || currentUser?.displayName || 'المعلم'}
           </h2>
           <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>
-            المادة: {header.subject || 'عام'} • التاريخ: {header.visitDate || 'اليوم'}
+            المقيّم: <strong>{header.evaluatorName || evaluation.evaluatorName || ((evaluation.visitType === 'supervisor' || header.visitType === 'supervisor') ? 'المشرف التربوي' : 'مدير المدرسة')}</strong> • المادة: {header.subject || 'عام'} • التاريخ: {header.visitDate || 'اليوم'}
           </p>
         </div>
 
@@ -95,10 +108,16 @@ export default function TeacherEvaluationView({ evaluation, currentUser, onDecis
 
       {/* Header Metadata Info */}
       <div style={{ border: '1px solid #cbd5e1', borderRadius: '10px', background: '#f8fafc', padding: '14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', fontSize: '13px' }}>
+        <div>
+          <strong>نوع وصفة الزيارة:</strong>{' '}
+          <span style={{ fontWeight: 'bold', color: (evaluation.visitType === 'supervisor' || header.visitType === 'supervisor') ? '#7e22ce' : '#0369a1' }}>
+            {(evaluation.visitType === 'supervisor' || header.visitType === 'supervisor') ? '🎓 زيارة مشرف تربوي' : '👔 زيارة مدير مدرسة'}
+          </span>
+        </div>
         <div><strong>المادة والتخصص:</strong> {header.subject} ({header.specialty})</div>
         <div><strong>المرحلة والصف:</strong> {header.stage} - {header.classroom}</div>
         <div><strong>الحصة وعدد الطلاب:</strong> {header.period} ({header.studentsCount} طالب)</div>
-        <div><strong>وقت دخول المشرف:</strong> {header.entryTime} الحصة</div>
+        <div><strong>وقت الدخول:</strong> {header.entryTime} الحصة</div>
         {header.lessonTitle && <div style={{ gridColumn: 'span 2' }}><strong>عنوان موضوع الدرس:</strong> {header.lessonTitle}</div>}
       </div>
 

@@ -190,14 +190,29 @@ export default function EvaluatorView({ visit, initialEvaluation, currentUser, o
       {/* Top Action Bar & Status */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
         <div>
-          <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0284c7', background: 'rgba(2, 132, 199, 0.1)', padding: '4px 12px', borderRadius: '20px' }}>
-            رقم الزيارة: {visit?.visitNumber || visit?.id || 'VIS-1'}
-          </span>
-          <h2 style={{ fontSize: '20px', fontWeight: 900, margin: '8px 0 4px 0' }}>
-            أداة الملاحظة الصفية – لعام {headerData.academicYear}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0284c7', background: 'rgba(2, 132, 199, 0.1)', padding: '4px 12px', borderRadius: '20px' }}>
+              رقم الزيارة: {visit?.visitNumber || visit?.id || 'VIS-1'}
+            </span>
+            
+            {(visit?.visitType === 'supervisor' || visit?.evaluatorRole === 'supervisor') ? (
+              <span style={{ fontSize: '12px', fontWeight: '900', color: '#7e22ce', background: '#f3e8ff', border: '1px solid #d8b4fe', padding: '4px 12px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                🎓 استمارة زيارة مشرف تربوي
+              </span>
+            ) : (
+              <span style={{ fontSize: '12px', fontWeight: '900', color: '#0369a1', background: '#e0f2fe', border: '1px solid #7dd3fc', padding: '4px 12px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                👔 استمارة زيارة مدير المدرسة
+              </span>
+            )}
+          </div>
+
+          <h2 style={{ fontSize: '20px', fontWeight: 900, margin: '4px 0' }}>
+            {(visit?.visitType === 'supervisor' || visit?.evaluatorRole === 'supervisor') 
+              ? 'استمارة الملاحظة الصفية التخصصية – زيارة المشرف التربوي'
+              : 'استمارة الملاحظة الصفية والتقويم الإداري – زيارة مدير المدرسة'} (عام {headerData.academicYear})
           </h2>
           <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-            شركة المدارس المتقدمة • إدارة ضمان التعلم والتعليم الأهلي
+            شركة المدارس المتقدمة • إدارة ضمان التعلم والتعليم الأهلي • المقيّم: {headerData.evaluatorName || ((visit?.visitType === 'supervisor' || visit?.evaluatorRole === 'supervisor') ? 'المشرف التربوي' : 'مدير المدرسة')}
           </p>
         </div>
 
@@ -264,6 +279,13 @@ export default function EvaluatorView({ visit, initialEvaluation, currentUser, o
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1px', background: '#cbd5e1' }}>
+          <div style={{ background: (visit?.visitType === 'supervisor' || visit?.evaluatorRole === 'supervisor') ? '#faf5ff' : '#f0f9ff', padding: '10px 14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', color: (visit?.visitType === 'supervisor' || visit?.evaluatorRole === 'supervisor') ? '#7e22ce' : '#0369a1', fontWeight: 'bold' }}>نوع الزيارة والجهة المقيّمة:</label>
+            <div style={{ fontWeight: '900', fontSize: '13px', color: (visit?.visitType === 'supervisor' || visit?.evaluatorRole === 'supervisor') ? '#6b21a8' : '#0c4a6e', marginTop: '2px' }}>
+              {(visit?.visitType === 'supervisor' || visit?.evaluatorRole === 'supervisor') ? '🎓 زيارة مشرف تربوي' : '👔 زيارة مدير المدرسة'}
+            </div>
+          </div>
+
           <div style={{ background: 'white', padding: '10px 14px' }}>
             <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>اسم المعلم:</label>
             <input

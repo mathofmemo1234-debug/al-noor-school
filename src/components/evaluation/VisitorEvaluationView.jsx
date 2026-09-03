@@ -43,7 +43,18 @@ export default function VisitorEvaluationView({ rawEvaluation, visitId }) {
       {/* Header Info */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b' }}>تقرير الزيارة الصفية: {visitId}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b' }}>تقرير الزيارة الصفية: {visitId}</span>
+            {(evaluation.visitType === 'supervisor' || header.visitType === 'supervisor') ? (
+              <span style={{ fontSize: '11px', fontWeight: '900', color: '#7e22ce', background: '#f3e8ff', border: '1px solid #d8b4fe', padding: '2px 8px', borderRadius: '12px' }}>
+                🎓 زيارة مشرف تربوي
+              </span>
+            ) : (
+              <span style={{ fontSize: '11px', fontWeight: '900', color: '#0369a1', background: '#e0f2fe', border: '1px solid #7dd3fc', padding: '2px 8px', borderRadius: '12px' }}>
+                👔 زيارة مدير مدرسة
+              </span>
+            )}
+          </div>
           <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '4px 0 0 0' }}>سجل الملاحظة والتقييم الفني للمعلم: {header.teacherName || 'المعلم'}</h2>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

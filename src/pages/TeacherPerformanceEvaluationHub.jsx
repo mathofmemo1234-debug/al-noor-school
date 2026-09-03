@@ -512,13 +512,17 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
               <span>زيارة: {selectedVisit.visitNumber || selectedVisit.id} • {selectedVisit.teacherName}</span>
               <span style={{ 
                 fontSize: '12px', 
-                padding: '2px 8px', 
-                borderRadius: '6px', 
+                padding: '4px 12px', 
+                borderRadius: '8px', 
                 background: (selectedVisit.visitType === 'supervisor' || selectedVisit.evaluatorRole === 'supervisor') ? '#f3e8ff' : '#e0f2fe',
                 color: (selectedVisit.visitType === 'supervisor' || selectedVisit.evaluatorRole === 'supervisor') ? '#7e22ce' : '#0369a1',
-                fontWeight: 'bold'
+                border: (selectedVisit.visitType === 'supervisor' || selectedVisit.evaluatorRole === 'supervisor') ? '1px solid #d8b4fe' : '1px solid #7dd3fc',
+                fontWeight: '900',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
               }}>
-                {(selectedVisit.visitType === 'supervisor' || selectedVisit.evaluatorRole === 'supervisor') ? '🎓 زيارة إشرافية' : '👔 زيارة مدير'}
+                {(selectedVisit.visitType === 'supervisor' || selectedVisit.evaluatorRole === 'supervisor') ? '🎓 زيارة مشرف تربوي' : '👔 زيارة مدير مدرسة'}
               </span>
             </div>
           </div>
@@ -884,11 +888,16 @@ export default function TeacherPerformanceEvaluationHub({ role = 'admin' }) {
                   </span>
                 </div>
 
-                <div style={{ background: isSupervisor ? '#faf5ff' : '#eff6ff', border: isSupervisor ? '1px solid #d8b4fe' : '1px solid #bfdbfe', padding: '8px 12px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', color: isSupervisor ? '#7e22ce' : '#1d4ed8', fontWeight: 'bold' }}>صفة الزيارة:</span>
-                  <span style={{ fontSize: '12px', fontWeight: 900, color: isSupervisor ? '#7e22ce' : '#1d4ed8' }}>
-                    {isSupervisor ? '🎓 إشرافية' : '👔 مدير'}
-                  </span>
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '8px 12px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: '#475569', fontWeight: 'bold' }}>نوع الزيارة:</span>
+                  <select
+                    value={newVisitForm.visitType || (isSupervisor ? 'supervisor' : 'principal')}
+                    onChange={(e) => setNewVisitForm({ ...newVisitForm, visitType: e.target.value })}
+                    style={{ border: 'none', background: 'transparent', fontWeight: 900, fontSize: '12px', color: (newVisitForm.visitType === 'supervisor' || isSupervisor) ? '#7e22ce' : '#0369a1', outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="principal">👔 زيارة مدير مدرسة</option>
+                    <option value="supervisor">🎓 زيارة مشرف تربوي</option>
+                  </select>
                 </div>
               </div>
 
