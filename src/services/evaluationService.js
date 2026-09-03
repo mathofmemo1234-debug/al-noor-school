@@ -219,7 +219,7 @@ export function calculateRating(percentage) {
 }
 
 /**
- * إنشاء زيارة صفية جديدة مع ترقيم تلقائي متسلسل
+ * إنشاء زيارة صفية جديدة مع ترقيم تلقائي متسلسل وتحديد نوع الزيارة (مدير / مشرف)
  */
 export async function createClassroomVisit(visitData, schoolId) {
   const q = query(
@@ -238,6 +238,10 @@ export async function createClassroomVisit(visitData, schoolId) {
     schoolId,
     seqNumber: nextSeq,
     visitNumber,
+    visitType: visitData.visitType || (visitData.evaluatorRole === 'admin' ? 'principal' : 'supervisor'),
+    evaluatorRole: visitData.evaluatorRole || (visitData.visitType === 'principal' ? 'admin' : 'supervisor'),
+    accessRequests: Array.isArray(visitData.accessRequests) ? visitData.accessRequests : [],
+    approvedViewers: Array.isArray(visitData.approvedViewers) ? visitData.approvedViewers : [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
@@ -548,4 +552,88 @@ export function sanitizeForVisitor(evaluation) {
   }
   delete sanitized.readAt;
   return sanitized;
+}
+
+/**
+ * إرسال طلب من مدير المدرسة للمشرف التربوي لمشاهدة تقرير الزيارة الإشرافية
+ */
+export async function requestVisitAccess(visitId, requesterUser, notes = '') {
+  if (!visitId) throw new Error('معرف الزيارة مطلوب');
+  const visitRef = doc(db, 'classroom_visits', visitId);
+  const snap = await getDoc(visitRef);
+  if (!snap.exists()) throw new Error('سجل الزيارة غير موجود');
+
+  const visit = snap.data();
+  const existingRequests = Array.isArray(visit.accessRequests) ? [...visit.accessRequests] : [];
+  
+  const requesterId = requesterUser?.id || requesterUser?.uid || 'admin_user';
+  const requesterName = requesterUser?.name || 'مدير المدرسة';
+
+  // Check if there is already a pending request from this user
+  const existingIndex = existingRequests.findIndex(r => r.requesterId === requesterId);
+
+  const newRequest = {
+    requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    requesterId,
+    requesterName,
+    requesterRole: requesterUser?.role || 'admin',
+    requestedAt: new Date().toISOString(),
+    status: 'pending',
+    notes: (notes || '').trim(),
+    respondedAt: null
+  };
+
+  if (existingIndex >= 0) {
+    existingRequests[existingIndex] = newRequest;
+  } else {
+    existingRequests.push(newRequest);
+  }
+
+  await updateDoc(visitRef, {
+    accessRequests: existingRequests,
+    updatedAt: serverTimestamp()
+  });
+
+  return { success: true, request: newRequest };
+}
+
+/**
+ * رد المشرف التربوي على طلب مشاهدة الزيارة (موافقة أو رفض)
+ */
+export async function respondToVisitAccessRequest(visitId, requestId, decision, supervisorUser) {
+  if (!visitId) throw new Error('معرف الزيارة مطلوب');
+  const visitRef = doc(db, 'classroom_visits', visitId);
+  const snap = await getDoc(visitRef);
+  if (!snap.exists()) throw new Error('سجل الزيارة غير موجود');
+
+  const visit = snap.data();
+  const existingRequests = Array.isArray(visit.accessRequests) ? [...visit.accessRequests] : [];
+  const approvedViewers = Array.isArray(visit.approvedViewers) ? [...visit.approvedViewers] : [];
+
+  const reqIndex = existingRequests.findIndex(r => r.requestId === requestId);
+  if (reqIndex === -1) throw new Error('طلب المشاهدة غير موجود');
+
+  const targetReq = existingRequests[reqIndex];
+  targetReq.status = decision; // 'approved' | 'rejected'
+  targetReq.respondedAt = new Date().toISOString();
+  targetReq.responderName = supervisorUser?.name || 'المشرف التربوي';
+
+  if (decision === 'approved') {
+    if (!approvedViewers.includes(targetReq.requesterId)) {
+      approvedViewers.push(targetReq.requesterId);
+    }
+  } else if (decision === 'rejected') {
+    const vIdx = approvedViewers.indexOf(targetReq.requesterId);
+    if (vIdx > -1) {
+      approvedViewers.splice(vIdx, 1);
+    }
+  }
+
+  await updateDoc(visitRef, {
+    accessRequests: existingRequests,
+    approvedViewers: approvedViewers,
+    updatedAt: serverTimestamp()
+  });
+
+  return { success: true, decision, approvedViewers };
 }
