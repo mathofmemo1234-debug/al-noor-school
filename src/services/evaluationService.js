@@ -394,6 +394,7 @@ export function getSampleEvaluationForVisit(visit) {
   const percentage = totalMax > 0 ? Number(((totalEarned / totalMax) * 100).toFixed(1)) : 0;
   const rating = calculateRating(percentage);
 
+  const visitIdStr = visit?.id || visit?.visitNumber || 'VIS-1';
   const isSupervisor = visit?.visitType === 'supervisor' || visit?.evaluatorRole === 'supervisor';
   const visitType = isSupervisor ? 'supervisor' : 'principal';
   const visitTypeLabel = isSupervisor ? 'زيارة مشرف تربوي' : 'زيارة مدير مدرسة';
