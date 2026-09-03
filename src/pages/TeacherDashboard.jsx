@@ -535,6 +535,7 @@ function WeeklyPlan() {
       const payload = {
         teacherId: teacherDocId,
         teacherEmail: auth.currentUser.email,
+        schoolId: userData?.schoolId || 'default_school_1',
         className: selectedClass,
         week: selectedWeek,
         plan: plan,
@@ -597,9 +598,9 @@ function WeeklyPlan() {
             <div key={dayKey} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
               <h3 style={{ borderBottom: '2px solid var(--color-bg)', paddingBottom: '10px', marginBottom: '16px', color: 'var(--color-primary-dark)' }}>{t(`days.${dayKey}`)}</h3>
               
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                  <label>{t('teacherDashboard.lessonTopicLabel')}</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontWeight: 600, color: '#334155', marginBottom: '6px', display: 'block' }}>{t('teacherDashboard.lessonTopicLabel')}</label>
                   <input 
                     type="text" 
                     placeholder={t('teacherDashboard.lessonTopicPlaceholder')} 
@@ -607,13 +608,22 @@ function WeeklyPlan() {
                     onChange={(e) => handleChange(dayKey, 'topic', e.target.value)}
                   />
                 </div>
-                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                  <label>{t('teacherDashboard.lessonGoalsLabel')}</label>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontWeight: 600, color: '#15803d', marginBottom: '6px', display: 'block' }}>📝 {t('teacherDashboard.lessonHomeworkLabel') || 'الواجب'}</label>
                   <input 
                     type="text" 
-                    placeholder={t('teacherDashboard.lessonGoalsPlaceholder')} 
-                    value={plan[dayKey]?.goals || ''}
-                    onChange={(e) => handleChange(dayKey, 'goals', e.target.value)}
+                    placeholder={t('teacherDashboard.lessonHomeworkPlaceholder') || 'اكتب الواجب المطلوب...'} 
+                    value={plan[dayKey]?.homework ?? plan[dayKey]?.goals ?? ''}
+                    onChange={(e) => handleChange(dayKey, 'homework', e.target.value)}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontWeight: 600, color: '#a16207', marginBottom: '6px', display: 'block' }}>📌 {t('teacherDashboard.lessonNotesLabel') || 'ملاحظات أو مهام إضافية'}</label>
+                  <input 
+                    type="text" 
+                    placeholder={t('teacherDashboard.lessonNotesPlaceholder') || 'أدخل ملاحظات أو مهام إضافية...'} 
+                    value={plan[dayKey]?.notes || ''}
+                    onChange={(e) => handleChange(dayKey, 'notes', e.target.value)}
                   />
                 </div>
               </div>
