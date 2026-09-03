@@ -1,22 +1,23 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 import './index.css';
 
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-const SupervisorDashboard = lazy(() => import('./pages/SupervisorDashboard'));
-const StaffDashboard = lazy(() => import('./pages/StaffDashboard'));
-const TeacherDashboard = lazy(() => import('./pages/TeacherDashboard'));
-const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
-const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
-const Migration = lazy(() => import('./pages/Migration'));
+const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard'));
+const SupervisorDashboard = lazyWithRetry(() => import('./pages/SupervisorDashboard'));
+const StaffDashboard = lazyWithRetry(() => import('./pages/StaffDashboard'));
+const TeacherDashboard = lazyWithRetry(() => import('./pages/TeacherDashboard'));
+const StudentDashboard = lazyWithRetry(() => import('./pages/StudentDashboard'));
+const SuperAdminDashboard = lazyWithRetry(() => import('./pages/SuperAdminDashboard'));
+const Migration = lazyWithRetry(() => import('./pages/Migration'));
 
-const ParentDashboard = lazy(() => import('./pages/ParentDashboard'));
-const SchoolExcellenceDashboard = lazy(() => import('./pages/SchoolExcellenceDashboard'));
+const ParentDashboard = lazyWithRetry(() => import('./pages/ParentDashboard'));
+const SchoolExcellenceDashboard = lazyWithRetry(() => import('./pages/SchoolExcellenceDashboard'));
 
 function App() {
   return (

@@ -3,6 +3,12 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
+// Auto reload on Vite dynamic import / chunk preload error
+window.addEventListener('vite:preloadError', (event) => {
+  console.warn('Vite preload error detected. Reloading page...', event);
+  window.location.reload();
+});
+
 // Force clear any leftover Google Translate cookies & enforce Arabic RTL
 try {
   const host = window.location.hostname;
@@ -18,6 +24,7 @@ try {
 } catch (e) {
   // Ignore
 }
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
