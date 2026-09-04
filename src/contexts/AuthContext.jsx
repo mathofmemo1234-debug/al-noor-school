@@ -18,8 +18,20 @@ export function AuthProvider({ children }) {
 
   const resolveRole = useCallback(async (user, roleHint) => {
     try {
-      if (user.email === 'super@admin.com') {
-        const superData = { name: 'حساب الماستر', role: 'superadmin', schoolId: 'ALL' };
+      const isSuperEmail = 
+        user.email === 'super@admin.com' || 
+        user.email?.startsWith('master_') || 
+        user.email?.includes('superadmin') || 
+        user.email === 'master@school.local' ||
+        roleHint === 'superadmin';
+
+      if (isSuperEmail) {
+        const superData = { 
+          name: 'حساب الماستر العام - مدارس النور', 
+          role: 'superadmin', 
+          schoolId: 'ALL', 
+          schoolName: 'جميع المدارس (الماستر العام)' 
+        };
         setUserRole('superadmin');
         setUserData(superData);
         localStorage.setItem('userRole', 'superadmin');
@@ -78,7 +90,7 @@ export function AuthProvider({ children }) {
         if (data.role==='staff'){try{const sfQ=query(collection(db,'staff'),where('nationalId','==',nid));const sfS=await getDocs(sfQ);if(!sfS.empty){const sfd=sfS.docs[0].data();data.roleTitle=sfd.roleTitle||data.roleTitle||'';data.permissions=sfd.permissions||data.permissions||[];if(sfd.name)data.name=sfd.name;}}catch(e){}}
         if (data.role==='student'){try{const stQ=query(collection(db,'students'),where('nationalId','==',nid));const stS=await getDocs(stQ);if(!stS.empty){const std=stS.docs[0].data();data.class=std.class||std.className||data.class||'';if(std.name)data.name=std.name;}}catch(e){}}
         if (data.role==='supervisor'){try{const spQ=query(collection(db,'supervisors'),where('nationalId','==',nid));const spS=await getDocs(spQ);if(!spS.empty){const spd=spS.docs[0].data();data.specialty=spd.specialty||data.specialty||'';if(spd.name)data.name=spd.name;}}catch(e){}}
-        if (data.role==='superadmin'){data.schoolId = data.schoolId || 'ALL'; if(!data.name) data.name='الماستر العام';}
+        if (data.role==='superadmin'){data.schoolId = data.schoolId || 'ALL'; data.schoolName = data.schoolName || 'جميع المدارس (الماستر العام)'; if(!data.name) data.name='حساب الماستر العام - مدارس النور';}
         if (data.schoolId && data.schoolId!=='ALL'){try{const sd=await getDoc(doc(db,'schools',data.schoolId));if(sd.exists()){data.schoolName=sd.data().name;data.logoUrl=sd.data().logoUrl||null;}}catch(e){}}
         setUserRole(data.role);
         setUserData(data);

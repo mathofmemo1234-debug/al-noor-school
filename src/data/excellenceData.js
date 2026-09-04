@@ -1,4 +1,4 @@
-export const SCHOOL_NAME = "المدارس المتقدمة للتعلم الذكي بجدة";
+export const SCHOOL_NAME = "مدارس النور الأهلية للتعلم الذكي";
 export const PAGE_TITLE = "ملف التميز المدرسي - المؤشرات المعتمدة والاحتياطية";
 
 export const excellenceData = [

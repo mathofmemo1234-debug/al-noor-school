@@ -28,7 +28,7 @@ module.exports = {
     "sidebar.exams": "الاختبارات",
     "sidebar.materials": "المرفقات/المقررات",
     "sidebar.studentPreparations": "عرض التحاضير",
-    "login.title": "المدارس المتقدمة للتعلم الذكي",
+    "login.title": "مدارس النور الأهلية للتعلم الذكي",
     "login.signupSubtitle": "إنشاء حساب جديد",
     "login.loginSubtitle": "بوابة الدخول الموحدة",
     "login.error": "يوجد خطأ في البيانات",

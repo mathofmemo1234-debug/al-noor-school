@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Building2, Globe, ExternalLink, X, BookOpen, Award, 
-  Sparkles, CheckCircle2, MapPin, Compass, Users, Phone 
+  Sparkles, CheckCircle2, MapPin, Compass, Users, Phone, Mail, ShieldCheck 
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,7 +14,7 @@ export default function AboutSchoolModal({ isOpen, onClose }) {
 
   const currentSchoolName = userData?.schoolName && userData.schoolName !== 'ALL' 
     ? userData.schoolName 
-    : 'منظومة المدارس الذكية المتكاملة';
+    : 'مدارس النور الأهلية للتعلم الذكي';
 
   return (
     <div 
@@ -214,7 +214,7 @@ export default function AboutSchoolModal({ isOpen, onClose }) {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: '#ffffff', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               <CheckCircle2 size={16} color="#059669" style={{ marginTop: '2px', flexShrink: 0 }} />
               <div>
-                <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>المسار الأهلي المتقدم</div>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>المسار الأهلي المعتمد</div>
                 <div style={{ fontSize: '11px', color: '#64748b' }}>مناهج وزارة التعليم مدعومة ببرامج إثرائية مكثفة في العلوم واللغة الإنجليزية</div>
               </div>
             </div>
@@ -222,8 +222,8 @@ export default function AboutSchoolModal({ isOpen, onClose }) {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: '#ffffff', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               <CheckCircle2 size={16} color="#0284c7" style={{ marginTop: '2px', flexShrink: 0 }} />
               <div>
-                <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>المسار العالمي (International)</div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>برامج الدبلومة الأمريكية والاعتمادات الأكاديمية الدولية (AdvancED)</div>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>المسار العالمي (International Track)</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>برامج الدبلومة الأمريكية والاعتمادات الأكاديمية الدولية</div>
               </div>
             </div>
 
@@ -238,7 +238,7 @@ export default function AboutSchoolModal({ isOpen, onClose }) {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: '#ffffff', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               <CheckCircle2 size={16} color="#d97706" style={{ marginTop: '2px', flexShrink: 0 }} />
               <div>
-                <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>مدارس تحفيظ القرآن الكريم</div>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>أقسام تحفيظ القرآن الكريم</div>
                 <div style={{ fontSize: '11px', color: '#64748b' }}>عناية بالقرآن الكريم وعلومه مع مناهج تفاعلية حديثة</div>
               </div>
             </div>
@@ -246,113 +246,73 @@ export default function AboutSchoolModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Coverage & Cities Comprehensive Grid */}
+        {/* School Complexes and Branches */}
         <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '22px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0e7490', fontWeight: 800, fontSize: '14px' }}>
-              <MapPin size={18} color="#0e7490" /> فروع ومجمعات المدارس في مدن ومناطق المملكة:
+              <MapPin size={18} color="#0e7490" /> مجمعات وأقسام مدارس النور الأهلية:
             </div>
             <div style={{ fontSize: '11px', color: '#059669', fontWeight: 700, background: '#ecfdf5', padding: '2px 8px', borderRadius: '10px' }}>
-              توسع شامل ومستمر
+              بيئة تعليمية رائدة
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '8px', fontSize: '12px' }}>
             <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '14px' }}>📍</span>
+              <span style={{ fontSize: '14px' }}>🏢</span>
               <div>
-                <strong style={{ color: '#0f172a' }}>جدة:</strong>
-                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>مدارس المتقدمة للتعلم الذكي (حي الزهراء)</span>
+                <strong style={{ color: '#0f172a' }}>مجمع البنين:</strong>
+                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>المراحل الابتدائية، المتوسطة، والثانوية</span>
               </div>
             </div>
 
             <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '14px' }}>📍</span>
+              <span style={{ fontSize: '14px' }}>🏢</span>
               <div>
-                <strong style={{ color: '#0f172a' }}>الرياض:</strong>
-                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>الملقا، حطين، النرجس، قرطبة، الصحافة، الغدير...</span>
+                <strong style={{ color: '#0f172a' }}>مجمع البنات:</strong>
+                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>المراحل الابتدائية، المتوسطة، والثانوية</span>
               </div>
             </div>
 
             <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '14px' }}>📍</span>
+              <span style={{ fontSize: '14px' }}>🌐</span>
               <div>
-                <strong style={{ color: '#0f172a' }}>المنطقة الشرقية:</strong>
-                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>مجمعات الدمام، الخبر، والجبيل</span>
+                <strong style={{ color: '#0f172a' }}>مدارس النور العالمية:</strong>
+                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>المسار الدولي والدبلومة الأمريكية</span>
               </div>
             </div>
 
             <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '14px' }}>📍</span>
+              <span style={{ fontSize: '14px' }}>🌱</span>
               <div>
-                <strong style={{ color: '#0f172a' }}>الأحساء:</strong>
-                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>مجمعات تعليمية كبرى (بنين وبنات)</span>
-              </div>
-            </div>
-
-            <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '14px' }}>📍</span>
-              <div>
-                <strong style={{ color: '#0f172a' }}>المدينة المنورة ومكة:</strong>
-                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>مجمعات أجيال المتقدمة وتحفيظ القرآن</span>
-              </div>
-            </div>
-
-            <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '14px' }}>📍</span>
-              <div>
-                <strong style={{ color: '#0f172a' }}>الخرج والجوف وينبع:</strong>
-                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>مجمعات المتقدمة بمختلف المسارات</span>
+                <strong style={{ color: '#0f172a' }}>روضة وحضانة النور:</strong>
+                <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>الطفولة المبكرة والتعليم التأسيسي التفاعلي</span>
               </div>
             </div>
           </div>
 
-          {/* Unified Call Center Number */}
+          {/* Unified Contact and Support */}
           <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', fontSize: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569' }}>
               <Phone size={15} color="#0e7490" />
-              <span>الرقم الموحد لخدمة العملاء: <strong style={{ color: '#0e7490', letterSpacing: '0.5px' }} dir="ltr">920012991</strong></span>
+              <span>خدمة أولياء الأمور والدعم الفني: <strong style={{ color: '#0e7490', letterSpacing: '0.5px' }} dir="ltr">مدارس النور الأهلية</strong></span>
             </div>
-            <div style={{ color: '#64748b', fontSize: '11px' }}>
-              بوابة التسجيل: <strong style={{ color: '#0284c7' }}>crm.msc.edu.sa</strong>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '11px' }}>
+              <ShieldCheck size={14} color="#059669" />
+              <span>نظام إدارة مدرسي مستقل وآمن</span>
             </div>
           </div>
         </div>
 
-        {/* Action Buttons: Visit Official Website & Close */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <a
-            href="https://www.msc.edu.sa/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-flash-about"
-            style={{
-              flex: 1,
-              minWidth: '220px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '12px 20px',
-              fontSize: '14px',
-              fontWeight: 800,
-              borderRadius: '12px',
-              textDecoration: 'none',
-              boxShadow: '0 4px 14px rgba(234, 179, 8, 0.4)'
-            }}
-          >
-            <Globe size={18} />
-            <span>زيارة الموقع الرسمي لشركة المدارس المتقدمة (msc.edu.sa)</span>
-            <ExternalLink size={15} />
-          </a>
-
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-outline"
+            className="btn btn-primary"
             style={{
-              padding: '12px 24px',
-              fontSize: '13px',
+              padding: '12px 28px',
+              fontSize: '14px',
               fontWeight: 700,
               borderRadius: '12px'
             }}

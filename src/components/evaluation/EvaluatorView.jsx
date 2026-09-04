@@ -9,7 +9,7 @@ export default function EvaluatorView({ visit, initialEvaluation, currentUser, o
       academicYear: '1448هـ',
       semester: 'الفصل الدراسي الأول',
       department: 'القسم التعليمي',
-      educationalComplex: 'مجمع المدارس المتقدمة',
+      educationalComplex: 'مجمع مدارس النور الأهلية',
       visitDay: 'الأحد',
       visitDate: visit?.visitDate || new Date().toISOString().split('T')[0],
       subject: visit?.subject || '',
@@ -212,7 +212,7 @@ export default function EvaluatorView({ visit, initialEvaluation, currentUser, o
               : 'استمارة الملاحظة الصفية والتقويم الإداري – زيارة مدير المدرسة'} (عام {headerData.academicYear})
           </h2>
           <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-            شركة المدارس المتقدمة • إدارة ضمان التعلم والتعليم الأهلي • المقيّم: {headerData.evaluatorName || ((visit?.visitType === 'supervisor' || visit?.evaluatorRole === 'supervisor') ? 'المشرف التربوي' : 'مدير المدرسة')}
+            مدارس النور الأهلية • إدارة ضمان التعلم والتعليم الأهلي • المقيّم: {headerData.evaluatorName || ((visit?.visitType === 'supervisor' || visit?.evaluatorRole === 'supervisor') ? 'المشرف التربوي' : 'مدير المدرسة')}
           </p>
         </div>
 

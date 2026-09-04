@@ -59,7 +59,7 @@ function ParentHome() {
             </div>
             <div style={{ fontSize: '13px', color: 'var(--color-text)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div><strong>الصف الدراسي:</strong> {userData?.studentClass || 'غير محدد'}</div>
-              <div><strong>المدرسة/المجمع:</strong> {userData?.schoolName || 'المدارس المتقدمة للتعلم الذكي'}</div>
+              <div><strong>المدرسة/المجمع:</strong> {userData?.schoolName || 'مدارس النور الأهلية'}</div>
               <div><strong>رقم هوية الطالب:</strong> {userData?.studentNationalId || 'غير محدد'}</div>
             </div>
           </div>

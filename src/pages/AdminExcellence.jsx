@@ -81,7 +81,7 @@ export default function AdminExcellence({ schoolId }) {
               {t('adminExcellence.title')}
             </h1>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-              المدارس المتقدمة للتعلم الذكي بجدة
+              {userData?.schoolName || 'مدارس النور الأهلية للتعلم الذكي'}
             </p>
           </div>
         </div>

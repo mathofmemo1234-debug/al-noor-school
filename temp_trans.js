@@ -33,7 +33,7 @@ module.exports = {
     'sidebar.studentPreparations': 'عرض التحاضير',
     
     // Login
-    'login.title': 'المدارس المتقدمة للتعلم الذكي',
+    'login.title': 'مدارس النور الأهلية للتعلم الذكي',
     'login.signupSubtitle': 'إنشاء حساب جديد',
     'login.loginSubtitle': 'بوابة الدخول الموحدة',
     'login.error': 'يوجد خطأ في البيانات',

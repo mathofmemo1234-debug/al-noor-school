@@ -2,13 +2,12 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, getDocs } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA-BaaAqrzeFzHiZpmNEwAeEB6Igd6QWKc",
-  authDomain: "advanced-smart-learning-3dfbf.firebaseapp.com",
-  databaseURL: "https://advanced-smart-learning-3dfbf-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "advanced-smart-learning-3dfbf",
-  storageBucket: "advanced-smart-learning-3dfbf.firebasestorage.app",
-  messagingSenderId: "210401728875",
-  appId: "1:210401728875:web:e7bf2d6626ac6d4d85542e"
+  apiKey: "AIzaSyDoLuzPsKZeMSDfxOGWpE-aBmG2PzKWcTo",
+  authDomain: "al-noor-school-b2d7e.firebaseapp.com",
+  projectId: "al-noor-school-b2d7e",
+  storageBucket: "al-noor-school-b2d7e.firebasestorage.app",
+  messagingSenderId: "907983588153",
+  appId: "1:907983588153:web:aa4f77d5098d208680b6e8"
 };
 
 const app = initializeApp(firebaseConfig);

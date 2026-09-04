@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore';
 
 /**
- * بنود استمارة الملاحظة الصفية الرسمية لعام 1448هـ (شركة المدارس المتقدمة)
+ * بنود استمارة الملاحظة الصفية الرسمية لعام 1448هـ (مدارس النور الأهلية)
  * 20 بنداً مقسمة على 3 مجالات أساسية: التخطيط، بناء خبرات التعلم، تقويم التعلم
  */
 export const OFFICIAL_CRITERIA_TEMPLATE = [
@@ -414,7 +414,7 @@ export function getSampleEvaluationForVisit(visit) {
       academicYear: '1448هـ',
       semester: 'الفصل الدراسي الأول',
       department: 'القسم التعليمي',
-      educationalComplex: 'مجمع المدارس المتقدمة',
+      educationalComplex: 'مجمع مدارس النور الأهلية',
       visitType: visitType,
       visitTypeLabel: visitTypeLabel,
       evaluatorName: evaluatorName,
