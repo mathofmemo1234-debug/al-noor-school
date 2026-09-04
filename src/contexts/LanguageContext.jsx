@@ -14,7 +14,7 @@ export function LanguageProvider({ children }) {
   const { userData } = useAuth();
   
   const [lang, setLang] = useState(() => {
-    return localStorage.getItem('appLang') || 'ar';
+    return localStorage.getItem('alnoor_appLang') || 'ar';
   });
 
   // Automatically detect and sync language with the school's configured or detected language
@@ -67,7 +67,7 @@ export function LanguageProvider({ children }) {
   useEffect(() => {
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
-    localStorage.setItem('appLang', lang);
+    localStorage.setItem('alnoor_appLang', lang);
   }, [lang]);
 
   const toggleLanguage = () => {

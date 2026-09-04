@@ -14,6 +14,13 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// HARD DATABASE ISOLATION ASSERTION:
+// Ensures this application instance is strictly locked to Al-Noor School database
+if (firebaseConfig.projectId !== "al-noor-school-b2d7e") {
+  throw new Error("FATAL_SECURITY_ERROR: Al-Noor School must connect exclusively to al-noor-school-b2d7e project.");
+}
+
 export const auth = getAuth(app);
 
 // Ensure session persists after page refresh

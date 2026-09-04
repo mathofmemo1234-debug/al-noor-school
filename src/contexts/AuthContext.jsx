@@ -34,8 +34,8 @@ export function AuthProvider({ children }) {
         };
         setUserRole('superadmin');
         setUserData(superData);
-        localStorage.setItem('userRole', 'superadmin');
-        localStorage.setItem('userData', JSON.stringify(superData));
+        localStorage.setItem('alnoor_userRole', 'superadmin');
+        localStorage.setItem('alnoor_userData', JSON.stringify(superData));
         return superData;
       }
 
@@ -94,8 +94,8 @@ export function AuthProvider({ children }) {
         if (data.schoolId && data.schoolId!=='ALL'){try{const sd=await getDoc(doc(db,'schools',data.schoolId));if(sd.exists()){data.schoolName=sd.data().name;data.logoUrl=sd.data().logoUrl||null;}}catch(e){}}
         setUserRole(data.role);
         setUserData(data);
-        localStorage.setItem('userRole', data.role);
-        localStorage.setItem('userData', JSON.stringify(data));
+        localStorage.setItem('alnoor_userRole', data.role);
+        localStorage.setItem('alnoor_userData', JSON.stringify(data));
         return data;
       }
       return null;
@@ -111,8 +111,8 @@ export function AuthProvider({ children }) {
       if (user) {
         if (!initializedRef.current) {
           initializedRef.current = true;
-          const cachedRole = localStorage.getItem('userRole');
-          const cachedData = (() => { try { return JSON.parse(localStorage.getItem('userData') || 'null'); } catch { return null; } })();
+          const cachedRole = localStorage.getItem('alnoor_userRole');
+          const cachedData = (() => { try { return JSON.parse(localStorage.getItem('alnoor_userData') || 'null'); } catch { return null; } })();
           if (cachedRole && cachedData) {
             setUserRole(cachedRole);
             setUserData(cachedData);
@@ -130,8 +130,8 @@ export function AuthProvider({ children }) {
         setCurrentUser(null);
         setUserRole(null);
         setUserData(null);
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userData');
+        localStorage.removeItem('alnoor_userRole');
+        localStorage.removeItem('alnoor_userData');
         initializedRef.current = false;
         setLoading(false);
       }
@@ -145,7 +145,7 @@ export function AuthProvider({ children }) {
     if (newSchoolId === 'ALL' || !newSchoolId) {
       const updated = { ...userData, schoolId: 'ALL', schoolName: 'جميع المدارس (الماستر العام)', logoUrl: null, activePreviewSchoolId: null };
       setUserData(updated);
-      localStorage.setItem('userData', JSON.stringify(updated));
+      localStorage.setItem('alnoor_userData', JSON.stringify(updated));
     } else {
       let sName = newSchoolName;
       let sLogo = newLogoUrl;
@@ -162,18 +162,18 @@ export function AuthProvider({ children }) {
       }
       const updated = { ...userData, schoolId: newSchoolId, schoolName: sName || 'المدرسة المحددة', logoUrl: sLogo || null, activePreviewSchoolId: newSchoolId };
       setUserData(updated);
-      localStorage.setItem('userData', JSON.stringify(updated));
+      localStorage.setItem('alnoor_userData', JSON.stringify(updated));
     }
   }, [userRole, userData]);
 
   const setLoginRole = useCallback((role) => {
     setUserRole(role);
-    localStorage.setItem('userRole', role);
+    localStorage.setItem('alnoor_userRole', role);
   }, []);
 
   const cachedUserData = (() => {
     try {
-      return userData || JSON.parse(localStorage.getItem('userData') || 'null');
+      return userData || JSON.parse(localStorage.getItem('alnoor_userData') || 'null');
     } catch {
       return userData || null;
     }
