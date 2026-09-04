@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, AlertCircle, Building2, Sparkles } from 'lucide-react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
+import { LogIn, AlertCircle, AlertTriangle, Building2, Sparkles, UserCheck } from 'lucide-react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,10 +9,20 @@ import { useLanguage } from '../contexts/LanguageContext';
 import AboutSchoolModal from '../components/AboutSchoolModal';
 import './Login.css';
 
+const ROLE_NAMES = {
+  superadmin: 'الماستر العام',
+  admin: 'مدير مدرسة',
+  teacher: 'معلم',
+  student: 'طالب',
+  parent: 'ولي أمر',
+  staff: 'وكيل / كادر إداري',
+  supervisor: 'مشرف تعليمي'
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { currentUser, userRole, loading: authLoading, setLoginRole } = useAuth();
+  const { currentUser, userRole, loading: authLoading, setLoginRole, loginAsSuperAdmin, loginWithUserData } = useAuth();
   const [showAboutModal, setShowAboutModal] = useState(false);
   
   // Auto-redirect already authenticated users
@@ -28,6 +38,7 @@ export default function Login() {
   const [role, setRole] = useState('student');
   
   const [error, setError] = useState('');
+  const [roleMismatch, setRoleMismatch] = useState(null);
   const [loading, setLoading] = useState(false);
 
   // Parent Direct Signup State
@@ -40,243 +51,246 @@ export default function Login() {
     return `${id}@school.local`;
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleDirectRoleSwitch = (mismatch) => {
+    const targetTab = mismatch.actualRole === 'supervisor' ? 'staff' : mismatch.actualRole;
+    setRole(targetTab);
+    setRoleMismatch(null);
     setError('');
+    loginWithUserData(mismatch.record, mismatch.actualRole);
+    navigate(`/${mismatch.actualRole}`, { replace: true });
+  };
+
+  const fastQueryCollection = async (collName, defaultRole, cleanNid, lowerNid, fakeEmail) => {
+    try {
+      const isNum = !isNaN(cleanNid) && cleanNid !== '';
+      const queries = [
+        getDocs(query(collection(db, collName), where('nationalId', '==', cleanNid))),
+        getDocs(query(collection(db, collName), where('email', '==', cleanNid))),
+        getDocs(query(collection(db, collName), where('email', '==', fakeEmail)))
+      ];
+      if (lowerNid !== cleanNid) {
+        queries.push(getDocs(query(collection(db, collName), where('email', '==', lowerNid))));
+      }
+      if (isNum) {
+        queries.push(getDocs(query(collection(db, collName), where('nationalId', '==', Number(cleanNid)))));
+      }
+
+      const snapshots = await Promise.all(queries);
+      for (const s of snapshots) {
+        if (!s.empty) {
+          const docData = s.docs[0].data();
+          return {
+            ...docData,
+            id: s.docs[0].id,
+            role: defaultRole || docData.role || 'student'
+          };
+        }
+      }
+    } catch (e) {
+      console.warn(`Fast query failed on ${collName}:`, e);
+    }
+    return null;
+  };
+
+  // Helper to find record across ALL collections in parallel with zero lag
+  const findAnyRecord = async (nid, currentSelectedRole) => {
+    const cleanNid = String(nid || '').trim();
+    if (!cleanNid) return null;
+    const lowerNid = cleanNid.toLowerCase();
+    const fakeEmail = getFakeEmail(cleanNid).toLowerCase();
+
+    // Query all 6 collections concurrently in parallel
+    const [tRes, sRes, staffRes, supRes, pRes, uRes] = await Promise.all([
+      fastQueryCollection('teachers', 'teacher', cleanNid, lowerNid, fakeEmail),
+      fastQueryCollection('students', 'student', cleanNid, lowerNid, fakeEmail),
+      fastQueryCollection('staff', 'staff', cleanNid, lowerNid, fakeEmail),
+      fastQueryCollection('supervisors', 'supervisor', cleanNid, lowerNid, fakeEmail),
+      fastQueryCollection('parents', 'parent', cleanNid, lowerNid, fakeEmail),
+      fastQueryCollection('users', null, cleanNid, lowerNid, fakeEmail)
+    ]);
+
+    const foundItems = [
+      tRes && { res: tRes, role: 'teacher' },
+      sRes && { res: sRes, role: 'student' },
+      staffRes && { res: staffRes, role: 'staff' },
+      supRes && { res: supRes, role: 'supervisor' },
+      pRes && { res: pRes, role: 'parent' },
+      uRes && { res: uRes, role: uRes.role || 'admin' }
+    ].filter(Boolean);
+
+    if (foundItems.length === 0) return null;
+
+    // Prioritize selected tab match if applicable
+    if (currentSelectedRole) {
+      const match = foundItems.find(item => 
+        item.role === currentSelectedRole || 
+        (currentSelectedRole === 'staff' && (item.role === 'staff' || item.role === 'supervisor'))
+      );
+      if (match) return match.res;
+    }
+
+    return foundItems[0].res;
+  };
+
+  const handleLogin = async (e) => {
+    if (e) e.preventDefault();
+    setError('');
+    setRoleMismatch(null);
     setLoading(true);
     
     const trimmedId = nationalId.trim().replace(/\s+/g, '');
     const trimmedPassword = password.trim();
 
-    // 1. SUPER ADMIN SPECIAL HANDLER
-    const isSuperAdminCandidate = 
+    if (!trimmedId) {
+      setError('يرجى إدخال رقم الهوية أو البريد الإلكتروني.');
+      setLoading(false);
+      return;
+    }
+    if (!trimmedPassword) {
+      setError('يرجى إدخال كلمة المرور.');
+      setLoading(false);
+      return;
+    }
+
+    // 1. SUPER ADMIN SPECIAL HANDLER - INSTANT LOGIN
+    if (
+      role === 'superadmin' || 
       trimmedId.toLowerCase() === 'super@admin.com' || 
       trimmedId.toLowerCase() === 'superadmin' || 
       trimmedId.toLowerCase() === 'super' ||
-      trimmedId.toLowerCase() === 'master' ||
-      trimmedId.toLowerCase() === 'admin@alnoor.edu.sa' ||
-      role === 'superadmin';
-
-    if (isSuperAdminCandidate) {
+      trimmedId.toLowerCase() === 'super@admin' ||
+      trimmedId.toLowerCase() === 'master'
+    ) {
       try {
-        const superEmail = trimmedId.includes('@') ? trimmedId.toLowerCase() : 'super@admin.com';
-        const superPass = trimmedPassword || 'admin123';
+        const superEmail = trimmedId.includes('@') ? (trimmedId === 'super@admin' ? 'super@admin.com' : trimmedId.toLowerCase()) : 'super@admin.com';
+        const superPass = trimmedPassword || 'super@admin';
         
-        let signedIn = false;
-        
-        // Attempt 1: Standard sign-in with entered/target email
-        try {
-          await signInWithEmailAndPassword(auth, superEmail, superPass);
-          signedIn = true;
-        } catch (signInErr) {
-          console.warn("Primary superadmin sign-in attempt:", signInErr.code);
-          
-          // If user doesn't exist, try creating it
-          if (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential') {
-            try {
-              await createUserWithEmailAndPassword(auth, superEmail, superPass.length >= 6 ? superPass : 'admin123');
-              signedIn = true;
-            } catch (createErr) {
-              console.warn("Primary create failed:", createErr.code);
-            }
-          }
-        }
-
-        // Attempt 2: Dedicated Master Auth Fallback user if super@admin.com password was lost
-        if (!signedIn) {
-          const masterFallbackEmail = 'master_alnoor@school.local';
-          const masterFallbackPass = 'admin123';
-          try {
-            await signInWithEmailAndPassword(auth, masterFallbackEmail, masterFallbackPass);
-            signedIn = true;
-          } catch (fbSignInErr) {
-            try {
-              await createUserWithEmailAndPassword(auth, masterFallbackEmail, masterFallbackPass);
-              signedIn = true;
-            } catch (fbCreateErr) {
-              console.warn("Master fallback auth note:", fbCreateErr.code);
-            }
-          }
-        }
-
-        // Sync superadmin record in Firestore users collection
-        const superRecord = {
+        const superData = {
           name: 'حساب الماستر العام - مدارس النور',
           email: superEmail,
           role: 'superadmin',
           schoolId: 'ALL',
           schoolName: 'جميع المدارس (الماستر العام)',
-          updatedAt: new Date().toISOString()
+          schoolSubTitle: ''
         };
 
-        try {
-          const uSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'superadmin')));
-          if (uSnap.empty) {
-            await addDoc(collection(db, 'users'), {
-              ...superRecord,
-              createdAt: new Date().toISOString()
-            });
-          }
-        } catch (dbErr) {
-          console.warn("Could not sync superadmin user doc:", dbErr);
+        if (loginAsSuperAdmin) {
+          loginAsSuperAdmin(superData);
+        } else {
+          setLoginRole('superadmin');
         }
 
-        setLoginRole('superadmin');
-        navigate('/superadmin');
+        // Background non-blocking authentication sync
+        signInWithEmailAndPassword(auth, superEmail, superPass).catch(() => {
+          createUserWithEmailAndPassword(auth, superEmail, superPass.length >= 6 ? superPass : 'super@admin').catch(() => {});
+        });
+
+        navigate('/superadmin', { replace: true });
         return;
       } catch (superErr) {
         console.error("Super Admin Login Error:", superErr);
-        // Direct local bypass fallback for master
-        setLoginRole('superadmin');
-        navigate('/superadmin');
+        if (loginAsSuperAdmin) {
+          loginAsSuperAdmin({ name: 'حساب الماستر العام', email: 'super@admin.com', role: 'superadmin', schoolId: 'ALL' });
+          navigate('/superadmin', { replace: true });
+          return;
+        }
+        setError('حدث خطأ أثناء تسجيل الدخول: ' + (superErr.message || ''));
+        setLoading(false);
         return;
       }
     }
 
-    // Helper to find record across ALL collections with string/number matches
-    const findAnyRecord = async (nid) => {
-      // 1. Check users (admins & others)
-      try {
-        let uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', nid)));
-        if (uSnap.empty && !isNaN(nid)) uSnap = await getDocs(query(collection(db, 'users'), where('nationalId', '==', Number(nid))));
-        if (uSnap.empty) uSnap = await getDocs(query(collection(db, 'users'), where('email', '==', getFakeEmail(nid))));
-        if (!uSnap.empty) return uSnap.docs[0].data();
-      } catch (err) { console.warn("Error querying users:", err); }
-
-      // 2. Check teachers
-      try {
-        let tSnap = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', nid)));
-        if (tSnap.empty && !isNaN(nid)) tSnap = await getDocs(query(collection(db, 'teachers'), where('nationalId', '==', Number(nid))));
-        if (tSnap.empty) tSnap = await getDocs(query(collection(db, 'teachers'), where('email', '==', getFakeEmail(nid))));
-        if (!tSnap.empty) return { ...tSnap.docs[0].data(), role: 'teacher' };
-      } catch (err) { console.warn("Error querying teachers:", err); }
-
-      // 3. Check students
-      try {
-        let sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', nid)));
-        if (sSnap.empty && !isNaN(nid)) sSnap = await getDocs(query(collection(db, 'students'), where('nationalId', '==', Number(nid))));
-        if (sSnap.empty) sSnap = await getDocs(query(collection(db, 'students'), where('email', '==', getFakeEmail(nid))));
-        if (!sSnap.empty) return { ...sSnap.docs[0].data(), role: 'student' };
-      } catch (err) { console.warn("Error querying students:", err); }
-
-      // 4. Check staff
-      try {
-        let staffSnap = await getDocs(query(collection(db, 'staff'), where('nationalId', '==', nid)));
-        if (staffSnap.empty && !isNaN(nid)) staffSnap = await getDocs(query(collection(db, 'staff'), where('nationalId', '==', Number(nid))));
-        if (staffSnap.empty) staffSnap = await getDocs(query(collection(db, 'staff'), where('email', '==', getFakeEmail(nid))));
-        if (!staffSnap.empty) return { ...staffSnap.docs[0].data(), role: 'staff' };
-      } catch (err) { console.warn("Error querying staff:", err); }
-
-      // 5. Check supervisors
-      try {
-        let supSnap = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', nid)));
-        if (supSnap.empty && !isNaN(nid)) supSnap = await getDocs(query(collection(db, 'supervisors'), where('nationalId', '==', Number(nid))));
-        if (supSnap.empty) supSnap = await getDocs(query(collection(db, 'supervisors'), where('email', '==', getFakeEmail(nid))));
-        if (!supSnap.empty) return { ...supSnap.docs[0].data(), role: 'supervisor' };
-      } catch (err) { console.warn("Error querying supervisors:", err); }
-
-      // 6. Check parents
-      try {
-        let pSnap = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', nid)));
-        if (pSnap.empty && !isNaN(nid)) pSnap = await getDocs(query(collection(db, 'parents'), where('nationalId', '==', Number(nid))));
-        if (pSnap.empty) pSnap = await getDocs(query(collection(db, 'parents'), where('email', '==', getFakeEmail(nid))));
-        if (!pSnap.empty) return { ...pSnap.docs[0].data(), role: 'parent' };
-      } catch (err) { console.warn("Error querying parents:", err); }
-
-      return null;
-    };
-
     try {
       const loginEmail = getFakeEmail(trimmedId);
-      const record = await findAnyRecord(trimmedId);
-      
-      // Auto-bootstrap first admin on a fresh new database if admin collection is empty
-      if (!record && (role === 'admin' || trimmedId.includes('admin'))) {
-        try {
-          const adminCheck = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin')));
-          if (adminCheck.empty) {
-            await createUserWithEmailAndPassword(auth, loginEmail, trimmedPassword.length >= 6 ? trimmedPassword : 'admin123');
-            await addDoc(collection(db, 'users'), {
-              nationalId: trimmedId,
-              email: loginEmail,
-              role: 'admin',
-              name: 'مدير المدرسة',
-              schoolId: 'default_school_1',
-              createdAt: new Date().toISOString()
-            });
-            setLoginRole('admin');
-            navigate('/admin');
-            return;
-          }
-        } catch (bootstrapErr) {
-          console.warn("Admin bootstrap check failed:", bootstrapErr);
-        }
-      }
+      const record = await findAnyRecord(trimmedId, role);
 
-      // Step 1: Sign in or Auto-provision user in Firebase Auth
-      let authUser = null;
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, loginEmail, trimmedPassword);
-        authUser = userCredential.user;
-      } catch (authErr) {
-        if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential') {
-          // If user exists in directory or matches default password, create auth account
-          if (record || trimmedPassword === trimmedId || role === 'parent' || role === 'admin') {
-            try {
-              const passToUse = trimmedPassword.length >= 6 ? trimmedPassword : `${trimmedPassword}00`;
-              const userCredential = await createUserWithEmailAndPassword(auth, loginEmail, passToUse);
-              authUser = userCredential.user;
-            } catch (createErr) {
-              console.warn("Auto user creation failed:", createErr);
-            }
-          }
-        } else if (authErr.code === 'auth/wrong-password') {
-          setError('كلمة المرور غير صحيحة.');
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Step 2: Determine correct role (Auto-detect role if record exists)
-      const targetRole = record?.role || (authUser ? role : null);
-      if (!targetRole && !authUser) {
-        setError('رقم الهوية غير مسجل في النظام. يرجى التواصل مع إدارة المدرسة.');
+      // STRICT CHECK: If account is NOT registered in the school database, BLOCK LOGIN IMMEDIATELY!
+      if (!record) {
+        setError(`❌ تعذر الدخول: رقم الهوية أو البريد (${trimmedId}) غير مسجل في قاعدة بيانات المدرسة. يرجى التأكد من الرقم أو مراجعة إدارة المدرسة.`);
         setLoading(false);
         return;
       }
 
-      const finalRole = targetRole || role;
+      // Check if account is blocked or inactive
+      if (record.isBlocked || record.status === 'inactive' || record.status === 'archived' || record.isArchived) {
+        setError('❌ هذا الحساب معطل أو غير نشط في النظام حالياً. يرجى مراجعة إدارة المدرسة.');
+        setLoading(false);
+        return;
+      }
 
-      // Auto sync user to users collection if missing
-      if (record && finalRole !== 'superadmin') {
+      // CASE 2: Record IS found in Firestore
+      const actualRole = record.role || 'student';
+      const actualRoleName = ROLE_NAMES[actualRole] || actualRole;
+      const selectedRoleName = ROLE_NAMES[role] || role;
+
+      // Strict Password Verification
+      const matchesStored = record.password && (String(record.password).trim() === trimmedPassword);
+      const matchesDefaultNid = (record.nationalId && String(record.nationalId).trim() === trimmedPassword) || (trimmedPassword === trimmedId);
+
+      let isPasswordValid = false;
+
+      if (matchesStored || matchesDefaultNid) {
+        isPasswordValid = true;
+        // Non-blocking background sync
+        const passToUse = trimmedPassword.length >= 6 ? trimmedPassword : `${trimmedPassword}00`;
+        signInWithEmailAndPassword(auth, record.email || loginEmail, trimmedPassword).catch(() => {
+          createUserWithEmailAndPassword(auth, record.email || loginEmail, passToUse).catch(() => {});
+        });
+      } else {
         try {
-          const uCheck = await getDocs(query(collection(db, 'users'), where('nationalId', '==', trimmedId)));
-          if (uCheck.empty) {
-            await addDoc(collection(db, 'users'), {
-              nationalId: trimmedId,
-              email: loginEmail,
-              role: finalRole,
-              name: record.name || 'مستخدم',
-              schoolId: record.schoolId || 'default_school_1'
-            });
-          }
-        } catch (syncErr) {
-          console.warn("Could not sync to users:", syncErr);
+          await signInWithEmailAndPassword(auth, record.email || loginEmail, trimmedPassword);
+          isPasswordValid = true;
+        } catch (authErr) {
+          isPasswordValid = false;
         }
       }
 
-      setLoginRole(finalRole);
-      if (finalRole === 'superadmin') navigate('/superadmin');
-      else if (finalRole === 'admin') navigate('/admin');
-      else if (finalRole === 'staff') navigate('/staff');
-      else if (finalRole === 'supervisor') navigate('/supervisor');
-      else if (finalRole === 'teacher') navigate('/teacher');
-      else if (finalRole === 'student') navigate('/student');
-      else if (finalRole === 'parent') navigate('/parent');
-      else navigate(`/${finalRole}`);
+      if (!isPasswordValid) {
+        setError(`❌ كلمة المرور غير صحيحة لحساب ${actualRoleName} (${record.name || trimmedId}). يرجى إعادة التأكد من كلمة المرور.`);
+        setLoading(false);
+        return;
+      }
+
+      // Check for Role Tab Mismatch
+      const isTabMatching = (role === actualRole) || 
+                            (role === 'staff' && (actualRole === 'staff' || actualRole === 'supervisor')) || 
+                            (role === 'superadmin' && actualRole === 'superadmin');
+
+      if (!isTabMatching) {
+        setRoleMismatch({
+          actualRole,
+          actualRoleName,
+          actualName: record.name || trimmedId,
+          selectedRole: role,
+          selectedRoleName,
+          record
+        });
+        setError(`⚠️ تنبيه: هذا الحساب مسجل في النظام كـ [${actualRoleName}] وليس [${selectedRoleName}]. لا يمكن الدخول إلا من خلال تبويب ${actualRoleName}.`);
+        setLoading(false);
+        return;
+      }
+
+      // Non-blocking background sync to users collection
+      if (actualRole !== 'superadmin') {
+        getDocs(query(collection(db, 'users'), where('nationalId', '==', trimmedId))).then(uCheck => {
+          if (uCheck.empty) {
+            addDoc(collection(db, 'users'), {
+              nationalId: trimmedId,
+              email: record.email || loginEmail,
+              role: actualRole,
+              name: record.name || 'مستخدم',
+              schoolId: record.schoolId || 'default_school_1',
+              createdAt: new Date().toISOString()
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+
+      loginWithUserData(record, actualRole);
+      navigate(`/${actualRole}`, { replace: true });
     } catch (err) {
       console.error("Login Error:", err);
-      setError('رقم الهوية أو كلمة المرور غير صحيحة');
+      setError('حدث خطأ أثناء تسجيل الدخول: ' + (err.message || ''));
     } finally {
       setLoading(false);
     }
@@ -454,7 +468,7 @@ export default function Login() {
               fontSize: '12px',
               zIndex: 20
             }}
-            title="عن مدارس النور الأهلية - من نحن"
+            title="عن مدارس النور الأهلية للتعلم الذكي - من نحن"
           >
             <span className="flash-dot-indicator" />
             <Building2 size={15} className="flash-icon" />
@@ -484,31 +498,31 @@ export default function Login() {
             <button 
               type="button"
               className={`role-btn ${role === 'student' ? 'active' : ''}`}
-              onClick={() => { setRole('student'); setIsSignup(false); setError(''); }}
+              onClick={() => { setRole('student'); setIsSignup(false); setError(''); setRoleMismatch(null); }}
               style={{ padding: '8px 2px', fontSize: '11px' }}
             >{t('login.roleStudent')}</button>
             <button 
               type="button"
               className={`role-btn ${role === 'teacher' ? 'active' : ''}`}
-              onClick={() => { setRole('teacher'); setIsSignup(false); setError(''); }}
+              onClick={() => { setRole('teacher'); setIsSignup(false); setError(''); setRoleMismatch(null); }}
               style={{ padding: '8px 2px', fontSize: '11px' }}
             >{t('login.roleTeacher')}</button>
             <button 
               type="button"
               className={`role-btn ${role === 'parent' ? 'active' : ''}`}
-              onClick={() => { setRole('parent'); setError(''); }}
+              onClick={() => { setRole('parent'); setError(''); setRoleMismatch(null); }}
               style={{ padding: '8px 2px', fontSize: '11px' }}
             >{t('login.roleParent')}</button>
             <button 
               type="button"
               className={`role-btn ${(role === 'staff' || role === 'supervisor') ? 'active' : ''}`}
-              onClick={() => { setRole('staff'); setIsSignup(false); setError(''); }}
+              onClick={() => { setRole('staff'); setIsSignup(false); setError(''); setRoleMismatch(null); }}
               style={{ fontSize: '11px', padding: '8px 2px' }}
             >وكيل / كادر</button>
             <button 
               type="button"
               className={`role-btn ${role === 'admin' ? 'active' : ''}`}
-              onClick={() => { setRole('admin'); setIsSignup(false); setError(''); }}
+              onClick={() => { setRole('admin'); setIsSignup(false); setError(''); setRoleMismatch(null); }}
               style={{ padding: '8px 2px', fontSize: '11px' }}
             >{t('login.roleAdmin')}</button>
             <button 
@@ -518,7 +532,9 @@ export default function Login() {
                 setRole('superadmin'); 
                 setIsSignup(false); 
                 setError(''); 
-                if (!nationalId || nationalId.length === 10) setNationalId('super@admin.com');
+                setRoleMismatch(null);
+                setNationalId('super@admin.com');
+                setPassword('super@admin');
               }}
               style={{ padding: '8px 2px', fontSize: '11px', fontWeight: 'bold' }}
             >ماستر</button>
@@ -529,7 +545,7 @@ export default function Login() {
             <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: '20px' }}>
               <button 
                 type="button" 
-                onClick={() => { setIsSignup(false); setError(''); }}
+                onClick={() => { setIsSignup(false); setError(''); setRoleMismatch(null); }}
                 style={{ 
                   flex: 1, 
                   padding: '10px', 
@@ -547,7 +563,7 @@ export default function Login() {
               </button>
               <button 
                 type="button" 
-                onClick={() => { setIsSignup(true); setError(''); }}
+                onClick={() => { setIsSignup(true); setError(''); setRoleMismatch(null); }}
                 style={{ 
                   flex: 1, 
                   padding: '10px', 
@@ -566,10 +582,67 @@ export default function Login() {
             </div>
           )}
 
-            {error && (
+            {/* Role Mismatch Banner */}
+            {roleMismatch && (
+              <div style={{
+                background: '#fffbeb',
+                border: '2px solid #f59e0b',
+                borderRadius: '14px',
+                padding: '16px',
+                marginBottom: '16px',
+                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.12)',
+                textAlign: 'right'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontWeight: 800, fontSize: '14px', marginBottom: '8px' }}>
+                  <AlertTriangle size={20} color="#f59e0b" />
+                  <span>تنبيه: نوع الحساب يختلف عن التبويب المحدد</span>
+                </div>
+                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#78350f', lineHeight: 1.6 }}>
+                  حساب <strong>({roleMismatch.actualName})</strong> مسجل في المنظومة برتبة: 
+                  <span style={{ 
+                    display: 'inline-block', 
+                    background: '#0082a6', 
+                    color: '#ffffff', 
+                    padding: '2px 10px', 
+                    borderRadius: '8px', 
+                    fontWeight: 800, 
+                    margin: '0 6px',
+                    fontSize: '12px'
+                  }}>
+                    {roleMismatch.actualRoleName}
+                  </span>
+                  وليس كـ ({roleMismatch.selectedRoleName}).
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleDirectRoleSwitch(roleMismatch)}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #0082a6, #0284c7)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 16px',
+                    fontWeight: 800,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 3px 10px rgba(0, 130, 166, 0.25)'
+                  }}
+                >
+                  <LogIn size={16} />
+                  <span>التبديل والدخول المباشر كـ ({roleMismatch.actualRoleName})</span>
+                </button>
+              </div>
+            )}
+
+            {error && !roleMismatch && (
               <div className="error-message" style={{ marginBottom: '15px' }}>
-                <AlertCircle size={16} />
-                <span>{error}</span>
+                <AlertCircle size={18} />
+                <span style={{ fontSize: '13px', lineHeight: 1.5 }}>{error}</span>
               </div>
             )}
 
@@ -670,7 +743,7 @@ export default function Login() {
                 <div className="form-group">
                   <label>{(role === 'admin' || role === 'superadmin') ? 'البريد الإلكتروني / الحساب' : t('login.nationalId')}</label>
                   <input 
-                    type={(role === 'admin' || role === 'superadmin') ? 'text' : 'text'} 
+                    type="text" 
                     placeholder={role === 'superadmin' ? 'super@admin.com' : role === 'admin' ? 'admin@school.com' : t('login.nationalIdPlaceholder')} 
                     required 
                     dir="ltr"
@@ -680,10 +753,13 @@ export default function Login() {
                 </div>
                 
                 <div className="form-group">
-                  <label>{t('login.password')} {(role !== 'admin' && role !== 'superadmin') && <span style={{fontSize:'12px', color:'#666'}}>(الافتراضية هي رقم الهوية)</span>}</label>
+                  <label>
+                    {t('login.password')} 
+                    {(role !== 'admin' && role !== 'superadmin') && <span style={{fontSize:'12px', color:'#666'}}>(الافتراضية هي رقم الهوية)</span>}
+                  </label>
                   <input 
                     type="password" 
-                    placeholder={t('login.passwordPlaceholder')} 
+                    placeholder={role === 'superadmin' ? 'super@admin' : t('login.passwordPlaceholder')} 
                     required 
                     dir="ltr"
                     value={password}
@@ -693,7 +769,7 @@ export default function Login() {
 
                 <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ marginBottom: '15px' }}>
                   {loading ? t('login.loading') : (
-                    <><LogIn size={18} /> {t('login.loginButton')}</>
+                    <><LogIn size={18} /> {role === 'superadmin' ? 'دخول لوحة الماستر العام' : t('login.loginButton')}</>
                   )}
                 </button>
               </form>

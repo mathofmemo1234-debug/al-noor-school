@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Routes, Route, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Users, BookOpen, UserPlus, X, Edit, Trash2, ShieldCheck, UserCheck, Printer, FileText, Globe, Award, ClipboardList } from 'lucide-react';
+import { Users, BookOpen, UserPlus, X, Edit, Trash2, ShieldCheck, UserCheck, Printer, FileText, Globe, Award, ClipboardList, Building2 } from 'lucide-react';
 import ManageSchedules from './ManageSchedules';
 import { db } from '../firebase';
 import { collection, addDoc, setDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
@@ -27,11 +27,21 @@ import GamificationBadge from '../components/GamificationBadge';
 import { calculateTeacherActivity, calculateStudentActivity } from '../utils/gamificationEngine';
 
 function AdminHome({ schoolId }) {
-  const { t } = useLanguage();
+  const { t, isRTL } = useLanguage();
+  const { userData } = useAuth();
   const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0, supervisors: 0, staff: 0 });
+  const [schoolInfo, setSchoolInfo] = useState(null);
 
   useEffect(() => {
     if (!schoolId) return;
+    
+    // Fetch School metadata and subtitle
+    const unsubSchool = onSnapshot(doc(db, 'schools', schoolId), snap => {
+      if (snap.exists()) {
+        setSchoolInfo({ id: snap.id, ...snap.data() });
+      }
+    });
+
     const qTeachers = query(collection(db, 'teachers'), where('schoolId', '==', schoolId));
     const qStudents = query(collection(db, 'students'), where('schoolId', '==', schoolId));
     const qClasses = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
@@ -53,7 +63,14 @@ function AdminHome({ schoolId }) {
     const unsubStaff = onSnapshot(qStaff, (snap) => {
       setStats(prev => ({ ...prev, staff: snap.size }));
     });
-    return () => { unsubTeachers(); unsubStudents(); unsubClasses(); unsubSupervisors(); unsubStaff(); };
+    return () => { 
+      if (unsubSchool) unsubSchool();
+      unsubTeachers(); 
+      unsubStudents(); 
+      unsubClasses(); 
+      unsubSupervisors(); 
+      unsubStaff(); 
+    };
   }, [schoolId]);
 
   const handleSeedData = async () => {
@@ -169,8 +186,53 @@ function AdminHome({ schoolId }) {
   };
 
   return (
-    <div>
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
+      {/* 🏢 Standalone School Identity & Subtitle Banner */}
+      <div 
+        style={{
+          background: 'linear-gradient(135deg, #0e7490 0%, #0284c7 60%, #0369a1 100%)',
+          borderRadius: '20px',
+          padding: '22px 28px',
+          color: '#ffffff',
+          boxShadow: '0 8px 20px -4px rgba(14, 116, 144, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '14px',
+            background: 'rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(6px)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Building2 size={26} color="#ffffff" />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#ffffff' }}>
+              {schoolInfo?.name || userData?.schoolName || 'مجمع مدارس النور الأهلية للتعلم الذكي'}
+            </h2>
+            <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span>📍 العنوان الفرعي: <strong>{schoolInfo?.subTitle || 'الفرع المعتمد - المسار الأهلي المطور و STEM'}</strong></span>
+              <span>•</span>
+              <span>المدينة: <strong>{schoolInfo?.city || 'الرياض'}</strong></span>
+              <span>•</span>
+              <span>كود المجمع: <strong dir="ltr">{schoolInfo?.code || schoolId}</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <Link 
           to="/admin/student-records" 
           className="btn btn-primary"
@@ -304,7 +366,8 @@ function ManageTeachers({ schoolId }) {
   useEffect(() => {
     if (!schoolId || teachers.length === 0) return;
 
-    const qPrep = schoolId === 'ALL' ? collection(db, 'lesson_preparations') : query(collection(db, 'lesson_preparations'), where('schoolId', '==', schoolId));
+    const qPrep = schoolId === 'ALL' ? collection(db, 'preparations') : query(collection(db, 'preparations'), where('schoolId', '==', schoolId));
+    const qPrepOld = schoolId === 'ALL' ? collection(db, 'lesson_preparations') : query(collection(db, 'lesson_preparations'), where('schoolId', '==', schoolId));
     const qPlans = schoolId === 'ALL' ? collection(db, 'weekly_plans') : query(collection(db, 'weekly_plans'), where('schoolId', '==', schoolId));
     const qAssign = schoolId === 'ALL' ? collection(db, 'assignments') : query(collection(db, 'assignments'), where('schoolId', '==', schoolId));
     const qExams = schoolId === 'ALL' ? collection(db, 'exams') : query(collection(db, 'exams'), where('schoolId', '==', schoolId));
@@ -313,13 +376,14 @@ function ManageTeachers({ schoolId }) {
 
     Promise.all([
       getDocs(qPrep),
+      getDocs(qPrepOld),
       getDocs(qPlans),
       getDocs(qAssign),
       getDocs(qExams),
       getDocs(qMat),
       getDocs(qAtt)
-    ]).then(([snapPrep, snapPlans, snapAssign, snapExams, snapMat, snapAtt]) => {
-      const preps = snapPrep.docs.map(d => d.data());
+    ]).then(([snapPrep, snapPrepOld, snapPlans, snapAssign, snapExams, snapMat, snapAtt]) => {
+      const preps = [...snapPrep.docs.map(d => d.data()), ...snapPrepOld.docs.map(d => d.data())];
       const plans = snapPlans.docs.map(d => d.data());
       const assigns = snapAssign.docs.map(d => d.data());
       const exams = snapExams.docs.map(d => d.data());

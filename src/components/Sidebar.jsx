@@ -8,15 +8,24 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 export default function Sidebar({ role }) {
   const navigate = useNavigate();
-  const { userData } = useAuth();
+  const { userData, logout } = useAuth();
   const { t } = useLanguage();
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
-      navigate('/login');
+      if (logout) {
+        await logout();
+      } else {
+        localStorage.removeItem('alnoor_userRole');
+        localStorage.removeItem('alnoor_userData');
+        await signOut(auth);
+      }
+      navigate('/login', { replace: true });
     } catch (error) {
       console.error('Logout error', error);
+      localStorage.removeItem('alnoor_userRole');
+      localStorage.removeItem('alnoor_userData');
+      navigate('/login', { replace: true });
     }
   };
 
@@ -80,6 +89,10 @@ export default function Sidebar({ role }) {
 
   const superAdminLinks = [
     { path: '/superadmin', icon: Home, label: t('sidebar.superAdminDashboard') },
+    { path: '/superadmin/messages', icon: Mail, label: 'المراسلات والتعاميم' },
+    { path: '/superadmin/portfolio', icon: Award, label: 'ملف الإنجاز القيادي' },
+    { path: '/superadmin/excellence', icon: Star, label: 'معايير التميز والاعتماد' },
+    { path: '/superadmin/settings', icon: Settings, label: t('sidebar.settings') },
   ];
 
   const teacherLinks = [

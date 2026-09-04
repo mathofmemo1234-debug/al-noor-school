@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { db } from '../firebase';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { 
   Printer, 
   Download, 
@@ -15,7 +17,9 @@ import {
   FileText,
   Eye,
   Settings,
-  ShieldCheck
+  ShieldCheck,
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import { DEFAULT_PORTFOLIO_DOMAINS, PORTFOLIO_ROLES } from '../data/portfolioData';
 
@@ -27,7 +31,9 @@ export default function PrintPortfolioModal({
   onClose
 }) {
   const [reportTitle, setReportTitle] = useState(
-    role === 'student' 
+    role === 'superadmin'
+      ? 'ملف إنجاز الإدارة العامة والماستر العام'
+      : role === 'student' 
       ? 'ملف الإنجاز الأكاديمي والأنشطة الطلابية'
       : role === 'supervisor'
       ? 'ملف الإنجاز والتميز الإشرافي المهني'
@@ -38,14 +44,126 @@ export default function PrintPortfolioModal({
       : 'ملف الإنجاز المهني والتربوي للمعلم'
   );
 
+  const [livePortfolioData, setLivePortfolioData] = useState(portfolioData || {});
+  const [isLoadingLive, setIsLoadingLive] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+
+  // Live real-time Firestore sync with onSnapshot & LocalStorage cache
+  useEffect(() => {
+    // 1. Try LocalStorage for immediate zero-latency load
+    const idToTry = userData?.id || userData?.nationalId;
+    const nidToTry = userData?.nationalId;
+    if (idToTry || nidToTry) {
+      const cacheKey1 = `portfolio_${role}_${idToTry}`;
+      const cacheKey2 = nidToTry ? `portfolio_${role}_${nidToTry}` : null;
+      const cached = localStorage.getItem(cacheKey1) || (cacheKey2 ? localStorage.getItem(cacheKey2) : null);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && Object.keys(parsed).length > 0) {
+            setLivePortfolioData(parsed);
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (portfolioData && Object.keys(portfolioData).length > 0) {
+      setLivePortfolioData(prev => ({ ...(prev || {}), ...portfolioData }));
+    }
+
+    if (!db) return;
+    if (!idToTry && !nidToTry) return;
+
+    setIsLoadingLive(true);
+    let unsubPrimary = null;
+    let unsubSecondary = null;
+
+    try {
+      if (idToTry) {
+        const docRef = doc(db, 'portfolios', `${role}_${idToTry}`);
+        unsubPrimary = onSnapshot(docRef, (snap) => {
+          if (snap.exists() && snap.data()?.portfolioData) {
+            setLivePortfolioData(snap.data().portfolioData);
+            setLastSyncTime(snap.data().updatedAt || new Date().toISOString());
+            setIsLoadingLive(false);
+          }
+        }, (err) => {
+          console.warn('Live portfolio snapshot error:', err);
+        });
+      }
+
+      if (nidToTry && nidToTry !== idToTry) {
+        const docRef2 = doc(db, 'portfolios', `${role}_${nidToTry}`);
+        unsubSecondary = onSnapshot(docRef2, (snap) => {
+          if (snap.exists() && snap.data()?.portfolioData) {
+            setLivePortfolioData(snap.data().portfolioData);
+            setLastSyncTime(snap.data().updatedAt || new Date().toISOString());
+            setIsLoadingLive(false);
+          }
+        });
+      }
+
+      // Also fallback initial fetch by nationalId query if not found
+      if (nidToTry) {
+        const q = query(collection(db, 'portfolios'), where('nationalId', '==', String(nidToTry).trim()));
+        getDocs(q).then((qSnap) => {
+          if (!qSnap.empty && qSnap.docs[0].data()?.portfolioData) {
+            setLivePortfolioData(qSnap.docs[0].data().portfolioData);
+            setLastSyncTime(qSnap.docs[0].data().updatedAt || new Date().toISOString());
+          }
+        }).catch(err => console.warn(err)).finally(() => setIsLoadingLive(false));
+      }
+    } catch (err) {
+      console.warn('Error setting up live portfolio listener:', err);
+      setIsLoadingLive(false);
+    }
+
+    return () => {
+      if (unsubPrimary) unsubPrimary();
+      if (unsubSecondary) unsubSecondary();
+    };
+  }, [role, userData, portfolioData]);
+
+  // Combined and fully merged portfolio data
+  const effectivePortfolioData = useMemo(() => {
+    const merged = {};
+    if (livePortfolioData && typeof livePortfolioData === 'object') {
+      Object.keys(livePortfolioData).forEach(domainKey => {
+        merged[domainKey] = { ...(livePortfolioData[domainKey] || {}) };
+      });
+    }
+    if (portfolioData && typeof portfolioData === 'object') {
+      Object.keys(portfolioData).forEach(domainKey => {
+        merged[domainKey] = {
+          ...(merged[domainKey] || {}),
+          ...(portfolioData[domainKey] || {})
+        };
+      });
+    }
+    return merged;
+  }, [livePortfolioData, portfolioData]);
+
   const [customSchoolName, setCustomSchoolName] = useState(
     schoolName || userData?.schoolName || 'المجمع التعليمي'
   );
   const [academicYear, setAcademicYear] = useState('1447 - 1448 هـ');
-  const [personName, setPersonName] = useState(userData?.name || portfolioData?.profile?.fullName || 'عضو الكادر التعليمي');
+  const [personName, setPersonName] = useState(
+    userData?.name || 
+    portfolioData?.profile?.fullName || 
+    livePortfolioData?.profile?.fullName || 
+    'عضو الكادر التعليمي'
+  );
   const [principalName, setPrincipalName] = useState(userData?.principalName || 'إدارة المدرسة');
   const [supervisorName, setSupervisorName] = useState('المشرف التربوي المعتمد');
   const [activeTab, setActiveTab] = useState('preview'); // 'preview' | 'settings'
+
+  // Update name if loaded asynchronously
+  useEffect(() => {
+    const loadedName = effectivePortfolioData?.profile?.fullName || userData?.name;
+    if (loadedName && (!personName || personName === 'عضو الكادر التعليمي')) {
+      setPersonName(loadedName);
+    }
+  }, [effectivePortfolioData, userData, personName]);
 
   const [includeSignatures, setIncludeSignatures] = useState(true);
   const [includeBadges, setIncludeBadges] = useState(true);
@@ -220,9 +338,24 @@ export default function PrintPortfolioModal({
                 <Award size={24} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', color: '#f8fafc' }}>
-                  طباعة وتصدير ملف الإنجاز الإلكتروني الشامل
-                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', color: '#f8fafc' }}>
+                    طباعة وتصدير ملف الإنجاز الإلكتروني الشامل
+                  </h3>
+                  <span style={{ 
+                    background: '#059669', 
+                    color: '#ecfdf5', 
+                    padding: '2px 8px', 
+                    borderRadius: '8px', 
+                    fontSize: '0.72rem', 
+                    fontWeight: 'bold', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px' 
+                  }}>
+                    <Zap size={12} /> متصل لحظياً
+                  </span>
+                </div>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>
                   وثيقة إنجاز رسمية موثقة وفق المعايير العالمية وهيئة تقويم التعليم والتدريب (ETEC)
                 </p>
@@ -531,12 +664,33 @@ export default function PrintPortfolioModal({
                 {/* Domain Items */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {domain.items.map((item) => {
-                    const savedVal = portfolioData?.[domain.id]?.[item.key];
-                    const val = savedVal !== undefined ? savedVal : item.defaultValue;
+                    const domainObj = effectivePortfolioData?.[domain.id] || {};
+                    const savedVal = domainObj[item.key];
+                    
+                    let val = savedVal;
+                    if (val === undefined || val === null || val === '') {
+                      if (item.key === 'fullName') {
+                        val = userData?.name || personName || '';
+                      } else if (item.key === 'nationalId') {
+                        val = userData?.nationalId || '';
+                      } else if (item.key === 'schoolName') {
+                        val = customSchoolName || userData?.schoolName || 'المجمع التعليمي';
+                      } else if (item.key === 'specialty' && (userData?.subject || userData?.specialty)) {
+                        val = userData.subject || userData.specialty;
+                      } else if (item.key === 'class' && (userData?.className || userData?.class)) {
+                        val = userData.className || userData.class;
+                      } else if (item.key === 'roleTitle' && userData?.roleTitle) {
+                        val = userData.roleTitle;
+                      } else {
+                        val = item.defaultValue || '';
+                      }
+                    }
 
                     if (item.type === 'table') {
                       if (!includeTables) return null;
-                      const rows = Array.isArray(savedVal) ? savedVal : item.defaultRows;
+                      const rows = (Array.isArray(savedVal) && savedVal.length > 0) 
+                        ? savedVal 
+                        : (Array.isArray(item.defaultRows) ? item.defaultRows : []);
                       return (
                         <div key={item.key} style={{ marginTop: '4px' }}>
                           <strong style={{ fontSize: '0.85rem', color: '#1e293b', display: 'block', marginBottom: '6px' }}>
@@ -568,7 +722,9 @@ export default function PrintPortfolioModal({
 
                     if (item.type === 'badges') {
                       if (!includeBadges) return null;
-                      const badges = Array.isArray(savedVal) ? savedVal : item.defaultBadges;
+                      const badges = (Array.isArray(savedVal) && savedVal.length > 0) 
+                        ? savedVal 
+                        : (Array.isArray(item.defaultBadges) ? item.defaultBadges : []);
                       return (
                         <div key={item.key} style={{ marginTop: '4px' }}>
                           <strong style={{ fontSize: '0.85rem', color: '#1e293b', display: 'block', marginBottom: '6px' }}>
