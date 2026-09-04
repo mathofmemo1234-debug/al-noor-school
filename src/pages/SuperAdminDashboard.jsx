@@ -1387,12 +1387,12 @@ function SuperAdminHome() {
               <Building2 size={56} color="#0e7490" style={{ margin: '0 auto 12px' }} />
               <h3 style={{ margin: '0 0 6px', color: '#0f172a', fontWeight: 800, fontSize: '18px' }}>لا توجد مجمعات مسجلة حالياً</h3>
               <p style={{ margin: '0 0 20px', color: '#64748b', fontSize: '14px', maxWidth: '520px', marginInline: 'auto' }}>
-                يمكنك بنقرة زر واحدة استعادة كافة مجمعات وفروع <strong>شركة المدارس المتقدمة</strong> المعتمدة (43 مجمع تعليمي معتمد) مع عناوينها الفرعية ومساراتها التعليمية ومدنها.
+                يمكنك بنقرة زر واحدة استعادة كافة مجمعات وفروع <strong>مدارس النور الأهلية</strong> المعتمدة مع عناوينها الفرعية ومساراتها التعليمية ومدنها.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <button 
                   className="btn"
-                  onClick={handleSeedAllAdvancedSchools}
+                  onClick={handleSeedAllAlNoorSchools}
                   disabled={isSeedingSchools}
                   style={{
                     background: 'linear-gradient(135deg, #0e7490, #0284c7)',
@@ -1410,7 +1410,7 @@ function SuperAdminHome() {
                   }}
                 >
                   {isSeedingSchools ? <RefreshCw size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                  <span>{isSeedingSchools ? 'جاري الاستعادة...' : 'استعادة كافة مجمعات شركة المدارس المتقدمة فوراً (43 مجمع)'}</span>
+                  <span>{isSeedingSchools ? 'جاري الاستعادة...' : 'استعادة كافة مجمعات وفروع مدارس النور فوراً'}</span>
                 </button>
                 <button className="btn btn-secondary" onClick={() => setShowAddSchoolModal(true)} style={{ padding: '10px 18px', fontSize: '14px' }}>
                   <Plus size={16} /> إضافة مجمع يدوياً
@@ -1920,7 +1920,7 @@ function SuperAdminHome() {
                 <input
                   type="text"
                   className="input-field"
-                  placeholder="مثال: مدارس المتقدمة للتعلم الذكي"
+                  placeholder="مثال: مدارس النور للتعلم الذكي"
                   value={schoolName}
                   onChange={(e) => setSchoolName(e.target.value)}
                   required
@@ -1963,7 +1963,7 @@ function SuperAdminHome() {
                   <input
                     type="text"
                     className="input-field"
-                    placeholder="مثال: msc_jed_smart"
+                    placeholder="مثال: alnoor_jed_smart"
                     value={schoolCode}
                     onChange={(e) => setSchoolCode(e.target.value)}
                     dir="ltr"
@@ -2280,7 +2280,7 @@ function SuperAdminHome() {
                 <input
                   type="text"
                   className="input-field"
-                  placeholder="مثال: الإشراف العام - شركة المدارس المتقدمة"
+                  placeholder="مثال: الإشراف العام - مدارس النور"
                   value={superAdminName}
                   onChange={(e) => setSuperAdminName(e.target.value)}
                   required

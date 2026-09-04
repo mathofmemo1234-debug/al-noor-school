@@ -479,15 +479,15 @@ export default function Login() {
           <div className="login-header">
             <div className="logo-container" style={{ width: '100px', height: '100px', background: 'transparent', boxShadow: 'none' }}>
               <img 
-                src={`${import.meta.env.BASE_URL}logo.webp`} 
-                alt="شعار المدارس" 
+                src={`${import.meta.env.BASE_URL}logo.svg`} 
+                alt="شعار مدارس النور الأهلية" 
                 width="100"
                 height="100"
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.src = `${import.meta.env.BASE_URL}default_logo.png`;
                 }}
-                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} 
+                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%', filter: 'drop-shadow(0 4px 12px rgba(14, 116, 144, 0.25))' }} 
               />
             </div>
             <h1>{t('login.title')}</h1>

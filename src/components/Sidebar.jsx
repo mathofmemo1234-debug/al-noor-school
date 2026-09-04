@@ -144,7 +144,7 @@ export default function Sidebar({ role }) {
                 role === 'teacher' ? teacherLinks : 
                 role === 'parent' ? parentLinks : studentLinks;
   
-  const logoSrc = userData?.logoUrl || `${import.meta.env.BASE_URL}logo.webp`;
+  const logoSrc = userData?.logoUrl || `${import.meta.env.BASE_URL}logo.svg`;
 
   return (
     <div className="sidebar">

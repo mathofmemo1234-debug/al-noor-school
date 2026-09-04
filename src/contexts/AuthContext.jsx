@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { auth, db } from '../firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -10,10 +10,29 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole] = useState(null);
-  const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Synchronous initial restore from localStorage to avoid flashing or unauth bouncing
+  const initialCachedRole = localStorage.getItem('alnoor_userRole');
+  const initialCachedData = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('alnoor_userData') || 'null');
+    } catch {
+      return null;
+    }
+  })();
+
+  const [currentUser, setCurrentUser] = useState(() => {
+    if (initialCachedData) {
+      return {
+        email: initialCachedData.email || 'user@school.local',
+        uid: initialCachedData.uid || initialCachedData.id || 'session_user',
+        displayName: initialCachedData.name || 'مستخدم'
+      };
+    }
+    return null;
+  });
+  const [userRole, setUserRole] = useState(initialCachedRole || null);
+  const [userData, setUserData] = useState(initialCachedData || null);
+  const [loading, setLoading] = useState(false);
   const initializedRef = useRef(false);
 
   const resolveRole = useCallback(async (user, roleHint) => {
@@ -28,9 +47,11 @@ export function AuthProvider({ children }) {
       if (isSuperEmail) {
         const superData = { 
           name: 'حساب الماستر العام - مدارس النور', 
+          email: user.email || 'super@admin.com',
           role: 'superadmin', 
           schoolId: 'ALL', 
-          schoolName: 'جميع المدارس (الماستر العام)' 
+          schoolName: 'جميع المدارس (الماستر العام)',
+          schoolSubTitle: ''
         };
         setUserRole('superadmin');
         setUserData(superData);
@@ -39,59 +60,81 @@ export function AuthProvider({ children }) {
         return superData;
       }
 
-      const nid = user.email.replace('@school.local', '');
+      const nid = user.email ? user.email.replace('@school.local', '').trim() : '';
+      const isNum = !isNaN(nid) && nid !== '';
+      const numNid = isNum ? Number(nid) : null;
+      const email = user.email ? user.email.toLowerCase() : '';
+
+      const queryCollectionFast = async (collName, defaultRole) => {
+        try {
+          const promises = [
+            getDocs(query(collection(db, collName), where('nationalId', '==', nid))),
+            getDocs(query(collection(db, collName), where('email', '==', user.email))),
+            getDocs(query(collection(db, collName), where('email', '==', email)))
+          ];
+          if (numNid !== null) {
+            promises.push(getDocs(query(collection(db, collName), where('nationalId', '==', numNid))));
+          }
+          if (user.uid) {
+            promises.push(getDocs(query(collection(db, collName), where('uid', '==', user.uid))));
+          }
+          const snapshots = await Promise.all(promises);
+          for (const s of snapshots) {
+            if (!s.empty) {
+              const d = s.docs[0].data();
+              return { ...d, id: s.docs[0].id, role: defaultRole || d.role || collName, nationalId: String(d.nationalId || nid), email: user.email };
+            }
+          }
+        } catch (e) {
+          console.warn(`Query ${collName} failed in resolveRole:`, e);
+        }
+        return null;
+      };
+
+      const [tData, sData, stData, spData, pData, uData] = await Promise.all([
+        queryCollectionFast('teachers', 'teacher'),
+        queryCollectionFast('students', 'student'),
+        queryCollectionFast('staff', 'staff'),
+        queryCollectionFast('supervisors', 'supervisor'),
+        queryCollectionFast('parents', 'parent'),
+        queryCollectionFast('users', null)
+      ]);
+
+      const candidates = [
+        tData && { data: tData, role: 'teacher' },
+        sData && { data: sData, role: 'student' },
+        stData && { data: stData, role: 'staff' },
+        spData && { data: spData, role: 'supervisor' },
+        pData && { data: pData, role: 'parent' },
+        uData && { data: uData, role: uData.role || 'admin' }
+      ].filter(Boolean);
+
       let data = null;
-
-      let q = query(collection(db, 'users'), where('email', '==', user.email));
-      let snap = await getDocs(q);
-      if (snap.empty && user.uid) { q = query(collection(db, 'users'), where('uid', '==', user.uid)); snap = await getDocs(q); }
-      if (snap.empty && nid) {
-        q = query(collection(db, 'users'), where('nationalId', '==', nid)); snap = await getDocs(q);
-        if (snap.empty && !isNaN(nid)) { q = query(collection(db, 'users'), where('nationalId', '==', Number(nid))); snap = await getDocs(q); }
-      }
-      if (!snap.empty) {
-        const allDocs = snap.docs.map(d => d.data());
-        data = (allDocs.length > 1 && roleHint) ? (allDocs.find(d => d.role === roleHint) || allDocs[0]) : allDocs[0];
-      }
-
-      if (!data && (!roleHint || roleHint === 'teacher')) {
-        let tQ = query(collection(db, 'teachers'), where('nationalId', '==', nid)); let tS = await getDocs(tQ);
-        if (tS.empty && !isNaN(nid)) { tQ = query(collection(db, 'teachers'), where('nationalId', '==', Number(nid))); tS = await getDocs(tQ); }
-        if (tS.empty) { tQ = query(collection(db, 'teachers'), where('email', '==', user.email)); tS = await getDocs(tQ); }
-        if (!tS.empty) { const d = tS.docs[0].data(); data = { ...d, role: 'teacher', email: user.email, nationalId: String(d.nationalId || nid) }; try { await addDoc(collection(db, 'users'), { nationalId: String(d.nationalId||nid), email: user.email, role: 'teacher', name: d.name||'معلم', subject: d.subject||'', schoolId: d.schoolId||'default_school_1' }); } catch(e){} }
-      }
-      if (!data && (!roleHint || roleHint === 'staff')) {
-        let sQ = query(collection(db, 'staff'), where('nationalId', '==', nid)); let sS = await getDocs(sQ);
-        if (sS.empty && !isNaN(nid)) { sQ = query(collection(db, 'staff'), where('nationalId', '==', Number(nid))); sS = await getDocs(sQ); }
-        if (sS.empty) { sQ = query(collection(db, 'staff'), where('email', '==', user.email)); sS = await getDocs(sQ); }
-        if (!sS.empty) { const d = sS.docs[0].data(); data = { ...d, role: 'staff', email: user.email, nationalId: String(d.nationalId || nid) }; try { await addDoc(collection(db, 'users'), { nationalId: String(d.nationalId||nid), email: user.email, role: 'staff', name: d.name||'عضو كادر', roleTitle: d.roleTitle||'', permissions: d.permissions||[], schoolId: d.schoolId||'default_school_1' }); } catch(e){} }
-      }
-      if (!data && (!roleHint || roleHint === 'supervisor')) {
-        let spQ = query(collection(db, 'supervisors'), where('nationalId', '==', nid)); let spS = await getDocs(spQ);
-        if (spS.empty && !isNaN(nid)) { spQ = query(collection(db, 'supervisors'), where('nationalId', '==', Number(nid))); spS = await getDocs(spQ); }
-        if (spS.empty) { spQ = query(collection(db, 'supervisors'), where('email', '==', user.email)); spS = await getDocs(spQ); }
-        if (!spS.empty) { const d = spS.docs[0].data(); data = { ...d, role: 'supervisor', email: user.email, nationalId: String(d.nationalId || nid) }; try { await addDoc(collection(db, 'users'), { nationalId: String(d.nationalId||nid), email: user.email, role: 'supervisor', name: d.name||'مشرف تعليمي', specialty: d.specialty||'', schoolId: d.schoolId||'default_school_1' }); } catch(e){} }
-      }
-      if (!data && (!roleHint || roleHint === 'student')) {
-        let stQ = query(collection(db, 'students'), where('nationalId', '==', nid)); let stS = await getDocs(stQ);
-        if (stS.empty && !isNaN(nid)) { stQ = query(collection(db, 'students'), where('nationalId', '==', Number(nid))); stS = await getDocs(stQ); }
-        if (stS.empty) { stQ = query(collection(db, 'students'), where('email', '==', user.email)); stS = await getDocs(stQ); }
-        if (!stS.empty) { const d = stS.docs[0].data(); data = { ...d, role: 'student', email: user.email, nationalId: String(d.nationalId || nid) }; try { await addDoc(collection(db, 'users'), { nationalId: String(d.nationalId||nid), email: user.email, role: 'student', name: d.name||'طالب', class: d.class||d.className||'', schoolId: d.schoolId||'default_school_1' }); } catch(e){} }
-      }
-      if (!data && (!roleHint || roleHint === 'parent')) {
-        let pQ = query(collection(db, 'parents'), where('email', '==', user.email)); let pS = await getDocs(pQ);
-        if (pS.empty && user.uid) { pQ = query(collection(db, 'parents'), where('uid', '==', user.uid)); pS = await getDocs(pQ); }
-        if (pS.empty && nid) { pQ = query(collection(db, 'parents'), where('nationalId', '==', nid)); pS = await getDocs(pQ); if (pS.empty && !isNaN(nid)) { pQ = query(collection(db, 'parents'), where('nationalId', '==', Number(nid))); pS = await getDocs(pQ); } }
-        if (!pS.empty) { const d = pS.docs[0].data(); data = { ...d, role: 'parent', email: user.email, uid: user.uid, nationalId: String(d.nationalId || nid) }; try { await addDoc(collection(db, 'users'), { uid: user.uid, email: user.email, role: 'parent', nationalId: String(d.nationalId||nid), name: d.name||user.displayName||'ولي أمر', studentNationalId: d.studentNationalId||'', studentName: d.studentName||'', studentClass: d.studentClass||'', schoolId: d.schoolId||'default_school_1' }); } catch(e){} }
+      if (candidates.length > 0) {
+        if (roleHint) {
+          const matched = candidates.find(c => c.role === roleHint || (roleHint === 'staff' && (c.role === 'staff' || c.role === 'supervisor')));
+          data = matched ? matched.data : candidates[0].data;
+        } else {
+          data = candidates[0].data;
+        }
       }
 
       if (data) {
-        if (data.role==='teacher'){try{const tQ=query(collection(db,'teachers'),where('nationalId','==',nid));const tS=await getDocs(tQ);if(!tS.empty){const td=tS.docs[0].data();data.subject=td.subject||data.subject||'';if(td.name)data.name=td.name;}}catch(e){}}
-        if (data.role==='staff'){try{const sfQ=query(collection(db,'staff'),where('nationalId','==',nid));const sfS=await getDocs(sfQ);if(!sfS.empty){const sfd=sfS.docs[0].data();data.roleTitle=sfd.roleTitle||data.roleTitle||'';data.permissions=sfd.permissions||data.permissions||[];if(sfd.name)data.name=sfd.name;}}catch(e){}}
-        if (data.role==='student'){try{const stQ=query(collection(db,'students'),where('nationalId','==',nid));const stS=await getDocs(stQ);if(!stS.empty){const std=stS.docs[0].data();data.class=std.class||std.className||data.class||'';if(std.name)data.name=std.name;}}catch(e){}}
-        if (data.role==='supervisor'){try{const spQ=query(collection(db,'supervisors'),where('nationalId','==',nid));const spS=await getDocs(spQ);if(!spS.empty){const spd=spS.docs[0].data();data.specialty=spd.specialty||data.specialty||'';if(spd.name)data.name=spd.name;}}catch(e){}}
-        if (data.role==='superadmin'){data.schoolId = data.schoolId || 'ALL'; data.schoolName = data.schoolName || 'جميع المدارس (الماستر العام)'; if(!data.name) data.name='حساب الماستر العام - مدارس النور';}
-        if (data.schoolId && data.schoolId!=='ALL'){try{const sd=await getDoc(doc(db,'schools',data.schoolId));if(sd.exists()){data.schoolName=sd.data().name;data.logoUrl=sd.data().logoUrl||null;}}catch(e){}}
+        if (data.role === 'superadmin') {
+          data.schoolId = data.schoolId || 'ALL';
+          data.schoolName = data.schoolName || 'جميع المدارس (الماستر العام)';
+          if (!data.name) data.name = 'حساب الماستر العام - مدارس النور';
+        }
+        if (data.schoolId && data.schoolId !== 'ALL' && !data.schoolName) {
+          try {
+            const sd = await getDoc(doc(db, 'schools', data.schoolId));
+            if (sd.exists()) {
+              data.schoolName = sd.data().name;
+              data.schoolSubTitle = sd.data().subTitle || '';
+              data.logoUrl = sd.data().logoUrl || null;
+            }
+          } catch (e) {}
+        }
         setUserRole(data.role);
         setUserData(data);
         localStorage.setItem('alnoor_userRole', data.role);
@@ -107,31 +150,79 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
       if (user) {
-        if (!initializedRef.current) {
-          initializedRef.current = true;
-          const cachedRole = localStorage.getItem('alnoor_userRole');
-          const cachedData = (() => { try { return JSON.parse(localStorage.getItem('alnoor_userData') || 'null'); } catch { return null; } })();
-          if (cachedRole && cachedData) {
-            setUserRole(cachedRole);
-            setUserData(cachedData);
-            setLoading(false);
-            resolveRole(user, cachedRole);
-          } else {
-            const result = await resolveRole(user, null);
-            if (!result) { setUserRole(null); setUserData(null); }
-            setLoading(false);
-          }
-        } else {
+        if (
+          user.email === 'super@admin.com' ||
+          user.email?.startsWith('master_') ||
+          user.email?.includes('superadmin') ||
+          user.email === 'master@school.local'
+        ) {
+          const superData = { 
+            name: 'حساب الماستر العام - مدارس النور', 
+            email: user.email || 'super@admin.com', 
+            role: 'superadmin', 
+            schoolId: 'ALL', 
+            schoolName: 'جميع المدارس (الماستر العام)',
+            schoolSubTitle: ''
+          };
+          setCurrentUser(user);
+          setUserRole('superadmin');
+          setUserData(superData);
+          localStorage.setItem('alnoor_userRole', 'superadmin');
+          localStorage.setItem('alnoor_userData', JSON.stringify(superData));
           setLoading(false);
+          return;
         }
+
+        const cachedRole = localStorage.getItem('alnoor_userRole');
+        const result = await resolveRole(user, cachedRole);
+        if (result && !result.isBlocked && result.status !== 'inactive' && !result.isArchived) {
+          setCurrentUser(user);
+          setUserRole(result.role);
+          setUserData(result);
+          localStorage.setItem('alnoor_userRole', result.role);
+          localStorage.setItem('alnoor_userData', JSON.stringify(result));
+        } else if (cachedRole !== 'superadmin') {
+          const cachedUserData = (() => {
+            try {
+              return JSON.parse(localStorage.getItem('alnoor_userData') || 'null');
+            } catch {
+              return null;
+            }
+          })();
+          if (cachedUserData?.role !== 'superadmin') {
+            localStorage.removeItem('alnoor_userRole');
+            localStorage.removeItem('alnoor_userData');
+            setCurrentUser(null);
+            setUserRole(null);
+            setUserData(null);
+            signOut(auth).catch(() => {});
+          }
+        }
+        setLoading(false);
       } else {
-        setCurrentUser(null);
-        setUserRole(null);
-        setUserData(null);
-        localStorage.removeItem('alnoor_userRole');
-        localStorage.removeItem('alnoor_userData');
+        const cachedRole = localStorage.getItem('alnoor_userRole');
+        const cachedData = (() => {
+          try {
+            return JSON.parse(localStorage.getItem('alnoor_userData') || 'null');
+          } catch {
+            return null;
+          }
+        })();
+
+        if (cachedRole && cachedData) {
+          setCurrentUser({
+            email: cachedData.email || 'user@school.local',
+            uid: cachedData.uid || cachedData.id || 'session_user',
+            displayName: cachedData.name || 'مستخدم'
+          });
+          setUserRole(cachedRole);
+          setUserData(cachedData);
+        } else {
+          setCurrentUser(null);
+          setUserRole(null);
+          setUserData(null);
+        }
         initializedRef.current = false;
         setLoading(false);
       }
@@ -139,28 +230,98 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, [resolveRole]);
 
-  const switchSchoolContext = useCallback(async (newSchoolId, newSchoolName, newLogoUrl) => {
+  const logout = useCallback(async () => {
+    try {
+      localStorage.removeItem('alnoor_userRole');
+      localStorage.removeItem('alnoor_userData');
+      setCurrentUser(null);
+      setUserRole(null);
+      setUserData(null);
+      initializedRef.current = false;
+      await signOut(auth);
+    } catch (e) {
+      console.warn('Error in logout:', e);
+      localStorage.removeItem('alnoor_userRole');
+      localStorage.removeItem('alnoor_userData');
+      setCurrentUser(null);
+      setUserRole(null);
+      setUserData(null);
+    }
+  }, []);
+
+  const loginAsSuperAdmin = useCallback((customData) => {
+    const superData = {
+      name: customData?.name || 'حساب الماستر العام - مدارس النور',
+      email: customData?.email || 'super@admin.com',
+      role: 'superadmin',
+      schoolId: 'ALL',
+      schoolName: 'جميع المدارس (الماستر العام)',
+      schoolSubTitle: ''
+    };
+    setCurrentUser({
+      email: superData.email,
+      uid: 'superadmin_master',
+      displayName: superData.name
+    });
+    setUserRole('superadmin');
+    setUserData(superData);
+    localStorage.setItem('alnoor_userRole', 'superadmin');
+    localStorage.setItem('alnoor_userData', JSON.stringify(superData));
+  }, []);
+
+  const loginWithUserData = useCallback((data, explicitRole) => {
+    const finalRole = explicitRole || data?.role || 'student';
+    const userObj = {
+      email: data.email || (data.nationalId ? `${data.nationalId}@school.local` : 'user@school.local'),
+      uid: data.uid || data.id || `user_${data.nationalId || Date.now()}`,
+      displayName: data.name || 'مستخدم'
+    };
+    setCurrentUser(userObj);
+    setUserRole(finalRole);
+    const enrichedData = { ...data, role: finalRole };
+    setUserData(enrichedData);
+    localStorage.setItem('alnoor_userRole', finalRole);
+    localStorage.setItem('alnoor_userData', JSON.stringify(enrichedData));
+  }, []);
+
+  const switchSchoolContext = useCallback(async (newSchoolId, newSchoolName, newLogoUrl, newSubTitle) => {
     if (userRole !== 'superadmin' && userData?.role !== 'superadmin') return;
     
     if (newSchoolId === 'ALL' || !newSchoolId) {
-      const updated = { ...userData, schoolId: 'ALL', schoolName: 'جميع المدارس (الماستر العام)', logoUrl: null, activePreviewSchoolId: null };
+      const updated = { 
+        ...userData, 
+        schoolId: 'ALL', 
+        schoolName: 'جميع المدارس (الماستر العام)', 
+        schoolSubTitle: '', 
+        logoUrl: null, 
+        activePreviewSchoolId: null 
+      };
       setUserData(updated);
       localStorage.setItem('alnoor_userData', JSON.stringify(updated));
     } else {
       let sName = newSchoolName;
       let sLogo = newLogoUrl;
-      if (!sName) {
+      let sSubTitle = newSubTitle || '';
+      if (!sName || !sSubTitle) {
         try {
           const sd = await getDoc(doc(db, 'schools', newSchoolId));
           if (sd.exists()) {
-            sName = sd.data().name;
-            sLogo = sd.data().logoUrl || null;
+            if (!sName) sName = sd.data().name;
+            if (!sLogo) sLogo = sd.data().logoUrl || null;
+            if (!sSubTitle) sSubTitle = sd.data().subTitle || '';
           }
         } catch (e) {
           console.warn('Error fetching school data in switchSchoolContext:', e);
         }
       }
-      const updated = { ...userData, schoolId: newSchoolId, schoolName: sName || 'المدرسة المحددة', logoUrl: sLogo || null, activePreviewSchoolId: newSchoolId };
+      const updated = { 
+        ...userData, 
+        schoolId: newSchoolId, 
+        schoolName: sName || 'المدرسة المحددة', 
+        schoolSubTitle: sSubTitle, 
+        logoUrl: sLogo || null, 
+        activePreviewSchoolId: newSchoolId 
+      };
       setUserData(updated);
       localStorage.setItem('alnoor_userData', JSON.stringify(updated));
     }
@@ -179,7 +340,17 @@ export function AuthProvider({ children }) {
     }
   })();
 
-  const value = { currentUser, userRole, userData, loading, setLoginRole, switchSchoolContext };
+  const value = { 
+    currentUser, 
+    userRole, 
+    userData, 
+    loading, 
+    setLoginRole, 
+    switchSchoolContext, 
+    loginAsSuperAdmin, 
+    loginWithUserData, 
+    logout 
+  };
 
   return (
     <AuthContext.Provider value={value}>
